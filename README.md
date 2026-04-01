@@ -1,16 +1,40 @@
-# React + Vite
+# Stokvel Management System
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Split-stack app: React (Vite) frontend and Node.js (Express) backend.
 
-Currently, two official plugins are available:
+## Prerequisites
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Node.js 18+ recommended
+- npm
 
-## React Compiler
+## Backend (Express)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+From the repository root:
 
-## Expanding the ESLint configuration
+```bash
+cd backend
+npm install
+npm run dev
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+The API listens on **http://localhost:5000** (override with the `PORT` environment variable). On some Macs, AirPlay Receiver uses port 5000; turn it off in System Settings → AirDrop & Handoff if the server fails to bind. If you change `PORT`, update the `proxy.target` in `frontend/vite.config.js` to match.
+
+For production-style runs:
+
+```bash
+npm start
+```
+
+## Frontend (Vite + React)
+
+In a separate terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The dev server prints the local URL (typically **http://localhost:5173**). Requests to `/api/*` are proxied to the backend on port 5000.
+
+Run both servers together during development so the frontend can reach the API.
