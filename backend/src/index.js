@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
+import { requireAuth } from './middleware/auth.js'
 
 const app = express()
 const PORT = Number(process.env.PORT) || 5000
@@ -10,6 +11,21 @@ app.use(express.json())
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'Stokvel API' })
+})
+
+app.get('/api/me', requireAuth, (req, res) => {
+  try {
+    res.json({
+      success: true,
+      user: {
+        id: req.user.id,
+        email: req.user.email,
+      },
+    })
+  } catch (err) {
+    console.error('Route Error:', err)
+    res.status(500).json({ error: 'Internal Server Error' })
+  }
 })
 
 app.listen(PORT, () => {
