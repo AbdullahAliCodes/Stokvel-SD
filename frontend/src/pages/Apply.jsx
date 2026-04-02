@@ -1,7 +1,54 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useSession } from '../context/SessionContext'
 
 export default function Apply() {
-  const [payoutMode, setPayoutMode] = useState('randomize')
+  const navigate = useNavigate()
+  const { session } = useSession()
+
+  const [name, setName] = useState('')
+  const [amount, setAmount] = useState('250')
+  const [payoutOrder, setPayoutOrder] = useState('randomize')
+  const [meetingFreq, setMeetingFreq] = useState('bi-weekly')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
+
+    if (!session?.access_token) {
+      setError('You must be signed in to create a stokvel.')
+      setLoading(false)
+      return
+    }
+
+    try {
+      const res = await fetch('/api/stokvels', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          name,
+          contributionAmount: amount,
+          payoutOrder,
+          meetingFrequency: meetingFreq,
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to create Stokvel')
+
+      navigate('/dashboard')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="mx-auto max-w-2xl text-black">
@@ -9,7 +56,7 @@ export default function Apply() {
         Stokvel application
       </h1>
 
-      <form className="space-y-10" onSubmit={(e) => e.preventDefault()}>
+      <form className="space-y-10" onSubmit={handleSubmit}>
         <section>
           <h2 className="mb-4 text-lg font-semibold">Personal info</h2>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -46,6 +93,9 @@ export default function Apply() {
               <input
                 className="border border-black bg-white p-2"
                 placeholder="Avoille Stokvel"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
               />
             </label>
             <label className="flex flex-col gap-1 text-sm">
@@ -102,6 +152,8 @@ export default function Apply() {
               type="number"
               className="max-w-xs border border-black bg-white p-2"
               placeholder="500"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
             />
           </label>
         </section>
@@ -113,8 +165,8 @@ export default function Apply() {
               <input
                 type="radio"
                 name="payout"
-                checked={payoutMode === 'randomize'}
-                onChange={() => setPayoutMode('randomize')}
+                checked={payoutOrder === 'randomize'}
+                onChange={() => setPayoutOrder('randomize')}
               />
               Randomize
             </label>
@@ -122,8 +174,8 @@ export default function Apply() {
               <input
                 type="radio"
                 name="payout"
-                checked={payoutMode === 'select'}
-                onChange={() => setPayoutMode('select')}
+                checked={payoutOrder === 'manual'}
+                onChange={() => setPayoutOrder('manual')}
               />
               Select manually
             </label>
@@ -132,18 +184,25 @@ export default function Apply() {
 
         <section>
           <h2 className="mb-4 text-lg font-semibold">Meeting freq</h2>
-          <select className="max-w-xs border border-black bg-white p-2 text-sm">
-            <option>Weekly</option>
-            <option>Bi-weekly</option>
-            <option>Monthly</option>
+          <select
+            className="max-w-xs border border-black bg-white p-2 text-sm"
+            value={meetingFreq}
+            onChange={(e) => setMeetingFreq(e.target.value)}
+          >
+            <option value="weekly">Weekly</option>
+            <option value="bi-weekly">Bi-weekly</option>
+            <option value="monthly">Monthly</option>
           </select>
         </section>
 
+        {error ? <p className="mb-4 text-red-600">{error}</p> : null}
+
         <button
           type="submit"
-          className="w-full border-2 border-black bg-black py-4 text-center text-lg font-bold tracking-wide text-white hover:bg-gray-900"
+          disabled={loading}
+          className="w-full border-2 border-black bg-black py-4 text-center text-lg font-bold tracking-wide text-white hover:bg-gray-900 disabled:opacity-60"
         >
-          SUBMIT
+          {loading ? 'Submitting...' : 'SUBMIT'}
         </button>
       </form>
     </div>

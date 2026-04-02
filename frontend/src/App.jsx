@@ -18,7 +18,9 @@ import Apply from './pages/Apply'
 import AdminDashboard from './pages/AdminDashboard'
 import AdminPlaceholder from './pages/AdminPlaceholder'
 import StokvelDashboard from './pages/StokvelDashboard'
+import SingleStokvel from './pages/SingleStokvel'
 import Meetings from './pages/Meetings'
+import MeetingDetails from './pages/MeetingDetails'
 import MyPayout from './pages/MyPayout'
 import Support from './pages/Support'
 
@@ -99,6 +101,8 @@ export default function App() {
           <Route element={<RequireAuth session={session} />}>
             <Route element={<DashboardLayout />}>
               <Route path="/dashboard" element={<StokvelDashboard />} />
+              <Route path="/stokvels/:id" element={<SingleStokvel />} />
+              <Route path="/meetings/:id" element={<MeetingDetails />} />
               <Route path="/meetings" element={<Meetings />} />
               <Route path="/apply" element={<Apply />} />
               <Route path="/my-payout" element={<MyPayout />} />
