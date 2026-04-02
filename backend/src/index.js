@@ -20,6 +20,7 @@ app.get('/api/me', requireAuth, (req, res) => {
       user: {
         id: req.user.id,
         email: req.user.email,
+        role: req.user.role,
       },
     })
   } catch (err) {

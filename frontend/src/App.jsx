@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   BrowserRouter,
   Routes,
@@ -6,8 +6,9 @@ import {
   Navigate,
 } from 'react-router-dom'
 import { supabase } from './utils/supabase'
-import { SessionContext } from './context/SessionContext'
+import { SessionProvider } from './context/SessionContext'
 import RequireAuth from './components/RequireAuth'
+import RequireAdmin from './components/RequireAdmin'
 import Auth from './components/Auth'
 import PublicLayout from './layouts/PublicLayout'
 import DashboardLayout from './layouts/DashboardLayout'
@@ -64,16 +65,6 @@ export default function App() {
     }
   }, [session])
 
-  const sessionContextValue = useMemo(
-    () => ({
-      session,
-      backendData,
-      setBackendData,
-      testBackendConnection,
-    }),
-    [session, backendData, testBackendConnection],
-  )
-
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-white text-black">
@@ -83,7 +74,12 @@ export default function App() {
   }
 
   return (
-    <SessionContext.Provider value={sessionContextValue}>
+    <SessionProvider
+      session={session}
+      backendData={backendData}
+      setBackendData={setBackendData}
+      testBackendConnection={testBackendConnection}
+    >
       <BrowserRouter>
         <Routes>
           <Route element={<PublicLayout />}>
@@ -109,30 +105,32 @@ export default function App() {
               <Route path="/support" element={<Support />} />
             </Route>
 
-            <Route path="/admin" element={<AdminLayout />}>
-              <Route index element={<AdminDashboard />} />
-              <Route
-                path="groups"
-                element={<AdminPlaceholder title="Active Groups" />}
-              />
-              <Route
-                path="tickets"
-                element={<AdminPlaceholder title="Issue Tickets" />}
-              />
-              <Route
-                path="reports"
-                element={<AdminPlaceholder title="Reports" />}
-              />
-              <Route
-                path="create-group"
-                element={<AdminPlaceholder title="Create Group" />}
-              />
+            <Route element={<RequireAdmin />}>
+              <Route path="/admin" element={<AdminLayout />}>
+                <Route index element={<AdminDashboard />} />
+                <Route
+                  path="groups"
+                  element={<AdminPlaceholder title="Active Groups" />}
+                />
+                <Route
+                  path="tickets"
+                  element={<AdminPlaceholder title="Issue Tickets" />}
+                />
+                <Route
+                  path="reports"
+                  element={<AdminPlaceholder title="Reports" />}
+                />
+                <Route
+                  path="create-group"
+                  element={<AdminPlaceholder title="Create Group" />}
+                />
+              </Route>
             </Route>
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
-    </SessionContext.Provider>
+    </SessionProvider>
   )
 }

@@ -2,7 +2,7 @@ import { Link, Outlet } from 'react-router-dom'
 import { useSession } from '../context/SessionContext'
 
 export default function PublicLayout() {
-  const { session } = useSession()
+  const { session, userRole } = useSession()
 
   return (
     <div className="min-h-screen bg-white text-black">
@@ -19,10 +19,10 @@ export default function PublicLayout() {
           </Link>
         ) : (
           <Link
-            to="/dashboard"
+            to={userRole === 'admin' ? '/admin' : '/dashboard'}
             className="border border-black bg-white px-4 py-2 text-sm hover:bg-gray-100"
           >
-            Dashboard
+            {userRole === 'admin' ? 'Admin Dashboard' : 'Dashboard'}
           </Link>
         )}
       </nav>

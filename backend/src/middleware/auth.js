@@ -19,7 +19,17 @@ export async function requireAuth(req, res, next) {
       })
     }
 
-    req.user = data.user
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', data.user.id)
+      .single()
+
+    if (profileError) {
+      console.error('Error fetching profile:', profileError)
+    }
+
+    req.user = { ...data.user, role: profile?.role || 'user' }
     next()
   } catch (err) {
     console.error('Auth Middleware Error:', err)
