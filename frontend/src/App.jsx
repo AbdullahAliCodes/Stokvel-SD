@@ -1,125 +1,140 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { useState, useEffect, useCallback } from 'react'
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+} from 'react-router-dom'
+import { supabase } from './utils/supabase'
+import { SessionProvider } from './context/SessionContext'
+import RequireAuth from './components/RequireAuth'
+import RequireAdmin from './components/RequireAdmin'
+import Auth from './components/Auth'
+import PublicLayout from './layouts/PublicLayout'
+import DashboardLayout from './layouts/DashboardLayout'
+import AdminLayout from './layouts/AdminLayout'
+import Home from './pages/Home'
+import Apply from './pages/Apply'
+import AdminDashboard from './pages/AdminDashboard'
+import AdminPlaceholder from './pages/AdminPlaceholder'
+import StokvelDashboard from './pages/StokvelDashboard'
+import SingleStokvel from './pages/SingleStokvel'
+import Meetings from './pages/Meetings'
+import MeetingDetails from './pages/MeetingDetails'
+import MyPayout from './pages/MyPayout'
+import Support from './pages/Support'
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  const [session, setSession] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [backendData, setBackendData] = useState(null)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session: initial } }) => {
+      setSession(initial)
+      setLoading(false)
+    })
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const testBackendConnection = useCallback(async () => {
+    if (!session) {
+      setBackendData({ error: 'No session' })
+      return
+    }
+    try {
+      const res = await fetch('/api/me', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+
+      const text = await res.text()
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${text}`)
+      }
+
+      const data = JSON.parse(text)
+      setBackendData(data)
+    } catch (err) {
+      setBackendData({ error: err.message })
+    }
+  }, [session])
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-white text-black">
+        <p className="text-sm">Loading…</p>
+      </div>
+    )
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <div
-            className="base"
-            role="img"
-            aria-label="Placeholder"
-            style={{ width: 170, height: 179, borderRadius: 12 }}
-          />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <SessionProvider
+      session={session}
+      backendData={backendData}
+      setBackendData={setBackendData}
+      testBackendConnection={testBackendConnection}
+    >
+      <BrowserRouter>
+        <Routes>
+          <Route element={<PublicLayout />}>
+            <Route path="/" element={<Home />} />
+            <Route
+              path="/auth"
+              element={
+                session ? (
+                  <Navigate to="/dashboard" replace />
+                ) : (
+                  <Auth />
+                )
+              }
+            />
+          </Route>
 
-      <div className="ticks"></div>
+          <Route element={<RequireAuth session={session} />}>
+            <Route element={<DashboardLayout />}>
+              <Route path="/dashboard" element={<StokvelDashboard />} />
+              <Route path="/stokvels/:id" element={<SingleStokvel />} />
+              <Route path="/meetings/:id" element={<MeetingDetails />} />
+              <Route path="/meetings" element={<Meetings />} />
+              <Route path="/apply" element={<Apply />} />
+              <Route path="/my-payout" element={<MyPayout />} />
+              <Route path="/support" element={<Support />} />
+            </Route>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+            <Route element={<RequireAdmin />}>
+              <Route path="/admin" element={<AdminLayout />}>
+                <Route index element={<AdminDashboard />} />
+                <Route
+                  path="groups"
+                  element={<AdminPlaceholder title="Active Groups" />}
+                />
+                <Route
+                  path="tickets"
+                  element={<AdminPlaceholder title="Issue Tickets" />}
+                />
+                <Route
+                  path="reports"
+                  element={<AdminPlaceholder title="Reports" />}
+                />
+                <Route
+                  path="create-group"
+                  element={<AdminPlaceholder title="Create Group" />}
+                />
+              </Route>
+            </Route>
+          </Route>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </SessionProvider>
   )
 }
-
-export default App
