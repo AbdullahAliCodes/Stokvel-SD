@@ -1,6 +1,25 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+} from 'react-router-dom'
 import { supabase } from './utils/supabase'
+import { SessionContext } from './context/SessionContext'
+import RequireAuth from './components/RequireAuth'
 import Auth from './components/Auth'
+import PublicLayout from './layouts/PublicLayout'
+import DashboardLayout from './layouts/DashboardLayout'
+import AdminLayout from './layouts/AdminLayout'
+import Home from './pages/Home'
+import Apply from './pages/Apply'
+import AdminDashboard from './pages/AdminDashboard'
+import AdminPlaceholder from './pages/AdminPlaceholder'
+import StokvelDashboard from './pages/StokvelDashboard'
+import Meetings from './pages/Meetings'
+import MyPayout from './pages/MyPayout'
+import Support from './pages/Support'
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -22,21 +41,7 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-white text-black">
-        <p className="text-sm">Loading…</p>
-      </div>
-    )
-  }
-
-  if (!session) {
-    return <Auth />
-  }
-
-  const email = session.user?.email ?? 'User'
-
-  const testBackendConnection = async () => {
+  const testBackendConnection = useCallback(async () => {
     if (!session) {
       setBackendData({ error: 'No session' })
       return
@@ -57,35 +62,77 @@ export default function App() {
     } catch (err) {
       setBackendData({ error: err.message })
     }
+  }, [session])
+
+  const sessionContextValue = useMemo(
+    () => ({
+      session,
+      backendData,
+      setBackendData,
+      testBackendConnection,
+    }),
+    [session, backendData, testBackendConnection],
+  )
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-white text-black">
+        <p className="text-sm">Loading…</p>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-white p-8 text-black">
-      <div className="mx-auto max-w-lg border border-black p-4">
-        <h1 className="mb-6 text-2xl font-semibold">Dashboard</h1>
-        <p className="mb-6">Welcome, {email}</p>
-        <div className="flex flex-wrap gap-3">
-          <button
-            type="button"
-            className="bg-black px-4 py-2 text-white hover:bg-gray-800"
-            onClick={() => supabase.auth.signOut()}
-          >
-            Log Out
-          </button>
-          <button
-            type="button"
-            className="border border-black bg-white px-4 py-2 text-black hover:bg-gray-200"
-            onClick={testBackendConnection}
-          >
-            Test Secure Backend
-          </button>
-        </div>
-        {backendData != null ? (
-          <pre className="mt-4 overflow-auto border border-black bg-gray-100 p-4 text-sm">
-            {JSON.stringify(backendData, null, 2)}
-          </pre>
-        ) : null}
-      </div>
-    </div>
+    <SessionContext.Provider value={sessionContextValue}>
+      <BrowserRouter>
+        <Routes>
+          <Route element={<PublicLayout />}>
+            <Route path="/" element={<Home />} />
+            <Route
+              path="/auth"
+              element={
+                session ? (
+                  <Navigate to="/dashboard" replace />
+                ) : (
+                  <Auth />
+                )
+              }
+            />
+          </Route>
+
+          <Route element={<RequireAuth session={session} />}>
+            <Route element={<DashboardLayout />}>
+              <Route path="/dashboard" element={<StokvelDashboard />} />
+              <Route path="/meetings" element={<Meetings />} />
+              <Route path="/apply" element={<Apply />} />
+              <Route path="/my-payout" element={<MyPayout />} />
+              <Route path="/support" element={<Support />} />
+            </Route>
+
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<AdminDashboard />} />
+              <Route
+                path="groups"
+                element={<AdminPlaceholder title="Active Groups" />}
+              />
+              <Route
+                path="tickets"
+                element={<AdminPlaceholder title="Issue Tickets" />}
+              />
+              <Route
+                path="reports"
+                element={<AdminPlaceholder title="Reports" />}
+              />
+              <Route
+                path="create-group"
+                element={<AdminPlaceholder title="Create Group" />}
+              />
+            </Route>
+          </Route>
+
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </SessionContext.Provider>
   )
 }
