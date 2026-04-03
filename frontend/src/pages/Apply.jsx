@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSession } from '../context/SessionContext'
+import { btnPrimary, errorBox, inputDark, labelDark, tableHead, tableRow, tableWrap } from '../ui'
 
 export default function Apply() {
   const navigate = useNavigate()
@@ -51,91 +52,73 @@ export default function Apply() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl text-black">
-      <h1 className="mb-8 border-b border-black pb-4 text-2xl font-semibold">
+    <div className="mx-auto max-w-2xl text-white">
+      <h1 className="mb-8 border-b border-white/10 pb-4 text-2xl font-bold tracking-wide text-cyan-400">
         Stokvel application
       </h1>
 
       <form className="space-y-10" onSubmit={handleSubmit}>
-        <section>
-          <h2 className="mb-4 text-lg font-semibold">Personal info</h2>
+        <section className="glass p-6">
+          <h2 className="mb-4 text-lg font-bold text-white">Personal info</h2>
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="flex flex-col gap-1 text-sm">
+            <label className={labelDark}>
               Name
-              <input
-                className="border border-black bg-white p-2"
-                placeholder="Jane"
-              />
+              <input className={inputDark} placeholder="Jane" />
             </label>
-            <label className="flex flex-col gap-1 text-sm">
+            <label className={labelDark}>
               Surname
-              <input
-                className="border border-black bg-white p-2"
-                placeholder="Doe"
-              />
+              <input className={inputDark} placeholder="Doe" />
             </label>
-            <label className="col-span-full flex flex-col gap-1 text-sm">
+            <label className={`${labelDark} sm:col-span-2`}>
               Email
-              <input
-                type="email"
-                className="border border-black bg-white p-2"
-                placeholder="jane@example.com"
-              />
+              <input type="email" className={inputDark} placeholder="jane@example.com" />
             </label>
           </div>
         </section>
 
-        <section>
-          <h2 className="mb-4 text-lg font-semibold">Stokvel details</h2>
+        <section className="glass p-6">
+          <h2 className="mb-4 text-lg font-bold text-white">Stokvel details</h2>
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="flex flex-col gap-1 text-sm">
+            <label className={labelDark}>
               Stokvel name
               <input
-                className="border border-black bg-white p-2"
+                className={inputDark}
                 placeholder="Avoille Stokvel"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
               />
             </label>
-            <label className="flex flex-col gap-1 text-sm">
+            <label className={labelDark}>
               Members count
-              <input
-                type="number"
-                min={1}
-                className="border border-black bg-white p-2"
-                placeholder="12"
-              />
+              <input type="number" min={1} className={inputDark} placeholder="12" />
             </label>
           </div>
         </section>
 
-        <section>
-          <h2 className="mb-4 text-lg font-semibold">Member details</h2>
-          <div className="overflow-x-auto border border-black">
-            <table className="w-full text-left text-sm">
+        <section className="glass p-6">
+          <h2 className="mb-4 text-lg font-bold text-white">Member details</h2>
+          <div className={tableWrap}>
+            <table className="w-full text-left text-sm text-slate-200">
               <thead>
-                <tr className="border-b border-black bg-gray-100">
-                  <th className="p-2 font-medium">#</th>
-                  <th className="p-2 font-medium">Name</th>
-                  <th className="p-2 font-medium">Role</th>
+                <tr className={tableHead}>
+                  <th className="p-2">#</th>
+                  <th className="p-2">Name</th>
+                  <th className="p-2">Role</th>
                 </tr>
               </thead>
               <tbody>
                 {[1, 2, 3].map((n) => (
-                  <tr key={n} className="border-b border-gray-300">
-                    <td className="p-2">{n}</td>
+                  <tr key={n} className={tableRow}>
+                    <td className="p-2 text-slate-400">{n}</td>
                     <td className="p-2">
                       <input
-                        className="w-full border border-gray-400 bg-white px-1 py-0.5"
+                        className={`${inputDark} text-sm`}
                         placeholder={`Member ${n}`}
                       />
                     </td>
                     <td className="p-2">
-                      <input
-                        className="w-full border border-gray-400 bg-white px-1 py-0.5"
-                        placeholder="Member"
-                      />
+                      <input className={`${inputDark} text-sm`} placeholder="Member" />
                     </td>
                   </tr>
                 ))}
@@ -144,13 +127,13 @@ export default function Apply() {
           </div>
         </section>
 
-        <section>
-          <h2 className="mb-4 text-lg font-semibold">Contribution amount</h2>
-          <label className="flex flex-col gap-1 text-sm">
+        <section className="glass p-6">
+          <h2 className="mb-4 text-lg font-bold text-white">Contribution amount</h2>
+          <label className={labelDark}>
             Monthly (ZAR)
             <input
               type="number"
-              className="max-w-xs border border-black bg-white p-2"
+              className={`${inputDark} max-w-xs`}
               placeholder="500"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
@@ -158,15 +141,16 @@ export default function Apply() {
           </label>
         </section>
 
-        <section>
-          <h2 className="mb-4 text-lg font-semibold">Payout order</h2>
-          <div className="flex flex-col gap-2 text-sm">
+        <section className="glass p-6">
+          <h2 className="mb-4 text-lg font-bold text-white">Payout order</h2>
+          <div className="flex flex-col gap-3 text-sm text-slate-300">
             <label className="flex items-center gap-2">
               <input
                 type="radio"
                 name="payout"
                 checked={payoutOrder === 'randomize'}
                 onChange={() => setPayoutOrder('randomize')}
+                className="accent-emerald-500"
               />
               Randomize
             </label>
@@ -176,16 +160,17 @@ export default function Apply() {
                 name="payout"
                 checked={payoutOrder === 'manual'}
                 onChange={() => setPayoutOrder('manual')}
+                className="accent-emerald-500"
               />
               Select manually
             </label>
           </div>
         </section>
 
-        <section>
-          <h2 className="mb-4 text-lg font-semibold">Meeting freq</h2>
+        <section className="glass p-6">
+          <h2 className="mb-4 text-lg font-bold text-white">Meeting frequency</h2>
           <select
-            className="max-w-xs border border-black bg-white p-2 text-sm"
+            className={`${inputDark} max-w-xs`}
             value={meetingFreq}
             onChange={(e) => setMeetingFreq(e.target.value)}
           >
@@ -195,14 +180,14 @@ export default function Apply() {
           </select>
         </section>
 
-        {error ? <p className="mb-4 text-red-600">{error}</p> : null}
+        {error ? <p className={errorBox}>{error}</p> : null}
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full border-2 border-black bg-black py-4 text-center text-lg font-bold tracking-wide text-white hover:bg-gray-900 disabled:opacity-60"
+          className={`${btnPrimary} w-full py-4 text-base uppercase tracking-wide`}
         >
-          {loading ? 'Submitting...' : 'SUBMIT'}
+          {loading ? 'Submitting…' : 'Submit'}
         </button>
       </form>
     </div>

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../utils/supabase'
+import { btnPrimary, inputDark, labelDark } from '../ui'
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true)
@@ -53,19 +54,22 @@ export default function Auth() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-white p-4 text-black">
-      <div className="w-full max-w-md border border-black bg-white p-4">
-        <h1 className="mb-4 border-b border-black pb-2 text-xl font-semibold">
-          Stokvel Management System
+    <div className="flex min-h-[calc(100vh-6rem)] items-center justify-center px-4 py-12">
+      <div className="glass w-full max-w-md p-6 shadow-2xl shadow-black/40">
+        <h1 className="mb-2 text-center text-xl font-bold uppercase tracking-widest text-cyan-400">
+          Stokvel Portal
         </h1>
+        <p className="mb-6 text-center text-xs text-slate-500">
+          Management system — sign in to continue
+        </p>
 
-        <div className="mb-4 flex gap-2">
+        <div className="mb-6 flex gap-2">
           <button
             type="button"
-            className={`flex-1 border px-4 py-2 ${
+            className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
               isLogin
-                ? 'border-black bg-black text-white'
-                : 'border-black bg-white text-black hover:bg-gray-100'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/30'
+                : 'border border-white/15 bg-white/5 text-slate-300 hover:bg-white/10'
             }`}
             onClick={() => {
               setIsLogin(true)
@@ -76,10 +80,10 @@ export default function Auth() {
           </button>
           <button
             type="button"
-            className={`flex-1 border px-4 py-2 ${
+            className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
               !isLogin
-                ? 'border-black bg-black text-white'
-                : 'border-black bg-white text-black hover:bg-gray-100'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/30'
+                : 'border border-white/15 bg-white/5 text-slate-300 hover:bg-white/10'
             }`}
             onClick={() => {
               setIsLogin(false)
@@ -91,14 +95,17 @@ export default function Auth() {
         </div>
 
         {error ? (
-          <p className="mb-4 font-bold text-red-600" role="alert">
+          <p
+            className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm font-medium text-red-200"
+            role="alert"
+          >
             {error}
           </p>
         ) : null}
 
         {isLogin ? (
-          <form onSubmit={handleLogin} className="flex flex-col gap-3">
-            <label className="flex flex-col gap-1 text-left text-sm">
+          <form onSubmit={handleLogin} className="flex flex-col gap-4">
+            <label className={labelDark}>
               Email
               <input
                 type="email"
@@ -106,10 +113,10 @@ export default function Auth() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="border border-black bg-white p-2 text-black"
+                className={inputDark}
               />
             </label>
-            <label className="flex flex-col gap-1 text-left text-sm">
+            <label className={labelDark}>
               Password
               <input
                 type="password"
@@ -117,20 +124,16 @@ export default function Auth() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="border border-black bg-white p-2 text-black"
+                className={inputDark}
               />
             </label>
-            <button
-              type="submit"
-              disabled={loading}
-              className="bg-black px-4 py-2 text-white hover:bg-gray-800 disabled:opacity-50"
-            >
+            <button type="submit" disabled={loading} className={`${btnPrimary} w-full`}>
               {loading ? 'Loading…' : 'Log in'}
             </button>
           </form>
         ) : (
-          <form onSubmit={handleSignUp} className="flex flex-col gap-3">
-            <label className="flex flex-col gap-1 text-left text-sm">
+          <form onSubmit={handleSignUp} className="flex flex-col gap-4">
+            <label className={labelDark}>
               First Name
               <input
                 type="text"
@@ -138,10 +141,10 @@ export default function Auth() {
                 required
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                className="border border-black bg-white p-2 text-black"
+                className={inputDark}
               />
             </label>
-            <label className="flex flex-col gap-1 text-left text-sm">
+            <label className={labelDark}>
               Last Name
               <input
                 type="text"
@@ -149,10 +152,10 @@ export default function Auth() {
                 required
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                className="border border-black bg-white p-2 text-black"
+                className={inputDark}
               />
             </label>
-            <label className="flex flex-col gap-1 text-left text-sm">
+            <label className={labelDark}>
               Phone Number
               <input
                 type="tel"
@@ -160,10 +163,10 @@ export default function Auth() {
                 required
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
-                className="border border-black bg-white p-2 text-black"
+                className={inputDark}
               />
             </label>
-            <label className="flex flex-col gap-1 text-left text-sm">
+            <label className={labelDark}>
               Email
               <input
                 type="email"
@@ -171,10 +174,10 @@ export default function Auth() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="border border-black bg-white p-2 text-black"
+                className={inputDark}
               />
             </label>
-            <label className="flex flex-col gap-1 text-left text-sm">
+            <label className={labelDark}>
               Password
               <input
                 type="password"
@@ -182,14 +185,10 @@ export default function Auth() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="border border-black bg-white p-2 text-black"
+                className={inputDark}
               />
             </label>
-            <button
-              type="submit"
-              disabled={loading}
-              className="bg-black px-4 py-2 text-white hover:bg-gray-800 disabled:opacity-50"
-            >
+            <button type="submit" disabled={loading} className={`${btnPrimary} w-full`}>
               {loading ? 'Loading…' : 'Create account'}
             </button>
           </form>

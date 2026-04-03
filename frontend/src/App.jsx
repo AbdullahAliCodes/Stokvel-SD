@@ -69,8 +69,8 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-white text-black">
-        <p className="text-sm">Loading…</p>
+      <div className="flex min-h-screen items-center justify-center bg-[#0f172a] text-slate-300">
+        <p className="text-sm tracking-wide">Loading…</p>
       </div>
     )
   }

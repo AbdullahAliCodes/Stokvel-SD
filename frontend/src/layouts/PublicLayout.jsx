@@ -5,22 +5,25 @@ export default function PublicLayout() {
   const { session, userRole } = useSession()
 
   return (
-    <div className="min-h-screen bg-white text-black">
-      <nav className="flex items-center justify-between border-b border-black px-4 py-3">
-        <Link to="/" className="text-lg font-semibold tracking-tight">
+    <div className="min-h-screen bg-[#0f172a] text-white">
+      <nav className="glass sticky top-0 z-10 mx-4 mt-4 flex items-center justify-between rounded-2xl px-4 py-3 md:mx-8">
+        <Link
+          to="/"
+          className="text-lg font-bold tracking-tight text-cyan-400 transition hover:text-cyan-300"
+        >
           Sawubona Stokvel
         </Link>
         {!session ? (
           <Link
             to="/auth"
-            className="border border-black bg-white px-4 py-2 text-sm hover:bg-gray-100"
+            className="rounded-lg border border-cyan-400/40 bg-cyan-400/10 px-4 py-2 text-sm font-semibold text-cyan-300 transition hover:bg-cyan-400/20"
           >
             Log In / Sign Up
           </Link>
         ) : (
           <Link
             to={userRole === 'admin' ? '/admin' : '/dashboard'}
-            className="border border-black bg-white px-4 py-2 text-sm hover:bg-gray-100"
+            className="rounded-lg border border-blue-400/40 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-300 transition hover:bg-blue-500/20"
           >
             {userRole === 'admin' ? 'Admin Dashboard' : 'Dashboard'}
           </Link>

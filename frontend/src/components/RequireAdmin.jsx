@@ -5,7 +5,11 @@ export default function RequireAdmin() {
   const { userRole } = useSession()
 
   if (userRole === null || userRole === undefined) {
-    return <div className="p-8">Loading authorization...</div>
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#0f172a] text-slate-400">
+        <p className="text-sm">Loading authorization…</p>
+      </div>
+    )
   }
 
   if (userRole !== 'admin') {
