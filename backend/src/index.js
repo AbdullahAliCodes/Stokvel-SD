@@ -3,6 +3,7 @@ import express from 'express'
 import cors from 'cors'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth } from './middleware/auth.js'
+import stokvelsRouter from './routes/stokvels.js'
 
 const app = express()
 const PORT = Number(process.env.PORT) || 5000
@@ -30,35 +31,7 @@ app.get('/api/me', requireAuth, (req, res) => {
   }
 })
 
-app.get('/api/my-stokvels', requireAuth, async (req, res) => {
-  try {
-    const token = req.headers.authorization.split(' ')[1]
-    const userSupabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_ANON_KEY,
-      {
-        global: {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      },
-    )
-
-    const { data, error } = await userSupabase
-      .from('stokvel_members')
-      .select('group_role, stokvels(*)')
-      .eq('user_id', req.user.id)
-
-    if (error) {
-      console.error('GET /api/my-stokvels:', error)
-      return res.status(500).json({ error: error.message })
-    }
-
-    res.json({ success: true, memberships: data })
-  } catch (err) {
-    console.error('GET /api/my-stokvels:', err)
-    res.status(500).json({ error: 'Internal Server Error' })
-  }
-})
+app.use('/api/stokvels', stokvelsRouter)
 
 app.get('/api/stokvels/:id', requireAuth, async (req, res) => {
   try {

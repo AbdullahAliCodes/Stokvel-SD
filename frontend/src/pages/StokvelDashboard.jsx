@@ -37,7 +37,7 @@ export default function StokvelDashboard() {
     async function load() {
       setError(null)
       try {
-        const res = await fetch('/api/my-stokvels', {
+        const res = await fetch('/api/stokvels', {
           headers: { Authorization: `Bearer ${session.access_token}` },
         })
         const text = await res.text()
@@ -76,7 +76,7 @@ export default function StokvelDashboard() {
       ) : null}
 
       {memberships === null ? (
-        <p className="text-sm text-gray-600">Loading…</p>
+        <p className="text-sm text-gray-600">Loading...</p>
       ) : memberships.length === 0 ? (
         <p className="border border-dashed border-gray-400 p-8 text-center text-gray-600">
           You are not part of any stokvel yet.
@@ -98,7 +98,7 @@ export default function StokvelDashboard() {
                     <h2 className="text-lg font-semibold leading-tight">
                       {stokvel?.name ?? 'Unnamed group'}
                     </h2>
-                    <StatusBadge status={stokvel?.status} />
+                    <StatusBadge status={m.status ?? stokvel?.status} />
                   </div>
                   <p className="text-sm text-gray-700">
                     Role:{' '}
