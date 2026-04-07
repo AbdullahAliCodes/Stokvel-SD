@@ -7,6 +7,7 @@ export default function Apply() {
   const { session } = useSession()
 
   const [name, setName] = useState('')
+  const [membersCount, setMembersCount] = useState('')
   const [amount, setAmount] = useState('250')
   const [payoutOrder, setPayoutOrder] = useState('randomize')
   const [meetingFreq, setMeetingFreq] = useState('bi-weekly')
@@ -33,6 +34,7 @@ export default function Apply() {
         },
         body: JSON.stringify({
           name,
+          membersCount,
           contributionAmount: amount,
           payoutOrder,
           meetingFrequency: meetingFreq,
@@ -105,6 +107,8 @@ export default function Apply() {
                 min={1}
                 className="border border-black bg-white p-2"
                 placeholder="12"
+                value={membersCount}
+                onChange={(e) => setMembersCount(e.target.value)}
               />
             </label>
           </div>
@@ -150,10 +154,13 @@ export default function Apply() {
             Monthly (ZAR)
             <input
               type="number"
+              min={0}
+              step="0.01"
               className="max-w-xs border border-black bg-white p-2"
               placeholder="500"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
+              required
             />
           </label>
         </section>

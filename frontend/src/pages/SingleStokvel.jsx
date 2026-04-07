@@ -2,18 +2,42 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useSession } from '../context/SessionContext'
 
+function formatZAR(n) {
+  const num = Number(n)
+  if (Number.isNaN(num)) return 'R 0'
+  return `R ${Math.round(num).toLocaleString('en-ZA')}`
+}
+
+function memberDisplay(m) {
+  const p = m.profiles
+  const first = p?.first_name?.trim()
+  const last = p?.last_name?.trim()
+  if (first || last) return [first, last].filter(Boolean).join(' ')
+  if (p?.full_name) return p.full_name
+  if (p?.email) return p.email.split('@')[0]
+  if (m.user_id) return `Member ${m.user_id.slice(0, 8)}`
+  return 'Member'
+}
+
 export default function SingleStokvel() {
   const { id } = useParams()
   const { session } = useSession()
+  const [stokvel, setStokvel] = useState(null)
   const [membership, setMembership] = useState(null)
+  const [members, setMembers] = useState([])
   const [error, setError] = useState(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!session || !id) return
+    if (!session || !id) {
+      setLoading(false)
+      return
+    }
 
     let cancelled = false
 
     async function load() {
+      setLoading(true)
       setError(null)
       try {
         const res = await fetch(`/api/stokvels/${id}`, {
@@ -26,11 +50,19 @@ export default function SingleStokvel() {
         const json = JSON.parse(text)
         if (!cancelled) {
           setMembership(json.membership ?? null)
+          setStokvel(json.stokvel ?? null)
+          setMembers(Array.isArray(json.members) ? json.members : [])
         }
       } catch (e) {
         if (!cancelled) {
           setError(e.message ?? String(e))
           setMembership(null)
+          setStokvel(null)
+          setMembers([])
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
         }
       }
     }
@@ -41,7 +73,22 @@ export default function SingleStokvel() {
     }
   }, [session, id])
 
-  const groupName = membership?.stokvels?.name
+  const groupName = stokvel?.name
+  const memberCount = members.length
+  const monthlyContribution = Number(stokvel?.contribution_amount) || 0
+  const totalContribution = 0
+  const expectedPayout = monthlyContribution
+  const savingsProjection = monthlyContribution * memberCount * 12
+
+  const statCards = [
+    { label: 'Total contribution', value: formatZAR(totalContribution) },
+    { label: 'Expected payout', value: formatZAR(expectedPayout) },
+    { label: 'Live interest rate', value: '0%' },
+    {
+      label: 'Savings projection',
+      value: memberCount > 0 ? formatZAR(savingsProjection) : formatZAR(0),
+    },
+  ]
 
   return (
     <div>
@@ -62,23 +109,24 @@ export default function SingleStokvel() {
         ) : null}
       </div>
 
+      {!session ? (
+        <p className="mb-6 text-sm text-gray-600">
+          Sign in to view this stokvel.
+        </p>
+      ) : null}
+
       {error ? (
         <p className="mb-6 border border-black bg-gray-100 p-3 text-sm">{error}</p>
       ) : null}
 
-      {membership === null && !error ? (
-        <p className="text-sm text-gray-600">Loading…</p>
+      {session && loading ? (
+        <p className="text-sm text-gray-600">Loading...</p>
       ) : null}
 
-      {membership ? (
+      {session && !loading && stokvel ? (
         <>
           <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              { label: 'Total contribution', value: 'R 4 200' },
-              { label: 'Expected payout', value: 'R 250' },
-              { label: 'Live interest rate', value: '4.5%' },
-              { label: 'Savings projection', value: 'R 12 600' },
-            ].map((card) => (
+            {statCards.map((card) => (
               <div
                 key={card.label}
                 className="border border-black bg-white p-4 shadow-none"
@@ -107,17 +155,27 @@ export default function SingleStokvel() {
                       </tr>
                     </thead>
                     <tbody>
-                      {[
-                        ['Sipho K.', 'R 500', '2026-04-01'],
-                        ['Thandi N.', 'R 500', '2026-03-28'],
-                        ['Mark F.', 'R 500', '2026-03-15'],
-                      ].map((row) => (
-                        <tr key={row[2] + row[0]} className="border-b border-gray-300">
-                          <td className="p-3">{row[0]}</td>
-                          <td className="p-3">{row[1]}</td>
-                          <td className="p-3">{row[2]}</td>
+                      {members.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={3}
+                            className="p-3 text-gray-600"
+                          >
+                            No members yet.
+                          </td>
                         </tr>
-                      ))}
+                      ) : (
+                        members.map((m) => (
+                          <tr
+                            key={m.user_id}
+                            className="border-b border-gray-300"
+                          >
+                            <td className="p-3">{memberDisplay(m)}</td>
+                            <td className="p-3">{formatZAR(0)}</td>
+                            <td className="p-3">—</td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -181,21 +239,27 @@ export default function SingleStokvel() {
                       </tr>
                     </thead>
                     <tbody>
-                      <tr className="border-b border-gray-300 font-bold">
-                        <td className="p-3">Lerato M.</td>
-                        <td className="p-3">R 3 000</td>
-                        <td className="p-3">2026-04-15</td>
-                      </tr>
-                      <tr className="border-b border-gray-300">
-                        <td className="p-3">Sipho K.</td>
-                        <td className="p-3">R 3 000</td>
-                        <td className="p-3">2026-05-15</td>
-                      </tr>
-                      <tr className="border-b border-gray-300">
-                        <td className="p-3">Thandi N.</td>
-                        <td className="p-3">R 3 000</td>
-                        <td className="p-3">2026-06-15</td>
-                      </tr>
+                      {members.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={3}
+                            className="p-3 text-gray-600"
+                          >
+                            No payout schedule yet.
+                          </td>
+                        </tr>
+                      ) : (
+                        members.map((m) => (
+                          <tr
+                            key={`payout-${m.user_id}`}
+                            className="border-b border-gray-300"
+                          >
+                            <td className="p-3">{memberDisplay(m)}</td>
+                            <td className="p-3">{formatZAR(monthlyContribution)}</td>
+                            <td className="p-3">—</td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
