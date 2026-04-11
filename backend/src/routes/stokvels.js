@@ -157,20 +157,79 @@ router.get('/:id', requireAuth, async (req, res) => {
       userSupabase,
       stokvelId,
     )
-
+    
     if (membersError) {
       console.error('GET /api/stokvels/:id members:', membersError)
       return res.status(500).json({ error: membersError.message })
     }
-
+    
+    const { data: contributions, error: contributionsError } = await userSupabase
+      .from('contributions')
+      .select('id, amount, paid_at, user_id, profiles(first_name, last_name)')
+      .eq('stokvel_id', stokvelId)
+      .order('paid_at', { ascending: false })
+    
+    if (contributionsError) {
+      console.error('GET /api/stokvels/:id contributions:', contributionsError)
+      return res.status(500).json({ error: contributionsError.message })
+    }
+    
+    const totalContribution = (contributions ?? []).reduce(
+      (sum, c) => sum + Number(c.amount),
+      0,
+    )
+    
     res.json({
       success: true,
       membership,
       stokvel,
       members: members ?? [],
+      totalContribution,
+      contributions: contributions ?? [],
     })
   } catch (err) {
     console.error('GET /api/stokvels/:id:', err)
+    res.status(500).json({ error: 'Internal Server Error' })
+  }
+})
+router.post('/:id/contributions', requireAuth, async (req, res) => {
+  try {
+    const stokvelId = req.params.id
+    const { amount } = req.body
+    const parsed = Number(amount)
+
+    if (!amount || Number.isNaN(parsed) || parsed <= 0) {
+      return res.status(400).json({ error: 'A valid amount is required' })
+    }
+
+    const userSupabase = userScopedSupabase(req)
+
+    // Verify user is a member
+    const { data: membership, error: membershipError } = await userSupabase
+      .from('stokvel_members')
+      .select('group_role')
+      .eq('user_id', req.user.id)
+      .eq('stokvel_id', stokvelId)
+      .maybeSingle()
+
+    if (membershipError || !membership) {
+      return res.status(403).json({ error: 'Not a member of this stokvel' })
+    }
+
+    const { data, error } = await userSupabase
+      .from('contributions')
+      .insert([{ stokvel_id: stokvelId, user_id: req.user.id, amount: parsed }])
+      .select()
+      .single()
+
+    if (error) {
+      console.error('POST contributions:', error)
+      return res.status(500).json({ error: error.message })
+    }
+
+    res.status(201).json({ success: true, contribution: data })
+  } catch (err) {
+    console.error('POST contributions:', err)
     res.status(500).json({ error: 'Internal Server Error' })
   }
 })
