@@ -3,6 +3,7 @@ import { useSession } from '../context/SessionContext'
 
 export default function PublicLayout() {
   const { session, userRole } = useSession()
+  const isAdmin = String(userRole || '').toLowerCase() === 'admin'
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-white">
@@ -22,10 +23,10 @@ export default function PublicLayout() {
           </Link>
         ) : (
           <Link
-            to={userRole === 'admin' ? '/admin' : '/dashboard'}
+            to={isAdmin ? '/admin' : '/dashboard'}
             className="rounded-lg border border-blue-400/40 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-300 transition hover:bg-blue-500/20"
           >
-            {userRole === 'admin' ? 'Admin Dashboard' : 'Dashboard'}
+            {isAdmin ? 'Admin Dashboard' : 'Dashboard'}
           </Link>
         )}
       </nav>

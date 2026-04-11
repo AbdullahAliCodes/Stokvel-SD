@@ -66,9 +66,9 @@ export default function SingleStokvel() {
           </h1>
           {groupName ? <p className={`mt-1 ${pageSubtitle}`}>{groupName}</p> : null}
         </div>
-        {isTreasurer ? (
-          <button type="button" className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-500">
-            Create Meeting
+        {['treasurer', 'admin'].includes(membership?.group_role) ? (
+          <button type="button" className={btnPrimary}>
+            Create meeting
           </button>
         ) : null}
       </div>

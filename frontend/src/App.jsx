@@ -17,6 +17,10 @@ import Home from './pages/Home'
 import Apply from './pages/Apply'
 import AdminDashboard from './pages/AdminDashboard'
 import AdminPlaceholder from './pages/AdminPlaceholder'
+import AdminCreateStokvel from './pages/AdminCreateStokvel'
+import AdminGroups from './pages/AdminGroups'
+import AdminEditStokvel from './pages/AdminEditStokvel'
+import Account from './pages/Account'
 import StokvelDashboard from './pages/StokvelDashboard'
 import SingleStokvel from './pages/SingleStokvel'
 import Meetings from './pages/Meetings'
@@ -107,15 +111,14 @@ export default function App() {
               <Route path="/apply" element={<Apply />} />
               <Route path="/my-payout" element={<MyPayout />} />
               <Route path="/support" element={<Support />} />
+              <Route path="/account" element={<Account />} />
             </Route>
 
             <Route element={<RequireAdmin />}>
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<AdminDashboard />} />
-                <Route
-                  path="groups"
-                  element={<AdminPlaceholder title="Active Groups" />}
-                />
+                <Route path="groups" element={<AdminGroups />} />
+                <Route path="groups/:id/edit" element={<AdminEditStokvel />} />
                 <Route
                   path="tickets"
                   element={<AdminPlaceholder title="Issue Tickets" />}
@@ -124,10 +127,7 @@ export default function App() {
                   path="reports"
                   element={<AdminPlaceholder title="Reports" />}
                 />
-                <Route
-                  path="create-group"
-                  element={<AdminPlaceholder title="Create Group" />}
-                />
+                <Route path="create-group" element={<AdminCreateStokvel />} />
               </Route>
             </Route>
           </Route>

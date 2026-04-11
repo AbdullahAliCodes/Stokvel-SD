@@ -75,7 +75,9 @@ export default function StokvelDashboard() {
         <LayoutDashboard className="h-8 w-8 text-blue-400" aria-hidden />
         My stokvels
       </h1>
-      <p className={`mb-8 ${pageSubtitle}`}>Select a group to open its dashboard.</p>
+      <p className={`mb-8 ${pageSubtitle}`}>
+        Only groups you have been added to appear here. Open one to view its dashboard.
+      </p>
 
       {error ? <p className={`mb-4 ${errorBox}`}>{error}</p> : null}
 

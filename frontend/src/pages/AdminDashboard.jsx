@@ -1,4 +1,6 @@
-import { pageSubtitle } from '../ui'
+import { Link } from 'react-router-dom'
+import { PlusCircle, Users } from 'lucide-react'
+import { pageSubtitle, btnPrimary, btnSecondary } from '../ui'
 
 export default function AdminDashboard() {
   const rows = [
@@ -9,6 +11,23 @@ export default function AdminDashboard() {
 
   return (
     <div>
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <Link
+          to="/admin/create-group"
+          className={`${btnPrimary} inline-flex items-center justify-center gap-2 px-5 py-3`}
+        >
+          <PlusCircle className="h-4 w-4 shrink-0" aria-hidden />
+          Create new stokvel
+        </Link>
+        <Link
+          to="/admin/groups"
+          className={`${btnSecondary} inline-flex items-center justify-center gap-2 px-5 py-3`}
+        >
+          <Users className="h-4 w-4 shrink-0" aria-hidden />
+          Edit groups
+        </Link>
+      </div>
+
       <h1 className="mb-2 flex items-center gap-2 text-2xl font-bold tracking-wide text-cyan-400 uppercase">
         <i className="fa-solid fa-shield-halved text-cyan-400" aria-hidden />
         User verifications

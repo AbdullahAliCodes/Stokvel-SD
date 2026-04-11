@@ -9,6 +9,7 @@ export default function Auth() {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [phoneNumber, setPhoneNumber] = useState('')
+  const [username, setUsername] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
@@ -34,7 +35,18 @@ export default function Auth() {
     setError(null)
     setLoading(true)
     try {
-      const { error: signUpError } = await supabase.auth.signUp({
+      const normalized = username
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, '_')
+        .replace(/[^a-z0-9_]/g, '')
+      if (normalized.length < 3 || normalized.length > 30) {
+        throw new Error(
+          'Username must be 3–30 characters (letters, numbers, underscore only).',
+        )
+      }
+
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -46,6 +58,29 @@ export default function Auth() {
         },
       })
       if (signUpError) throw signUpError
+
+      if (data?.session?.access_token) {
+        const res = await fetch('/api/profile/username', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${data.session.access_token}`,
+          },
+          body: JSON.stringify({ username: normalized }),
+        })
+        const text = await res.text()
+        if (!res.ok) {
+          let msg = text
+          try {
+            msg = JSON.parse(text).error || text
+          } catch {
+            /* keep text */
+          }
+          throw new Error(
+            `Account created but username could not be saved: ${msg}. You can try again after signing in.`,
+          )
+        }
+      }
     } catch (err) {
       setError(err.message ?? String(err))
     } finally {
@@ -165,6 +200,22 @@ export default function Auth() {
                 onChange={(e) => setPhoneNumber(e.target.value)}
                 className={inputDark}
               />
+            </label>
+            <label className={labelDark}>
+              Username
+              <input
+                type="text"
+                autoComplete="username"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className={inputDark}
+                placeholder="e.g. sipho_k"
+              />
+              <span className="mt-1 block text-xs text-slate-500">
+                3–30 characters: lowercase letters, numbers, underscore. Saved via the server after
+                signup.
+              </span>
             </label>
             <label className={labelDark}>
               Email

@@ -3,6 +3,10 @@ import express from 'express'
 import cors from 'cors'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth } from './middleware/auth.js'
+import adminStokvelsRouter from './routes/adminStokvels.js'
+import profileRouter from './routes/profile.js'
+import { getServiceSupabase } from './utils/supabaseAdmin.js'
+import { ensurePlatformAdminsInStokvel } from './utils/platformAdminStokvelMembers.js'
 
 const app = express()
 const PORT = Number(process.env.PORT) || 5000
@@ -13,6 +17,9 @@ app.use(express.json())
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'Stokvel API' })
 })
+
+app.use('/api/admin', adminStokvelsRouter)
+app.use('/api/profile', profileRouter)
 
 app.get('/api/me', requireAuth, (req, res) => {
   try {
@@ -53,7 +60,9 @@ app.get('/api/my-stokvels', requireAuth, async (req, res) => {
       return res.status(500).json({ error: error.message })
     }
 
-    res.json({ success: true, memberships: data })
+    const memberships = (data ?? []).filter((row) => row?.stokvels?.id)
+
+    res.json({ success: true, memberships })
   } catch (err) {
     console.error('GET /api/my-stokvels:', err)
     res.status(500).json({ error: 'Internal Server Error' })
@@ -140,6 +149,25 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
       return res.status(500).json({
         error: memberError.message || 'Failed to assign treasurer',
       })
+    }
+
+    const svc = getServiceSupabase()
+    if (svc) {
+      const { error: syncErr } = await ensurePlatformAdminsInStokvel(svc, newStokvel.id)
+      if (syncErr) {
+        console.error('POST /api/stokvels platform admin sync:', syncErr)
+        await userSupabase.from('stokvel_members').delete().eq('stokvel_id', newStokvel.id)
+        await userSupabase.from('stokvels').delete().eq('id', newStokvel.id)
+        return res.status(500).json({
+          error:
+            syncErr.message ||
+            'Failed to add platform admins to the new group. Ensure stokvel_members allows group_role admin (see repo SQL migration).',
+        })
+      }
+    } else {
+      console.warn(
+        'POST /api/stokvels: SUPABASE_SERVICE_ROLE_KEY not set; skipping auto-join for profiles.role=admin on new stokvels.',
+      )
     }
 
     res.status(201).json({ success: true, stokvel: newStokvel })

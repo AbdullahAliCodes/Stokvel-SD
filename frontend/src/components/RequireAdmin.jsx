@@ -12,7 +12,7 @@ export default function RequireAdmin() {
     )
   }
 
-  if (userRole !== 'admin') {
+  if (String(userRole || '').toLowerCase() !== 'admin') {
     return <Navigate to="/dashboard" replace />
   }
 

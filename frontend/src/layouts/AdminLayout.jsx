@@ -7,6 +7,7 @@ import {
   PlusCircle,
   Home,
   LogOut,
+  User,
 } from 'lucide-react'
 import { supabase } from '../utils/supabase'
 
@@ -23,7 +24,7 @@ export default function AdminLayout() {
       <aside className="glass flex w-full flex-col border-t-4 border-cyan-500 md:max-w-[240px] md:shrink-0">
         <div className="border-b border-white/10 p-4">
           <div className="rounded bg-cyan-600 py-2 text-center text-xs font-bold uppercase tracking-wide text-white">
-            System Admin
+            Admin
           </div>
           <p className="mt-3 text-xs font-semibold text-slate-500">Control panel</p>
         </div>
@@ -50,6 +51,10 @@ export default function AdminLayout() {
           <NavLink to="/admin/create-group" className={linkClass}>
             <PlusCircle className="h-4 w-4 shrink-0 text-white" aria-hidden />
             Create New Group
+          </NavLink>
+          <NavLink to="/account" className={linkClass}>
+            <User className="h-4 w-4 shrink-0 text-violet-400" aria-hidden />
+            Account
           </NavLink>
         </nav>
         <Link
