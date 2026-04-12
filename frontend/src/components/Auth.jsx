@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../utils/supabase'
+import { apiUrl } from '../utils/api'
 import { btnPrimary, inputDark, labelDark } from '../ui'
 
 export default function Auth() {
@@ -60,7 +61,7 @@ export default function Auth() {
       if (signUpError) throw signUpError
 
       if (data?.session?.access_token) {
-        const res = await fetch('/api/profile/username', {
+        const res = await fetch(apiUrl('/api/profile/username'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

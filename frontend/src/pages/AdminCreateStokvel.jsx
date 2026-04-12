@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Check, X } from 'lucide-react'
 import { useSession } from '../context/SessionContext'
+import { apiUrl } from '../utils/api'
 
 const TOTAL_STEPS = 4
 
@@ -73,7 +74,7 @@ export default function AdminCreateStokvel() {
       setSearchLoading(true)
       setSearchError('')
       try {
-        const res = await fetch(`/api/admin/users?q=${encodeURIComponent(q)}`, {
+        const res = await fetch(apiUrl(`/api/admin/users?q=${encodeURIComponent(q)}`), {
           headers: { Authorization: `Bearer ${session.access_token}` },
           signal: ctrl.signal,
         })
@@ -161,7 +162,7 @@ export default function AdminCreateStokvel() {
 
     setSubmitting(true)
     try {
-      const res = await fetch('/api/admin/stokvels', {
+      const res = await fetch(apiUrl('/api/admin/stokvels'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -203,7 +204,7 @@ export default function AdminCreateStokvel() {
 
     setInviteSubmitting(true)
     try {
-      const res = await fetch(`/api/admin/stokvels/${createdStokvel.id}/members`, {
+      const res = await fetch(apiUrl(`/api/admin/stokvels/${createdStokvel.id}/members`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

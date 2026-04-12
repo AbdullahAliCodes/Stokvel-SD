@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSession } from '../context/SessionContext'
+import { apiUrl } from '../utils/api'
 import {
   pageTitle,
   pageSubtitle,
@@ -37,7 +38,7 @@ export default function Account() {
       setLoading(true)
       setError('')
       try {
-        const res = await fetch('/api/profile/me', {
+        const res = await fetch(apiUrl('/api/profile/me'), {
           headers: { Authorization: `Bearer ${session.access_token}` },
         })
         const text = await res.text()
@@ -69,7 +70,7 @@ export default function Account() {
     setError('')
     setOk('')
     try {
-      const res = await fetch('/api/profile/me', {
+      const res = await fetch(apiUrl('/api/profile/me'), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

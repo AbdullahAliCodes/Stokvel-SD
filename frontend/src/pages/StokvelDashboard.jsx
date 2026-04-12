@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { LayoutDashboard } from 'lucide-react'
 import { useSession } from '../context/SessionContext'
+import { apiUrl } from '../utils/api'
 import { errorBox, pageSubtitle, pageTitle } from '../ui'
 
 function formatRole(role) {
@@ -53,7 +54,7 @@ export default function StokvelDashboard() {
     async function load() {
       setError(null)
       try {
-        const res = await fetch('/api/my-stokvels', {
+        const res = await fetch(apiUrl('/api/my-stokvels'), {
           headers: { Authorization: `Bearer ${session.access_token}` },
         })
         const text = await res.text()

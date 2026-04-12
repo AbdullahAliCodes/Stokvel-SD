@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Pencil } from 'lucide-react'
 import { useSession } from '../context/SessionContext'
+import { apiUrl } from '../utils/api'
 import { pageTitle, pageSubtitle, tableWrap, tableHead, tableRow, errorBox, btnSecondary } from '../ui'
 
 function parseApiError(text) {
@@ -74,7 +75,7 @@ export default function AdminGroups() {
     async function load() {
       setError('')
       try {
-        const res = await fetch('/api/admin/stokvels', {
+        const res = await fetch(apiUrl('/api/admin/stokvels'), {
           headers: { Authorization: `Bearer ${session.access_token}` },
         })
         const text = await res.text()

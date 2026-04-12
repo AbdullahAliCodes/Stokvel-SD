@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import { useSession } from '../context/SessionContext'
+import { apiUrl } from '../utils/api'
 import {
   pageTitle,
   pageSubtitle,
@@ -50,7 +51,7 @@ export default function AdminEditStokvel() {
       setLoading(true)
       setError('')
       try {
-        const res = await fetch(`/api/admin/stokvels/${id}`, {
+        const res = await fetch(apiUrl(`/api/admin/stokvels/${id}`), {
           headers: { Authorization: `Bearer ${session.access_token}` },
         })
         const text = await res.text()
@@ -88,7 +89,7 @@ export default function AdminEditStokvel() {
     try {
       const amount = Number(contributionAmount)
       const cycle = Number(cycleLength)
-      const res = await fetch(`/api/admin/stokvels/${id}`, {
+      const res = await fetch(apiUrl(`/api/admin/stokvels/${id}`), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -120,7 +121,7 @@ export default function AdminEditStokvel() {
     setMemberInviteMsg('')
     setMemberInviteLoading(true)
     try {
-      const res = await fetch(`/api/admin/stokvels/${id}/members`, {
+      const res = await fetch(apiUrl(`/api/admin/stokvels/${id}/members`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

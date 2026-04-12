@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSession } from '../context/SessionContext'
+import { apiUrl } from '../utils/api'
 import { btnPrimary, errorBox, inputDark, labelDark, tableHead, tableRow, tableWrap } from '../ui'
 
 export default function Apply() {
@@ -26,7 +27,7 @@ export default function Apply() {
     }
 
     try {
-      const res = await fetch('/api/stokvels', {
+      const res = await fetch(apiUrl('/api/stokvels'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
