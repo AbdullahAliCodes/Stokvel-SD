@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useSession } from '../context/SessionContext'
+import { apiUrl } from '../utils/api'
 import { errorBox, pageSubtitle } from '../ui'
 
 function parseApiError(text) {
@@ -27,7 +28,7 @@ export default function AdminReviewStokvel() {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch(`/api/admin/stokvels/${id}`, {
+      const res = await fetch(apiUrl(`/api/admin/stokvels/${id}`), {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
       const text = await res.text()
@@ -53,7 +54,7 @@ export default function AdminReviewStokvel() {
     try {
       // Use PATCH on the existing admin stokvel route (same as edit form) so we
       // don’t depend on a separate PUT handler or proxy quirks.
-      const res = await fetch(`/api/admin/stokvels/${id}`, {
+      const res = await fetch(apiUrl(`/api/admin/stokvels/${id}`), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -76,7 +77,7 @@ export default function AdminReviewStokvel() {
     setActionLoading(true)
     setError('')
     try {
-      const res = await fetch(`/api/admin/stokvels/${id}`, {
+      const res = await fetch(apiUrl(`/api/admin/stokvels/${id}`), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

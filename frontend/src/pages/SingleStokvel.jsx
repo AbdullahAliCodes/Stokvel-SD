@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useSession } from '../context/SessionContext'
+import { apiUrl } from '../utils/api'
 import { btnPrimary, errorBox, pageSubtitle, tableHead, tableRow, tableWrap } from '../ui'
 
 export default function SingleStokvel() {
@@ -17,7 +18,7 @@ export default function SingleStokvel() {
     async function load() {
       setError(null)
       try {
-        const res = await fetch(`/api/stokvels/${id}`, {
+        const res = await fetch(apiUrl(`/api/stokvels/${id}`), {
           headers: { Authorization: `Bearer ${session.access_token}` },
         })
         const text = await res.text()

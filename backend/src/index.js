@@ -11,8 +11,35 @@ import { ensurePlatformAdminsInStokvel } from './utils/platformAdminStokvelMembe
 const app = express()
 const PORT = Number(process.env.PORT) || 5000
 
-app.use(cors())
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  ...(typeof process.env.FRONTEND_URL === 'string'
+    ? process.env.FRONTEND_URL.split(',').map((s) => s.trim()).filter(Boolean)
+    : []),
+].filter((origin, i, arr) => origin && arr.indexOf(origin) === i)
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true)
+      } else {
+        callback(new Error('Not allowed by CORS'))
+      }
+    },
+  }),
+)
 app.use(express.json())
+
+// Health Check Route
+app.get('/', (req, res) => {
+  res.json({
+    status: 'online',
+    message: 'Stokvel API is running perfectly!',
+    time: new Date().toISOString(),
+  })
+})
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'Stokvel API' })
@@ -178,5 +205,5 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
 })
 
 app.listen(PORT, () => {
-  console.log(`Stokvel API listening on http://localhost:${PORT}`)
+  console.log(`Stokvel API listening on port ${PORT}`)
 })

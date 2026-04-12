@@ -6,6 +6,7 @@ import {
   Navigate,
 } from 'react-router-dom'
 import { supabase } from './utils/supabase'
+import { apiUrl } from './utils/api'
 import { SessionProvider } from './context/SessionContext'
 import RequireAuth from './components/RequireAuth'
 import RequireAdmin from './components/RequireAdmin'
@@ -56,7 +57,7 @@ export default function App() {
       return
     }
     try {
-      const res = await fetch('/api/me', {
+      const res = await fetch(apiUrl('/api/me'), {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
 
