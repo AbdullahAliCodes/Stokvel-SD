@@ -1,0 +1,32 @@
+name: Production Backend Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  Deploy-To-Render:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Tell GitHub UI a deployment is starting
+      - name: Start GitHub Deployment UI
+        uses: chrnorm/deployment-action@v2
+        id: deployment
+        with:
+          token: '${{ github.token }}'
+          environment-url: 'https://stokvel-backend-x0dm.onrender.com'
+          environment: 'Production (Backend)'
+
+      # 2. Actually trigger Render
+      - name: Trigger Render Deployment
+        run: curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}
+
+      # 3. Tell GitHub UI the deployment was successful!
+      - name: Update GitHub Deployment UI
+        uses: chrnorm/deployment-status@v2
+        with:
+          token: '${{ github.token }}'
+          environment-url: 'https://stokvel-backend-x0dm.onrender.com'
+          state: 'success'
+          deployment-id: ${{ steps.deployment.outputs.deployment_id }}
