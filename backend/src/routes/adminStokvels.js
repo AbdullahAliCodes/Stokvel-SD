@@ -25,6 +25,72 @@ function dbClient(req) {
   return getServiceSupabase() ?? createUserScopedClient(req)
 }
 
+/** True if `row` already reflects every key in `patch` (used after UPDATE returns 0 rows). */
+function rowMatchesPatch(row, patch) {
+  if (!row || !patch || Object.keys(patch).length === 0) return false
+  for (const [key, val] of Object.entries(patch)) {
+    if (!(key in row)) return false
+    const got = row[key]
+    if (got === val) continue
+    if (val != null && got != null && String(got).toLowerCase() === String(val).toLowerCase()) continue
+    if (typeof val === 'number' && Number(got) === val) continue
+    return false
+  }
+  return true
+}
+
+/**
+ * UPDATE … SELECT without `.single()` (avoids PGRST116). If UPDATE returns no rows, we only
+ * succeed if a refetch proves the row already matches `patch` (idempotent); otherwise we fail
+ * so we never return 200 when RLS blocked the write but SELECT still returns the old row.
+ */
+async function updateStokvelReturningRow(client, stokvelId, patch) {
+  const writer = getServiceSupabase() ?? client
+  const { data: rows, error } = await writer
+    .from('stokvels')
+    .update(patch)
+    .eq('id', stokvelId)
+    .select('*')
+
+  if (error) {
+    return { stokvel: null, error }
+  }
+
+  const first = Array.isArray(rows) && rows.length > 0 ? rows[0] : null
+  if (first) {
+    return { stokvel: first, error: null }
+  }
+
+  const reader = getServiceSupabase() ?? client
+  const { data: current, error: err2 } = await reader
+    .from('stokvels')
+    .select('*')
+    .eq('id', stokvelId)
+    .maybeSingle()
+
+  if (err2) {
+    return { stokvel: null, error: err2 }
+  }
+
+  if (current && rowMatchesPatch(current, patch)) {
+    return { stokvel: current, error: null }
+  }
+
+  if (current) {
+    return {
+      stokvel: null,
+      error: new Error(
+        'No rows were updated (RLS or permissions). Set SUPABASE_SERVICE_ROLE_KEY on the API server or add a policy allowing platform admins to update stokvels.',
+      ),
+    }
+  }
+
+  return {
+    stokvel: null,
+    error: new Error('Stokvel not found or update returned no rows.'),
+  }
+}
+
 const ALLOWED_TYPES = new Set(['Rotating', 'Fixed'])
 const ALLOWED_PAYOUT = new Set(['Manual', 'Auto-Rotate'])
 const ALLOWED_STATUS = new Set(['pending', 'active', 'rejected'])
@@ -564,16 +630,15 @@ router.patch('/stokvels/:stokvelId', requireAuth, requireAdmin, async (req, res)
       return res.status(400).json({ error: 'No valid fields to update.' })
     }
 
-    const { data: updated, error: upErr } = await client
-      .from('stokvels')
-      .update(patch)
-      .eq('id', stokvelId)
-      .select()
-      .single()
+    const { stokvel: updated, error: upErr } = await updateStokvelReturningRow(client, stokvelId, patch)
 
     if (upErr) {
       console.error('PATCH /api/admin/stokvels:', upErr)
-      return res.status(500).json({ error: upErr.message || 'Update failed' })
+      return res.status(500).json({ error: upErr.message || String(upErr) || 'Update failed' })
+    }
+
+    if (!updated) {
+      return res.status(404).json({ error: 'Stokvel not found after update.' })
     }
 
     return res.json({ success: true, stokvel: updated })

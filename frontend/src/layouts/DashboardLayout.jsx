@@ -7,11 +7,8 @@ import {
   Home,
   LogOut,
   User,
-  PlusCircle,
-  ShieldCheck,
 } from 'lucide-react'
 import { supabase } from '../utils/supabase'
-import { useSession } from '../context/SessionContext'
 
 const linkClass = ({ isActive }) =>
   `flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition ${
@@ -21,19 +18,12 @@ const linkClass = ({ isActive }) =>
   }`
 
 export default function DashboardLayout() {
-  const { userRole } = useSession()
-  const isAdmin = String(userRole || '').toLowerCase() === 'admin'
-
   return (
     <div className="flex min-h-[calc(100vh-5rem)] flex-col gap-4 px-4 pb-8 pt-2 text-white md:flex-row md:px-8">
       <aside className="glass flex w-full flex-col md:max-w-[220px] md:shrink-0">
         <div className="border-b border-white/10 p-4">
-          <div
-            className={`rounded py-2 text-center text-xs font-bold uppercase tracking-wide ${
-              isAdmin ? 'bg-cyan-600 text-white' : 'bg-blue-600 text-white'
-            }`}
-          >
-            {isAdmin ? 'Admin' : 'Member'}
+          <div className="rounded bg-blue-600 py-2 text-center text-xs font-bold uppercase tracking-wide text-white">
+            Member
           </div>
           <p className="mt-3 text-xs font-semibold text-slate-500">Sawubona Stokvel</p>
         </div>
@@ -58,21 +48,6 @@ export default function DashboardLayout() {
             <LifeBuoy className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
             Support
           </NavLink>
-          {isAdmin ? (
-            <>
-              <span className="mt-2 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Admin
-              </span>
-              <NavLink to="/admin/create-group" className={linkClass}>
-                <PlusCircle className="h-4 w-4 shrink-0 text-cyan-400" aria-hidden />
-                Create stokvel
-              </NavLink>
-              <NavLink to="/admin" className={linkClass}>
-                <ShieldCheck className="h-4 w-4 shrink-0 text-cyan-400" aria-hidden />
-                Admin home
-              </NavLink>
-            </>
-          ) : null}
         </nav>
         <Link
           to="/"

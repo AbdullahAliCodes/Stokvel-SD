@@ -125,7 +125,7 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
 
     const { data: newStokvel, error: stokvelError } = await userSupabase
       .from('stokvels')
-      .insert([{ name }])
+      .insert([{ name, status: 'pending' }])
       .select()
       .single()
 

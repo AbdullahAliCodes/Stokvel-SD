@@ -44,11 +44,40 @@ export default function SingleStokvel() {
 
   const groupName = membership?.stokvels?.name
   const isTreasurer = membership?.group_role === 'treasurer'
+  const stokvelStatus = String(membership?.stokvels?.status ?? '').toLowerCase()
+  const isActiveStokvel = stokvelStatus === 'active'
 
   return (
     <div>
+      {membership && stokvelStatus === 'rejected' ? (
+        <div
+          className="mb-6 rounded-xl border border-red-500/50 bg-red-500/10 px-4 py-3 text-sm text-red-100"
+          role="status"
+        >
+          <strong className="font-semibold text-red-50">Application rejected.</strong> This stokvel
+          is not active (status: <span className="font-mono">rejected</span>). Meeting and treasury
+          actions are disabled for this group.
+        </div>
+      ) : null}
+      {membership && stokvelStatus === 'pending' ? (
+        <div
+          className="mb-6 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100"
+          role="status"
+        >
+          <strong className="font-semibold text-amber-50">Awaiting approval.</strong> A platform
+          admin has not activated this stokvel yet. You will see an active status here once it is
+          approved.
+        </div>
+      ) : null}
+
       <div
-        className={`mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between ${isTreasurer ? 'rounded-xl border-t-4 border-emerald-500 pt-4' : ''}`}
+        className={`mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between ${
+          isTreasurer && isActiveStokvel
+            ? 'rounded-xl border-t-4 border-emerald-500 pt-4'
+            : isTreasurer && !isActiveStokvel
+              ? 'rounded-xl border-t-4 border-slate-600 pt-4'
+              : ''
+        }`}
       >
         <div>
           <h1 className="text-2xl font-bold tracking-widest text-cyan-400 uppercase sm:text-3xl">
@@ -64,9 +93,16 @@ export default function SingleStokvel() {
               </span>
             )}
           </h1>
-          {groupName ? <p className={`mt-1 ${pageSubtitle}`}>{groupName}</p> : null}
+          {groupName ? (
+            <p className={`mt-1 ${pageSubtitle}`}>
+              {groupName}
+              {stokvelStatus ? (
+                <span className="ml-2 capitalize text-slate-500">· {stokvelStatus}</span>
+              ) : null}
+            </p>
+          ) : null}
         </div>
-        {['treasurer', 'admin'].includes(membership?.group_role) ? (
+        {isActiveStokvel && ['treasurer', 'admin'].includes(membership?.group_role) ? (
           <button type="button" className={btnPrimary}>
             Create meeting
           </button>
@@ -215,17 +251,11 @@ export default function SingleStokvel() {
                       </tr>
                     </thead>
                     <tbody>
-                      {[
-                        ['Sipho K.', 'R 500', '2026-04-01'],
-                        ['Thandi N.', 'R 500', '2026-03-28'],
-                        ['Mark F.', 'R 500', '2026-03-15'],
-                      ].map((row) => (
-                        <tr key={row[2] + row[0]} className={tableRow}>
-                          <td className="p-3">{row[0]}</td>
-                          <td className="p-3">{row[1]}</td>
-                          <td className="p-3 text-slate-400">{row[2]}</td>
-                        </tr>
-                      ))}
+                      <tr className={tableRow}>
+                        <td colSpan="3" className="py-8 text-center text-gray-500 italic">
+                          No information available
+                        </td>
+                      </tr>
                     </tbody>
                   </table>
                 </div>
@@ -245,17 +275,11 @@ export default function SingleStokvel() {
                       </tr>
                     </thead>
                     <tbody>
-                      {[
-                        ['Q3 Financial Review', '2026-04-10', 'Bring statements'],
-                        ['Monthly check-in', '2026-04-24', 'All members'],
-                        ['Payout draw', '2026-05-01', 'Treasurer only prep'],
-                      ].map((row) => (
-                        <tr key={row[1] + row[0]} className={tableRow}>
-                          <td className="p-3">{row[0]}</td>
-                          <td className="p-3 text-slate-400">{row[1]}</td>
-                          <td className="p-3 text-slate-300">{row[2]}</td>
-                        </tr>
-                      ))}
+                      <tr className={tableRow}>
+                        <td colSpan="3" className="py-8 text-center text-gray-500 italic">
+                          No information available
+                        </td>
+                      </tr>
                     </tbody>
                   </table>
                 </div>
@@ -277,20 +301,10 @@ export default function SingleStokvel() {
                       </tr>
                     </thead>
                     <tbody>
-                      <tr className={`${tableRow} font-semibold text-cyan-200`}>
-                        <td className="p-3">Lerato M.</td>
-                        <td className="p-3">R 3 000</td>
-                        <td className="p-3 text-slate-400">2026-04-15</td>
-                      </tr>
                       <tr className={tableRow}>
-                        <td className="p-3">Sipho K.</td>
-                        <td className="p-3">R 3 000</td>
-                        <td className="p-3 text-slate-400">2026-05-15</td>
-                      </tr>
-                      <tr className={tableRow}>
-                        <td className="p-3">Thandi N.</td>
-                        <td className="p-3">R 3 000</td>
-                        <td className="p-3 text-slate-400">2026-06-15</td>
+                        <td colSpan="3" className="py-8 text-center text-gray-500 italic">
+                          No information available
+                        </td>
                       </tr>
                     </tbody>
                   </table>

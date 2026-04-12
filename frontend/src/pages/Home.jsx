@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useSession } from '../context/SessionContext'
-import { btnPrimary, pageSubtitle, pageTitle } from '../ui'
+import { btnPrimary, btnSecondary, pageSubtitle, pageTitle } from '../ui'
 
 export default function Home() {
   const { session, backendData, testBackendConnection } = useSession()

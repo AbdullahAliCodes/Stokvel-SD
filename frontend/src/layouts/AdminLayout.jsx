@@ -1,11 +1,10 @@
-import { Link, NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet } from 'react-router-dom'
 import {
   Users,
   ShieldCheck,
   Ticket,
   FileBarChart,
   PlusCircle,
-  Home,
   LogOut,
   User,
 } from 'lucide-react'
@@ -57,13 +56,6 @@ export default function AdminLayout() {
             Account
           </NavLink>
         </nav>
-        <Link
-          to="/"
-          className="mx-2 mb-2 flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-400 transition hover:bg-white/5 hover:text-white"
-        >
-          <Home className="h-4 w-4" aria-hidden />
-          Back to Home
-        </Link>
         <div className="border-t border-white/10 p-3">
           <button
             type="button"
