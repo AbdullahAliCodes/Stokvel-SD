@@ -37,4 +37,4 @@ npm run dev
 
 The dev server prints the local URL (typically **http://localhost:5173**). Requests to `/api/*` are proxied to the backend on port 5000.
 
-Run both servers together during development so the frontend can reach the API.
+Run both servers simultaneously during development so the frontend can reach the API.
