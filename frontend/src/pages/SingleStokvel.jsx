@@ -8,14 +8,12 @@ function formatZAR(n) {
   return `R ${Math.round(num).toLocaleString('en-ZA')}`
 }
 
-function memberDisplay(m) {
-  const p = m.profiles
+function memberDisplay(p) {
   const first = p?.first_name?.trim()
   const last = p?.last_name?.trim()
   if (first || last) return [first, last].filter(Boolean).join(' ')
   if (p?.full_name) return p.full_name
-  if (p?.email) return p.email.split('@')[0]
-  if (m.user_id) return `Member ${m.user_id.slice(0, 8)}`
+  if (p?.email) return p.email.split('@')[0]      
   return 'Member'
 }
 
@@ -27,6 +25,52 @@ export default function SingleStokvel() {
   const [members, setMembers] = useState([])
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [quickPayOpen, setQuickPayOpen] = useState(false)
+  const [quickPayAmount, setQuickPayAmount] = useState('')
+  const [quickPayLoading, setQuickPayLoading] = useState(false)
+  const [quickPayError, setQuickPayError] = useState(null)
+  const [totalContribution, setTotalContribution] = useState(0)
+  const [contributions, setContributions] = useState([])
+
+  async function handleQuickPay() {
+    const parsed = Number(quickPayAmount)
+    if (!quickPayAmount || Number.isNaN(parsed) || parsed <= 0) {
+      setQuickPayError('Please enter a valid amount')
+      return
+    }
+    setQuickPayLoading(true)
+    setQuickPayError(null)
+    try {
+      const res = await fetch(`/api/stokvels/${id}/contributions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ amount: parsed }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`)
+  
+      setTotalContribution((prev) => prev + parsed)
+      setContributions((prev) => [
+        {
+          id: json.contribution.id,
+          amount: parsed,
+          paid_at: json.contribution.paid_at,
+          user_id: json.contribution.user_id,
+          profiles: members.find((m) => m.user_id === json.contribution.user_id)?.profiles ?? null,
+        },
+        ...prev,
+      ])
+      setQuickPayOpen(false)
+      setQuickPayAmount('')
+    } catch (e) {
+      setQuickPayError(e.message)
+    } finally {
+      setQuickPayLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (!session || !id) {
@@ -52,6 +96,8 @@ export default function SingleStokvel() {
           setMembership(json.membership ?? null)
           setStokvel(json.stokvel ?? null)
           setMembers(Array.isArray(json.members) ? json.members : [])
+          setTotalContribution(json.totalContribution ?? 0)
+          setContributions(Array.isArray(json.contributions) ? json.contributions : [])
         }
       } catch (e) {
         if (!cancelled) {
@@ -76,7 +122,6 @@ export default function SingleStokvel() {
   const groupName = stokvel?.name
   const memberCount = members.length
   const monthlyContribution = Number(stokvel?.contribution_amount) || 0
-  const totalContribution = 0
   const expectedPayout = monthlyContribution
   const savingsProjection = monthlyContribution * memberCount * 12
 
@@ -155,25 +200,21 @@ export default function SingleStokvel() {
                       </tr>
                     </thead>
                     <tbody>
-                      {members.length === 0 ? (
+                      {contributions.length === 0 ? (
                         <tr>
-                          <td
-                            colSpan={3}
-                            className="p-3 text-gray-600"
-                          >
-                            No members yet.
+                          <td colSpan={3} className="p-3 text-gray-600">
+                            No contributions yet.
                           </td>
                         </tr>
                       ) : (
-                        members.map((m) => (
-                          <tr
-                            key={m.user_id}
-                            className="border-b border-gray-300"
-                          >
-                            <td className="p-3">{memberDisplay(m)}</td>
-                            <td className="p-3">{formatZAR(0)}</td>
-                            <td className="p-3">—</td>
-                          </tr>
+                        contributions.map((c) => (
+                          <tr key={c.id} className="border-b border-gray-300">
+                            <td className="p-3">{memberDisplay(c.profiles)}</td>
+                            <td className="p-3">{formatZAR(c.amount)}</td>
+                            <td className="p-3">
+                            {c.paid_at ? new Date(c.paid_at).toLocaleDateString('en-ZA') : '—'}
+                            </td>
+                         </tr>
                         ))
                       )}
                     </tbody>
@@ -254,7 +295,7 @@ export default function SingleStokvel() {
                             key={`payout-${m.user_id}`}
                             className="border-b border-gray-300"
                           >
-                            <td className="p-3">{memberDisplay(m)}</td>
+                            <td className="p-3">{memberDisplay(m.profiles)}</td>
                             <td className="p-3">{formatZAR(monthlyContribution)}</td>
                             <td className="p-3">—</td>
                           </tr>
@@ -268,11 +309,51 @@ export default function SingleStokvel() {
           </div>
 
           <button
-            type="button"
-            className="mt-8 w-full max-w-md border-2 border-black bg-black py-4 text-lg font-semibold text-white hover:bg-gray-900 sm:w-auto sm:px-12"
-          >
-            Quick Pay
-          </button>
+  type="button"
+  onClick={() => setQuickPayOpen(true)}
+  className="mt-8 w-full max-w-md border-2 border-black bg-black py-4 text-lg font-semibold text-white hover:bg-gray-900 sm:w-auto sm:px-12"
+>
+  Quick Pay
+</button>
+
+{quickPayOpen && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="w-full max-w-sm border border-black bg-white p-6 shadow-lg">
+      <h2 className="mb-4 text-lg font-bold">Quick Pay</h2>
+      <p className="mb-4 text-sm text-gray-600">
+        Enter the amount you are contributing to <strong>{groupName}</strong>.
+      </p>
+      <input
+        type="number"
+        min="1"
+        placeholder="Amount (R)"
+        value={quickPayAmount}
+        onChange={(e) => setQuickPayAmount(e.target.value)}
+        className="mb-2 w-full border border-black p-2 text-sm focus:outline-none"
+      />
+      {quickPayError && (
+        <p className="mb-2 text-xs text-red-600">{quickPayError}</p>
+      )}
+      <div className="mt-4 flex gap-3">
+        <button
+          type="button"
+          onClick={handleQuickPay}
+          disabled={quickPayLoading}
+          className="flex-1 border-2 border-black bg-black py-2 text-sm font-semibold text-white hover:bg-gray-900 disabled:opacity-50"
+        >
+          {quickPayLoading ? 'Submitting...' : 'Submit Payment'}
+        </button>
+        <button
+          type="button"
+          onClick={() => { setQuickPayOpen(false); setQuickPayError(null); setQuickPayAmount('') }}
+          className="flex-1 border border-black bg-white py-2 text-sm font-semibold hover:bg-gray-100"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+)}
         </>
       ) : null}
     </div>
