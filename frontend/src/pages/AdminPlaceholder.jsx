@@ -1,10 +1,8 @@
 export default function AdminPlaceholder({ title }) {
   return (
     <div>
-      <h1 className="mb-4 text-xl font-semibold">{title}</h1>
-      <p className="border border-dashed border-gray-400 bg-gray-50 p-8 text-center text-gray-600">
-        Placeholder — content coming soon
-      </p>
+      <h1 className="mb-2 text-xl font-bold tracking-wide text-cyan-400">{title}</h1>
+      <div className="mt-8 text-gray-500 italic">No information available</div>
     </div>
   )
 }

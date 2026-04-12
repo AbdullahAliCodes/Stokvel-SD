@@ -1,9 +1,42 @@
 @import 'tailwindcss';
 
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
 body {
   margin: 0;
+  font-family: var(--font-sans);
+  background-color: #0f172a;
+  color: #fff;
+  -webkit-font-smoothing: antialiased;
 }
 
 #root {
   min-height: 100vh;
+}
+
+/* Wireframe-aligned glass + accent cards */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+}
+
+.card-accent {
+  border-left: 4px solid #22d3ee;
+}
+
+.card-green {
+  border-left: 4px solid #10b981;
+}
+
+.card-blue {
+  border-left: 4px solid #3b82f6;
+}
+
+.stat-glow {
+  text-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
 }

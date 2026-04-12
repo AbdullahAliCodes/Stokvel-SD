@@ -42,7 +42,8 @@ export function SessionProvider({
 
         const data = JSON.parse(text)
         if (!cancelled) {
-          setUserRole(data.user?.role ?? 'user')
+          const r = data.user?.role ?? 'user'
+          setUserRole(String(r).toLowerCase() === 'admin' ? 'admin' : r)
         }
       } catch (err) {
         console.error('Failed to fetch /api/me for role:', err)
