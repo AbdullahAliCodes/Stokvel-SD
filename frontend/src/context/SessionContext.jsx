@@ -6,6 +6,7 @@ import {
   useEffect,
   useMemo,
 } from 'react'
+import { apiUrl } from '../utils/api'
 
 export const SessionContext = createContext(null)
 
@@ -30,7 +31,7 @@ export function SessionProvider({
 
     async function fetchMe() {
       try {
-        const res = await fetch('/api/me', {
+        const res = await fetch(apiUrl('/api/me'), {
           headers: { Authorization: `Bearer ${session.access_token}` },
         })
 
@@ -42,7 +43,8 @@ export function SessionProvider({
 
         const data = JSON.parse(text)
         if (!cancelled) {
-          setUserRole(data.user?.role ?? 'user')
+          const r = data.user?.role ?? 'user'
+          setUserRole(String(r).toLowerCase() === 'admin' ? 'admin' : r)
         }
       } catch (err) {
         console.error('Failed to fetch /api/me for role:', err)

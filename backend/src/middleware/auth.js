@@ -1,5 +1,12 @@
 import { supabase } from '../utils/supabase.js'
 
+/** Treat Admin / ADMIN / admin as platform admin for routes and /api/me. */
+export function normalizePlatformRole(role) {
+  if (role == null || role === '') return 'user'
+  if (String(role).toLowerCase() === 'admin') return 'admin'
+  return String(role)
+}
+
 export async function requireAuth(req, res, next) {
   try {
     const authHeader = req.headers.authorization
@@ -29,7 +36,7 @@ export async function requireAuth(req, res, next) {
       console.error('Error fetching profile:', profileError)
     }
 
-    req.user = { ...data.user, role: profile?.role || 'user' }
+    req.user = { ...data.user, role: normalizePlatformRole(profile?.role) }
     next()
   } catch (err) {
     console.error('Auth Middleware Error:', err)

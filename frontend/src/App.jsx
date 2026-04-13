@@ -6,17 +6,24 @@ import {
   Navigate,
 } from 'react-router-dom'
 import { supabase } from './utils/supabase'
+import { apiUrl } from './utils/api'
 import { SessionProvider } from './context/SessionContext'
 import RequireAuth from './components/RequireAuth'
 import RequireAdmin from './components/RequireAdmin'
+import RequireMember from './components/RequireMember'
+import AuthRedirect from './components/AuthRedirect'
 import Auth from './components/Auth'
 import PublicLayout from './layouts/PublicLayout'
 import DashboardLayout from './layouts/DashboardLayout'
 import AdminLayout from './layouts/AdminLayout'
-import Home from './pages/Home'
 import Apply from './pages/Apply'
 import AdminDashboard from './pages/AdminDashboard'
 import AdminPlaceholder from './pages/AdminPlaceholder'
+import AdminCreateStokvel from './pages/AdminCreateStokvel'
+import AdminGroups from './pages/AdminGroups'
+import AdminEditStokvel from './pages/AdminEditStokvel'
+import AdminReviewStokvel from './pages/AdminReviewStokvel'
+import Account from './pages/Account'
 import StokvelDashboard from './pages/StokvelDashboard'
 import SingleStokvel from './pages/SingleStokvel'
 import Meetings from './pages/Meetings'
@@ -50,7 +57,7 @@ export default function App() {
       return
     }
     try {
-      const res = await fetch('/api/me', {
+      const res = await fetch(apiUrl('/api/me'), {
         headers: { Authorization: `Bearer ${session.access_token}` },
       })
 
@@ -69,8 +76,8 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-white text-black">
-        <p className="text-sm">Loading…</p>
+      <div className="flex min-h-screen items-center justify-center bg-[#0f172a] text-slate-300">
+        <p className="text-sm tracking-wide">Loading…</p>
       </div>
     )
   }
@@ -85,37 +92,33 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route element={<PublicLayout />}>
-            <Route path="/" element={<Home />} />
+            <Route path="/" element={<AuthRedirect />} />
             <Route
               path="/auth"
-              element={
-                session ? (
-                  <Navigate to="/dashboard" replace />
-                ) : (
-                  <Auth />
-                )
-              }
+              element={session ? <AuthRedirect /> : <Auth />}
             />
           </Route>
 
           <Route element={<RequireAuth session={session} />}>
-            <Route element={<DashboardLayout />}>
-              <Route path="/dashboard" element={<StokvelDashboard />} />
-              <Route path="/stokvels/:id" element={<SingleStokvel />} />
-              <Route path="/meetings/:id" element={<MeetingDetails />} />
-              <Route path="/meetings" element={<Meetings />} />
-              <Route path="/apply" element={<Apply />} />
-              <Route path="/my-payout" element={<MyPayout />} />
-              <Route path="/support" element={<Support />} />
+            <Route element={<RequireMember />}>
+              <Route element={<DashboardLayout />}>
+                <Route path="/dashboard" element={<StokvelDashboard />} />
+                <Route path="/stokvels/:id" element={<SingleStokvel />} />
+                <Route path="/meetings/:id" element={<MeetingDetails />} />
+                <Route path="/meetings" element={<Meetings />} />
+                <Route path="/apply" element={<Apply />} />
+                <Route path="/my-payout" element={<MyPayout />} />
+                <Route path="/support" element={<Support />} />
+                <Route path="/account" element={<Account />} />
+              </Route>
             </Route>
 
             <Route element={<RequireAdmin />}>
               <Route path="/admin" element={<AdminLayout />}>
                 <Route index element={<AdminDashboard />} />
-                <Route
-                  path="groups"
-                  element={<AdminPlaceholder title="Active Groups" />}
-                />
+                <Route path="groups" element={<AdminGroups />} />
+                <Route path="groups/:id/review" element={<AdminReviewStokvel />} />
+                <Route path="groups/:id/edit" element={<AdminEditStokvel />} />
                 <Route
                   path="tickets"
                   element={<AdminPlaceholder title="Issue Tickets" />}
@@ -124,10 +127,7 @@ export default function App() {
                   path="reports"
                   element={<AdminPlaceholder title="Reports" />}
                 />
-                <Route
-                  path="create-group"
-                  element={<AdminPlaceholder title="Create Group" />}
-                />
+                <Route path="create-group" element={<AdminCreateStokvel />} />
               </Route>
             </Route>
           </Route>
