@@ -4,18 +4,92 @@ import { useSession } from '../context/SessionContext'
 import { apiUrl } from '../utils/api'
 import { btnPrimary, errorBox, pageSubtitle, tableHead, tableRow, tableWrap } from '../ui'
 
+function formatZAR(n) {
+  const num = Number(n)
+  if (Number.isNaN(num)) return 'R 0'
+  return `R ${Math.round(num).toLocaleString('en-ZA')}`
+}
+
+function memberDisplay(p) {
+  const first = p?.first_name?.trim()
+  const last = p?.last_name?.trim()
+  if (first || last) return [first, last].filter(Boolean).join(' ')
+  if (p?.full_name) return p.full_name
+  if (p?.email) return p.email.split('@')[0]
+  return 'Member'
+}
+
+function formatGroupRole(role) {
+  if (!role) return 'Member'
+  return String(role).charAt(0).toUpperCase() + String(role).slice(1).toLowerCase()
+}
+
 export default function SingleStokvel() {
   const { id } = useParams()
   const { session } = useSession()
+  const [stokvel, setStokvel] = useState(null)
   const [membership, setMembership] = useState(null)
+  const [members, setMembers] = useState([])
   const [error, setError] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [quickPayOpen, setQuickPayOpen] = useState(false)
+  const [quickPayAmount, setQuickPayAmount] = useState('')
+  const [quickPayLoading, setQuickPayLoading] = useState(false)
+  const [quickPayError, setQuickPayError] = useState(null)
+  const [totalContribution, setTotalContribution] = useState(0)
+  const [contributions, setContributions] = useState([])
+
+  async function handleQuickPay() {
+    if (!session?.access_token) return
+    const parsed = Number(quickPayAmount)
+    if (!quickPayAmount || Number.isNaN(parsed) || parsed <= 0) {
+      setQuickPayError('Please enter a valid amount')
+      return
+    }
+    setQuickPayLoading(true)
+    setQuickPayError(null)
+    try {
+      const res = await fetch(apiUrl(`/api/stokvels/${id}/contributions`), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ amount: parsed }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`)
+  
+      setTotalContribution((prev) => prev + parsed)
+      setContributions((prev) => [
+        {
+          id: json.contribution.id,
+          amount: parsed,
+          paid_at: json.contribution.paid_at,
+          user_id: json.contribution.user_id,
+          profiles: members.find((m) => m.user_id === json.contribution.user_id)?.profiles ?? null,
+        },
+        ...prev,
+      ])
+      setQuickPayOpen(false)
+      setQuickPayAmount('')
+    } catch (e) {
+      setQuickPayError(e.message)
+    } finally {
+      setQuickPayLoading(false)
+    }
+  }
 
   useEffect(() => {
-    if (!session || !id) return
+    if (!session || !id) {
+      setLoading(false)
+      return
+    }
 
     let cancelled = false
 
     async function load() {
+      setLoading(true)
       setError(null)
       try {
         const res = await fetch(apiUrl(`/api/stokvels/${id}`), {
@@ -28,11 +102,21 @@ export default function SingleStokvel() {
         const json = JSON.parse(text)
         if (!cancelled) {
           setMembership(json.membership ?? null)
+          setStokvel(json.stokvel ?? null)
+          setMembers(Array.isArray(json.members) ? json.members : [])
+          setTotalContribution(json.totalContribution ?? 0)
+          setContributions(Array.isArray(json.contributions) ? json.contributions : [])
         }
       } catch (e) {
         if (!cancelled) {
           setError(e.message ?? String(e))
           setMembership(null)
+          setStokvel(null)
+          setMembers([])
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
         }
       }
     }
@@ -43,10 +127,25 @@ export default function SingleStokvel() {
     }
   }, [session, id])
 
-  const groupName = membership?.stokvels?.name
-  const isTreasurer = membership?.group_role === 'treasurer'
-  const stokvelStatus = String(membership?.stokvels?.status ?? '').toLowerCase()
+  // Support both `{ stokvel }` (router) and legacy `{ membership.stokvels }` shapes
+  const effectiveStokvel = stokvel ?? membership?.stokvels ?? null
+  const groupName = effectiveStokvel?.name
+  const stokvelStatus = String(effectiveStokvel?.status ?? '').toLowerCase()
   const isActiveStokvel = stokvelStatus === 'active'
+  const memberCount = members.length
+  const monthlyContribution = Number(effectiveStokvel?.contribution_amount) || 0
+  const expectedPayout = monthlyContribution
+  const savingsProjection = monthlyContribution * memberCount * 12
+
+  const statCards = [
+    { label: 'Total contribution', value: formatZAR(totalContribution) },
+    { label: 'Expected payout', value: formatZAR(expectedPayout) },
+    { label: 'Live interest rate', value: '0%' },
+    {
+      label: 'Savings projection',
+      value: memberCount > 0 ? formatZAR(savingsProjection) : formatZAR(0),
+    },
+  ]
 
   return (
     <div>
@@ -73,32 +172,28 @@ export default function SingleStokvel() {
 
       <div
         className={`mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between ${
-          isTreasurer && isActiveStokvel
-            ? 'rounded-xl border-t-4 border-emerald-500 pt-4'
-            : isTreasurer && !isActiveStokvel
-              ? 'rounded-xl border-t-4 border-slate-600 pt-4'
-              : ''
+          isActiveStokvel
+            ? 'rounded-xl border-t-4 border-emerald-500/80 pt-4'
+            : 'rounded-xl border-t-4 border-slate-600 pt-4'
         }`}
       >
         <div>
           <h1 className="text-2xl font-bold tracking-widest text-cyan-400 uppercase sm:text-3xl">
-            {isTreasurer ? (
-              <span className="flex items-center gap-2">
-                <i className="fa-solid fa-file-invoice-dollar text-emerald-400" aria-hidden />
-                Treasurer dashboard
-              </span>
-            ) : (
-              <span className="flex items-center gap-2">
-                <i className="fa-solid fa-user-circle text-blue-400" aria-hidden />
-                Member dashboard
-              </span>
-            )}
+            <span className="flex items-center gap-2">
+              <i className="fa-solid fa-users text-cyan-400" aria-hidden />
+              Stokvel dashboard
+            </span>
           </h1>
-          {groupName ? (
+          {groupName || membership?.group_role ? (
             <p className={`mt-1 ${pageSubtitle}`}>
-              {groupName}
+              {groupName ? <span className="text-white">{groupName}</span> : null}
               {stokvelStatus ? (
                 <span className="ml-2 capitalize text-slate-500">· {stokvelStatus}</span>
+              ) : null}
+              {membership?.group_role ? (
+                <span className="ml-2 text-slate-500">
+                  · {formatGroupRole(membership.group_role)}
+                </span>
               ) : null}
             </p>
           ) : null}
@@ -110,104 +205,28 @@ export default function SingleStokvel() {
         ) : null}
       </div>
 
+      {!session ? (
+        <p className="mb-6 text-sm text-slate-500">Sign in to view this stokvel.</p>
+      ) : null}
+
       {error ? <p className={`mb-6 ${errorBox}`}>{error}</p> : null}
 
-      {membership === null && !error ? (
+      {session && loading ? (
         <p className="text-sm text-slate-500">Loading…</p>
       ) : null}
 
-      {membership ? (
+      {session && !loading && membership ? (
         <>
-          <div className="mb-8 grid gap-4 md:grid-cols-3">
-            <div className="glass card-green p-5">
-              <p className="text-xs text-slate-400">Total Contributions</p>
-              <p className="stat-glow text-2xl font-bold text-emerald-400">R 12,450.00</p>
-            </div>
-            <div className="glass card-accent p-5">
-              <p className="text-xs text-slate-400">Expected Payout</p>
-              <p className="text-2xl font-bold text-cyan-400">R 50,000.00</p>
-              <p className="mt-1 text-[10px] text-slate-500">Scheduled: Oct 2026</p>
-            </div>
-            <div className="glass card-blue p-5">
-              <p className="text-xs text-slate-400">SA Prime Rate</p>
-              <p className="text-2xl font-bold text-blue-400">11.75%</p>
-              <p className="text-[10px] text-blue-300/90">Live from SARB</p>
-            </div>
+          <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {statCards.map((card) => (
+              <div key={card.label} className="glass p-4">
+                <p className="mb-1 text-xs font-semibold uppercase text-slate-400">
+                  {card.label}
+                </p>
+                <p className="text-xl font-semibold text-white">{card.value}</p>
+              </div>
+            ))}
           </div>
-
-          {isTreasurer ? (
-            <div className="mb-8 glass border-t-4 border-emerald-500 p-6">
-              <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-                <h3 className="text-lg font-bold text-white">Member compliance overview</h3>
-                <button
-                  type="button"
-                  className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-white/15"
-                >
-                  Export CSV/PDF
-                </button>
-              </div>
-              <div className={tableWrap}>
-                <table className="w-full text-left text-sm text-slate-200">
-                  <thead>
-                    <tr className={tableHead}>
-                      <th className="p-3">Member</th>
-                      <th className="p-3">Status</th>
-                      <th className="p-3">Last Paid</th>
-                      <th className="p-3">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className={tableRow}>
-                      <td className="p-3">Thabo M.</td>
-                      <td className="p-3">
-                        <span className="text-emerald-400">● Paid</span>
-                      </td>
-                      <td className="p-3 text-slate-400">01 Mar 2026</td>
-                      <td className="p-3">
-                        <button type="button" className="text-sm text-blue-400 hover:underline">
-                          View
-                        </button>
-                      </td>
-                    </tr>
-                    <tr className={tableRow}>
-                      <td className="p-3">Sarah J.</td>
-                      <td className="p-3">
-                        <span className="text-red-400">● Overdue</span>
-                      </td>
-                      <td className="p-3 text-slate-500">—</td>
-                      <td className="p-3">
-                        <button
-                          type="button"
-                          className="rounded bg-red-500/20 px-2 py-1 text-xs text-red-300"
-                        >
-                          Flag Member
-                        </button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div className="mt-6 grid gap-4 md:grid-cols-2">
-                <div className="rounded-xl border border-blue-500/30 bg-white/[0.03] p-4">
-                  <p className="mb-2 text-sm font-bold text-white">ML financial health score (avg)</p>
-                  <div className="h-4 w-full overflow-hidden rounded-full bg-slate-700">
-                    <div className="h-full w-[78%] bg-gradient-to-r from-red-500 via-cyan-400 to-emerald-500" />
-                  </div>
-                  <p className="mt-1 text-right text-xs text-slate-400">78/100 — Healthy</p>
-                </div>
-                <div className="rounded-xl border border-cyan-500/30 bg-white/[0.03] p-4">
-                  <p className="mb-2 text-sm font-bold text-white">Next payout disbursement</p>
-                  <p className="text-lg text-cyan-400">R 45,000.00 → Sipho K.</p>
-                  <button
-                    type="button"
-                    className="mt-3 w-full rounded bg-cyan-600 py-2 text-xs font-bold text-white hover:bg-cyan-500"
-                  >
-                    Initiate Payout
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : null}
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div className="glass flex h-52 flex-col justify-between p-6">
@@ -226,9 +245,13 @@ export default function SingleStokvel() {
               <span className="text-sm font-bold text-white">Quick Pay</span>
               <button
                 type="button"
-                className={`${btnPrimary} mt-4 w-full py-3 text-base shadow-emerald-900/40`}
+                disabled={!isActiveStokvel}
+                onClick={() => isActiveStokvel && setQuickPayOpen(true)}
+                className={`${btnPrimary} mt-4 w-full py-3 text-base shadow-emerald-900/40 disabled:cursor-not-allowed disabled:opacity-40`}
               >
-                Pay monthly contribution (R 1,500)
+                {monthlyContribution > 0
+                  ? `Pay monthly contribution (${formatZAR(monthlyContribution)})`
+                  : 'Pay monthly contribution'}
               </button>
               <div className="mt-4 rounded-lg bg-white/5 p-3 text-xs italic text-slate-400">
                 &quot;Next meeting: 15 April via Zoom&quot;
@@ -252,11 +275,25 @@ export default function SingleStokvel() {
                       </tr>
                     </thead>
                     <tbody>
-                      <tr className={tableRow}>
-                        <td colSpan="3" className="py-8 text-center text-gray-500 italic">
-                          No information available
-                        </td>
-                      </tr>
+                      {contributions.length === 0 ? (
+                        <tr className={tableRow}>
+                          <td colSpan={3} className="p-6 text-center text-slate-500 italic">
+                            No contributions yet.
+                          </td>
+                        </tr>
+                      ) : (
+                        contributions.map((c) => (
+                          <tr key={c.id} className={tableRow}>
+                            <td className="p-3">{memberDisplay(c.profiles)}</td>
+                            <td className="p-3">{formatZAR(c.amount)}</td>
+                            <td className="p-3">
+                              {c.paid_at
+                                ? new Date(c.paid_at).toLocaleDateString('en-ZA')
+                                : '—'}
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -302,17 +339,80 @@ export default function SingleStokvel() {
                       </tr>
                     </thead>
                     <tbody>
-                      <tr className={tableRow}>
-                        <td colSpan="3" className="py-8 text-center text-gray-500 italic">
-                          No information available
-                        </td>
-                      </tr>
+                      {members.length === 0 ? (
+                        <tr className={tableRow}>
+                          <td colSpan={3} className="p-6 text-center text-slate-500 italic">
+                            No payout schedule yet.
+                          </td>
+                        </tr>
+                      ) : (
+                        members.map((m) => (
+                          <tr key={`payout-${m.user_id}`} className={tableRow}>
+                            <td className="p-3">{memberDisplay(m.profiles)}</td>
+                            <td className="p-3">{formatZAR(monthlyContribution)}</td>
+                            <td className="p-3">—</td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
               </section>
             </div>
           </div>
+          {isActiveStokvel ? (
+            <button
+              type="button"
+              onClick={() => setQuickPayOpen(true)}
+              className={`${btnPrimary} mt-8 w-full max-w-md py-4 text-base sm:w-auto sm:px-12`}
+            >
+              Quick Pay
+            </button>
+          ) : null}
+
+          {quickPayOpen ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+              <div className="glass w-full max-w-sm border border-white/10 p-6">
+                <h2 className="mb-4 text-lg font-bold text-white">Quick Pay</h2>
+                <p className="mb-4 text-sm text-slate-400">
+                  Enter the amount you are contributing to{' '}
+                  <strong className="text-white">{groupName}</strong>.
+                </p>
+                <input
+                  type="number"
+                  min="1"
+                  placeholder="Amount (R)"
+                  value={quickPayAmount}
+                  onChange={(e) => setQuickPayAmount(e.target.value)}
+                  className="mb-2 w-full rounded border border-white/15 bg-white/5 p-2 text-sm text-white placeholder:text-slate-500 focus:border-cyan-500/50 focus:outline-none"
+                />
+                {quickPayError ? (
+                  <p className="mb-2 text-xs text-red-400">{quickPayError}</p>
+                ) : null}
+                <div className="mt-4 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={handleQuickPay}
+                    disabled={quickPayLoading}
+                    className={`${btnPrimary} flex-1 py-2 text-sm disabled:opacity-50`}
+                  >
+                    {quickPayLoading ? 'Submitting…' : 'Submit Payment'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuickPayOpen(false)
+                      setQuickPayError(null)
+                      setQuickPayAmount('')
+                    }}
+                    className="flex-1 rounded border border-white/20 py-2 text-sm font-semibold text-slate-200 hover:bg-white/10"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </>
       ) : null}
     </div>

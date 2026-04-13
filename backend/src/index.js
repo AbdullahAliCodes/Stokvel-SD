@@ -3,6 +3,7 @@ import express from 'express'
 import cors from 'cors'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth } from './middleware/auth.js'
+import stokvelsRouter from './routes/stokvels.js'
 import adminStokvelsRouter from './routes/adminStokvels.js'
 import profileRouter from './routes/profile.js'
 import { getServiceSupabase } from './utils/supabaseAdmin.js'
@@ -96,41 +97,6 @@ app.get('/api/my-stokvels', requireAuth, async (req, res) => {
   }
 })
 
-app.get('/api/stokvels/:id', requireAuth, async (req, res) => {
-  try {
-    const token = req.headers.authorization.split(' ')[1]
-    const userSupabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_ANON_KEY,
-      {
-        global: {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      },
-    )
-
-    const { data, error } = await userSupabase
-      .from('stokvel_members')
-      .select('group_role, stokvels(*)')
-      .eq('user_id', req.user.id)
-      .eq('stokvel_id', req.params.id)
-      .single()
-
-    if (error) {
-      console.error('GET /api/stokvels/:id:', error)
-      if (error.code === 'PGRST116') {
-        return res.status(404).json({ error: 'Not found' })
-      }
-      return res.status(500).json({ error: error.message })
-    }
-
-    res.json({ success: true, membership: data })
-  } catch (err) {
-    console.error('GET /api/stokvels/:id:', err)
-    res.status(500).json({ error: 'Internal Server Error' })
-  }
-})
-
 app.post('/api/stokvels', requireAuth, async (req, res) => {
   try {
     const token = req.headers.authorization.split(' ')[1]
@@ -203,6 +169,9 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' })
   }
 })
+
+// GET /api/stokvels (list), GET /api/stokvels/:id, POST /api/stokvels/:id/contributions
+app.use('/api/stokvels', stokvelsRouter)
 
 app.listen(PORT, () => {
   console.log(`Stokvel API listening on port ${PORT}`)

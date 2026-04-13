@@ -9,6 +9,7 @@ export default function Apply() {
   const { session } = useSession()
 
   const [name, setName] = useState('')
+  const [membersCount, setMembersCount] = useState('')
   const [amount, setAmount] = useState('250')
   const [payoutOrder, setPayoutOrder] = useState('randomize')
   const [meetingFreq, setMeetingFreq] = useState('bi-weekly')
@@ -35,6 +36,7 @@ export default function Apply() {
         },
         body: JSON.stringify({
           name,
+          membersCount,
           contributionAmount: amount,
           payoutOrder,
           meetingFrequency: meetingFreq,
@@ -92,7 +94,14 @@ export default function Apply() {
             </label>
             <label className={labelDark}>
               Members count
-              <input type="number" min={1} className={inputDark} placeholder="12" />
+              <input
+                type="number"
+                min={1}
+                className={inputDark}
+                placeholder="12"
+                value={membersCount}
+                onChange={(e) => setMembersCount(e.target.value)}
+              />
             </label>
           </div>
         </section>
@@ -134,10 +143,13 @@ export default function Apply() {
             Monthly (ZAR)
             <input
               type="number"
+              min={0}
+              step="0.01"
               className={`${inputDark} max-w-xs`}
               placeholder="500"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
+              required
             />
           </label>
         </section>

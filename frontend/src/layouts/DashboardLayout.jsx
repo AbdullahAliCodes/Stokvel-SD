@@ -7,6 +7,7 @@ import {
   Home,
   LogOut,
   User,
+  UserPlus,
 } from 'lucide-react'
 import { supabase } from '../utils/supabase'
 
@@ -32,6 +33,10 @@ export default function DashboardLayout() {
             <LayoutDashboard className="h-4 w-4 shrink-0 text-blue-400" aria-hidden />
             Dashboard
           </NavLink>
+          <NavLink to="/apply" className={linkClass}>
+            <UserPlus className="h-4 w-4 shrink-0 text-amber-400" aria-hidden />
+            Apply to stokvel
+          </NavLink>
           <NavLink to="/account" className={linkClass}>
             <User className="h-4 w-4 shrink-0 text-violet-400" aria-hidden />
             Account
@@ -50,7 +55,7 @@ export default function DashboardLayout() {
           </NavLink>
         </nav>
         <Link
-          to="/"
+          to="/home"
           className="mx-2 mb-2 flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-400 transition hover:bg-white/5 hover:text-white"
         >
           <Home className="h-4 w-4" aria-hidden />

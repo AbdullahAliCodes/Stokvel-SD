@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { LayoutDashboard } from 'lucide-react'
 import { useSession } from '../context/SessionContext'
 import { apiUrl } from '../utils/api'
-import { errorBox, pageSubtitle, pageTitle } from '../ui'
+import { btnPrimary, errorBox, pageSubtitle } from '../ui'
 
 function formatRole(role) {
   if (!role) return 'Member'
@@ -85,10 +85,18 @@ export default function StokvelDashboard() {
         <LayoutDashboard className="h-8 w-8 text-blue-400" aria-hidden />
         My stokvels
       </h1>
-      <p className={`mb-8 ${pageSubtitle}`}>
+      <p className={`mb-4 ${pageSubtitle}`}>
         Active groups are ready to use. Pending applications await admin approval; rejected ones
         stay listed so you can see the outcome. Open a card for details.
       </p>
+      <div className="mb-8">
+        <Link
+          to="/apply"
+          className={`${btnPrimary} inline-flex px-10 py-3 text-base`}
+        >
+          Apply to stokvel
+        </Link>
+      </div>
 
       {error ? <p className={`mb-4 ${errorBox}`}>{error}</p> : null}
 
