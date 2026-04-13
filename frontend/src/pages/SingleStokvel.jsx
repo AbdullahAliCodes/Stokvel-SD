@@ -15,8 +15,13 @@ function memberDisplay(p) {
   const last = p?.last_name?.trim()
   if (first || last) return [first, last].filter(Boolean).join(' ')
   if (p?.full_name) return p.full_name
-  if (p?.email) return p.email.split('@')[0]      
+  if (p?.email) return p.email.split('@')[0]
   return 'Member'
+}
+
+function formatGroupRole(role) {
+  if (!role) return 'Member'
+  return String(role).charAt(0).toUpperCase() + String(role).slice(1).toLowerCase()
 }
 
 export default function SingleStokvel() {
@@ -122,14 +127,13 @@ export default function SingleStokvel() {
     }
   }, [session, id])
 
-  const groupName = stokvel?.name ?? membership?.stokvels?.name
-  const isTreasurer = membership?.group_role === 'treasurer'
-  const stokvelStatus = String(
-    stokvel?.status ?? membership?.stokvels?.status ?? '',
-  ).toLowerCase()
+  // Support both `{ stokvel }` (router) and legacy `{ membership.stokvels }` shapes
+  const effectiveStokvel = stokvel ?? membership?.stokvels ?? null
+  const groupName = effectiveStokvel?.name
+  const stokvelStatus = String(effectiveStokvel?.status ?? '').toLowerCase()
   const isActiveStokvel = stokvelStatus === 'active'
   const memberCount = members.length
-  const monthlyContribution = Number(stokvel?.contribution_amount) || 0
+  const monthlyContribution = Number(effectiveStokvel?.contribution_amount) || 0
   const expectedPayout = monthlyContribution
   const savingsProjection = monthlyContribution * memberCount * 12
 
@@ -168,32 +172,28 @@ export default function SingleStokvel() {
 
       <div
         className={`mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between ${
-          isTreasurer && isActiveStokvel
-            ? 'rounded-xl border-t-4 border-emerald-500 pt-4'
-            : isTreasurer && !isActiveStokvel
-              ? 'rounded-xl border-t-4 border-slate-600 pt-4'
-              : ''
+          isActiveStokvel
+            ? 'rounded-xl border-t-4 border-emerald-500/80 pt-4'
+            : 'rounded-xl border-t-4 border-slate-600 pt-4'
         }`}
       >
         <div>
           <h1 className="text-2xl font-bold tracking-widest text-cyan-400 uppercase sm:text-3xl">
-            {isTreasurer ? (
-              <span className="flex items-center gap-2">
-                <i className="fa-solid fa-file-invoice-dollar text-emerald-400" aria-hidden />
-                Treasurer dashboard
-              </span>
-            ) : (
-              <span className="flex items-center gap-2">
-                <i className="fa-solid fa-user-circle text-blue-400" aria-hidden />
-                Member dashboard
-              </span>
-            )}
+            <span className="flex items-center gap-2">
+              <i className="fa-solid fa-users text-cyan-400" aria-hidden />
+              Stokvel dashboard
+            </span>
           </h1>
-          {groupName ? (
+          {groupName || membership?.group_role ? (
             <p className={`mt-1 ${pageSubtitle}`}>
-              {groupName}
+              {groupName ? <span className="text-white">{groupName}</span> : null}
               {stokvelStatus ? (
                 <span className="ml-2 capitalize text-slate-500">· {stokvelStatus}</span>
+              ) : null}
+              {membership?.group_role ? (
+                <span className="ml-2 text-slate-500">
+                  · {formatGroupRole(membership.group_role)}
+                </span>
               ) : null}
             </p>
           ) : null}
@@ -215,7 +215,7 @@ export default function SingleStokvel() {
         <p className="text-sm text-slate-500">Loading…</p>
       ) : null}
 
-      {session && !loading && stokvel ? (
+      {session && !loading && membership ? (
         <>
           <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {statCards.map((card) => (
@@ -227,80 +227,6 @@ export default function SingleStokvel() {
               </div>
             ))}
           </div>
-
-          {isTreasurer ? (
-            <div className="mb-8 glass border-t-4 border-emerald-500 p-6">
-              <div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-                <h3 className="text-lg font-bold text-white">Member compliance overview</h3>
-                <button
-                  type="button"
-                  className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-white/15"
-                >
-                  Export CSV/PDF
-                </button>
-              </div>
-              <div className={tableWrap}>
-                <table className="w-full text-left text-sm text-slate-200">
-                  <thead>
-                    <tr className={tableHead}>
-                      <th className="p-3">Member</th>
-                      <th className="p-3">Status</th>
-                      <th className="p-3">Last Paid</th>
-                      <th className="p-3">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className={tableRow}>
-                      <td className="p-3">Thabo M.</td>
-                      <td className="p-3">
-                        <span className="text-emerald-400">● Paid</span>
-                      </td>
-                      <td className="p-3 text-slate-400">01 Mar 2026</td>
-                      <td className="p-3">
-                        <button type="button" className="text-sm text-blue-400 hover:underline">
-                          View
-                        </button>
-                      </td>
-                    </tr>
-                    <tr className={tableRow}>
-                      <td className="p-3">Sarah J.</td>
-                      <td className="p-3">
-                        <span className="text-red-400">● Overdue</span>
-                      </td>
-                      <td className="p-3 text-slate-500">—</td>
-                      <td className="p-3">
-                        <button
-                          type="button"
-                          className="rounded bg-red-500/20 px-2 py-1 text-xs text-red-300"
-                        >
-                          Flag Member
-                        </button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div className="mt-6 grid gap-4 md:grid-cols-2">
-                <div className="rounded-xl border border-blue-500/30 bg-white/[0.03] p-4">
-                  <p className="mb-2 text-sm font-bold text-white">ML financial health score (avg)</p>
-                  <div className="h-4 w-full overflow-hidden rounded-full bg-slate-700">
-                    <div className="h-full w-[78%] bg-gradient-to-r from-red-500 via-cyan-400 to-emerald-500" />
-                  </div>
-                  <p className="mt-1 text-right text-xs text-slate-400">78/100 — Healthy</p>
-                </div>
-                <div className="rounded-xl border border-cyan-500/30 bg-white/[0.03] p-4">
-                  <p className="mb-2 text-sm font-bold text-white">Next payout disbursement</p>
-                  <p className="text-lg text-cyan-400">R 45,000.00 → Sipho K.</p>
-                  <button
-                    type="button"
-                    className="mt-3 w-full rounded bg-cyan-600 py-2 text-xs font-bold text-white hover:bg-cyan-500"
-                  >
-                    Initiate Payout
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : null}
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div className="glass flex h-52 flex-col justify-between p-6">

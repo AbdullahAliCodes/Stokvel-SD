@@ -9,7 +9,7 @@ export default function PublicLayout() {
     <div className="min-h-screen bg-[#0f172a] text-white">
       <nav className="glass sticky top-0 z-10 mx-4 mt-4 flex items-center justify-between rounded-2xl px-4 py-3 md:mx-8">
         <Link
-          to="/"
+          to={!session ? '/' : isAdmin ? '/admin' : '/home'}
           className="text-lg font-bold tracking-tight text-cyan-400 transition hover:text-cyan-300"
         >
           Sawubona Stokvel

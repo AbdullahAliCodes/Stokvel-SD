@@ -30,6 +30,7 @@ import Meetings from './pages/Meetings'
 import MeetingDetails from './pages/MeetingDetails'
 import MyPayout from './pages/MyPayout'
 import Support from './pages/Support'
+import Home from './pages/Home'
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -101,6 +102,9 @@ export default function App() {
 
           <Route element={<RequireAuth session={session} />}>
             <Route element={<RequireMember />}>
+              <Route path="/home" element={<PublicLayout />}>
+                <Route index element={<Home />} />
+              </Route>
               <Route element={<DashboardLayout />}>
                 <Route path="/dashboard" element={<StokvelDashboard />} />
                 <Route path="/stokvels/:id" element={<SingleStokvel />} />
