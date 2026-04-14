@@ -19,12 +19,18 @@ function dbClient(req) {
   return getServiceSupabase() ?? createUserScopedClient(req)
 }
 
+function normalizeEmail(value) {
+  const email = typeof value === 'string' ? value.trim().toLowerCase() : ''
+  if (!email) return ''
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : ''
+}
+
 router.get('/me', requireAuth, async (req, res) => {
   try {
     const client = dbClient(req)
     const { data, error } = await client
       .from('profiles')
-      .select('first_name, last_name, username')
+      .select('first_name, last_name, username, email')
       .eq('id', req.user.id)
       .maybeSingle()
 
@@ -39,6 +45,7 @@ router.get('/me', requireAuth, async (req, res) => {
         firstName: data?.first_name ?? '',
         lastName: data?.last_name ?? '',
         username: data?.username ?? '',
+        email: data?.email ?? req.user.email ?? '',
       },
     })
   } catch (err) {
@@ -61,6 +68,14 @@ router.patch('/me', requireAuth, async (req, res) => {
     if (typeof body.lastName === 'string') {
       updates.last_name = body.lastName.trim().slice(0, 120)
       touched = true
+    }
+    if ('email' in body) {
+      touched = true
+      const normalized = normalizeEmail(body.email)
+      if (!normalized) {
+        return res.status(400).json({ error: 'Provide a valid email address.' })
+      }
+      updates.email = normalized
     }
 
     if ('username' in body) {
@@ -93,7 +108,7 @@ router.patch('/me', requireAuth, async (req, res) => {
 
     if (!touched) {
       return res.status(400).json({
-        error: 'Provide at least one field: firstName, lastName, or username.',
+        error: 'Provide at least one field: firstName, lastName, username, or email.',
       })
     }
 
@@ -117,6 +132,7 @@ router.patch('/me', requireAuth, async (req, res) => {
         first_name: updates.first_name ?? null,
         last_name: updates.last_name ?? null,
         username: 'username' in body ? updates.username ?? null : null,
+        email: updates.email ?? normalizeEmail(req.user.email) ?? null,
         updated_at: updates.updated_at,
       }
       const { error: insErr } = await client.from('profiles').insert(insertRow)
@@ -134,7 +150,7 @@ router.patch('/me', requireAuth, async (req, res) => {
 
     const { data: fresh, error: readErr } = await client
       .from('profiles')
-      .select('first_name, last_name, username')
+      .select('first_name, last_name, username, email')
       .eq('id', req.user.id)
       .single()
 
@@ -148,6 +164,7 @@ router.patch('/me', requireAuth, async (req, res) => {
         firstName: fresh?.first_name ?? '',
         lastName: fresh?.last_name ?? '',
         username: fresh?.username ?? '',
+        email: fresh?.email ?? req.user.email ?? '',
       },
     })
   } catch (err) {
@@ -232,6 +249,7 @@ router.post('/username', requireAuth, async (req, res) => {
       const { error: insErr } = await client.from('profiles').insert({
         id: req.user.id,
         username: normalized,
+        email: normalizeEmail(req.user.email) || null,
         role: 'user',
       })
       if (insErr) {
@@ -241,7 +259,11 @@ router.post('/username', requireAuth, async (req, res) => {
     } else {
       const { error: upErr } = await client
         .from('profiles')
-        .update({ username: normalized, updated_at: new Date().toISOString() })
+        .update({
+          username: normalized,
+          email: normalizeEmail(req.user.email) || null,
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', req.user.id)
       if (upErr) {
         console.error('POST /api/profile/username update:', upErr)

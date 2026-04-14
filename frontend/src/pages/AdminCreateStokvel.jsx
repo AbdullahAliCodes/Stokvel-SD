@@ -15,6 +15,10 @@ function parseApiError(text) {
   }
 }
 
+function confirmAction(message) {
+  return window.confirm(message)
+}
+
 export default function AdminCreateStokvel() {
   const { session } = useSession()
   const navigate = useNavigate()
@@ -32,12 +36,14 @@ export default function AdminCreateStokvel() {
   const [searchError, setSearchError] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
   const [selectedMembers, setSelectedMembers] = useState([])
+  const [treasurerUserId, setTreasurerUserId] = useState('')
 
   const [submitting, setSubmitting] = useState(false)
   const [inviteSubmitting, setInviteSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
   const [inviteError, setInviteError] = useState('')
   const [inviteUsername, setInviteUsername] = useState('')
+  const [inviteEmail, setInviteEmail] = useState('')
   const [inviteOk, setInviteOk] = useState('')
 
   const [createdStokvel, setCreatedStokvel] = useState(null)
@@ -109,6 +115,13 @@ export default function AdminCreateStokvel() {
     cycleNum < 1
 
   const myUserId = session?.user?.id
+  const myTreasurerLabel = 'You (group creator)'
+
+  useEffect(() => {
+    if (myUserId && !treasurerUserId) {
+      setTreasurerUserId(myUserId)
+    }
+  }, [myUserId, treasurerUserId])
 
   const selectUser = useCallback(
     (u) => {
@@ -117,6 +130,7 @@ export default function AdminCreateStokvel() {
         if (prev.some((x) => x.id === u.id)) return prev
         return [...prev, { id: u.id, username: u.username, label: u.label }]
       })
+      setTreasurerUserId((prev) => prev || myUserId || '')
       setMemberQuery('')
       setSearchResults([])
       setSearchOpen(false)
@@ -126,7 +140,8 @@ export default function AdminCreateStokvel() {
 
   const removeMember = useCallback((id) => {
     setSelectedMembers((prev) => prev.filter((x) => x.id !== id))
-  }, [])
+    setTreasurerUserId((prev) => (prev === id ? myUserId || '' : prev))
+  }, [myUserId])
 
   const goNext = () => {
     setFormError('')
@@ -159,6 +174,7 @@ export default function AdminCreateStokvel() {
       setFormError('Fix validation errors before submitting.')
       return
     }
+    if (!confirmAction('Create this group with the selected settings and treasurer?')) return
 
     setSubmitting(true)
     try {
@@ -175,6 +191,7 @@ export default function AdminCreateStokvel() {
           payoutStrategy,
           cycleLength: cycleNum,
           initialMemberIds: selectedMembers.map((m) => m.id),
+          treasurerUserId: treasurerUserId || myUserId || null,
         }),
       })
       const text = await res.text()
@@ -184,10 +201,15 @@ export default function AdminCreateStokvel() {
       const data = JSON.parse(text)
       setCreatedStokvel(data.stokvel ?? null)
       const n = selectedMembers.length
+      const effectiveTreasurerId = treasurerUserId || myUserId || ''
+      const treasurerName =
+        effectiveTreasurerId && effectiveTreasurerId !== myUserId
+          ? selectedMembers.find((m) => m.id === effectiveTreasurerId)?.label || 'selected member'
+          : 'you'
       setToast(
         n > 0
-          ? `Stokvel created — you are group admin; ${n} member(s) added.`
-          : 'Stokvel created — you were added as group admin.',
+          ? `Stokvel created — ${n} member(s) added, treasurer: ${treasurerName}.`
+          : `Stokvel created — treasurer assigned to ${treasurerName}.`,
       )
     } catch (err) {
       setFormError(err.message ?? String(err))
@@ -201,6 +223,7 @@ export default function AdminCreateStokvel() {
     setInviteError('')
     setInviteOk('')
     if (!createdStokvel?.id || !session?.access_token) return
+    if (!confirmAction(`Add "${inviteUsername.trim()}" as a member?`)) return
 
     setInviteSubmitting(true)
     try {
@@ -225,6 +248,36 @@ export default function AdminCreateStokvel() {
     }
   }
 
+  const handleEmailInvite = async (e) => {
+    e.preventDefault()
+    setInviteError('')
+    setInviteOk('')
+    if (!createdStokvel?.id || !session?.access_token) return
+    if (!confirmAction(`Send invitation to "${inviteEmail.trim()}"?`)) return
+
+    setInviteSubmitting(true)
+    try {
+      const res = await fetch(apiUrl(`/api/admin/stokvels/${createdStokvel.id}/invitations`), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ email: inviteEmail.trim() }),
+      })
+      const text = await res.text()
+      if (!res.ok) {
+        throw new Error(parseApiError(text))
+      }
+      setInviteOk(`Invitation sent: ${inviteEmail.trim()}`)
+      setInviteEmail('')
+    } catch (err) {
+      setInviteError(err.message ?? String(err))
+    } finally {
+      setInviteSubmitting(false)
+    }
+  }
+
   const resetFlow = () => {
     setStep(1)
     setName('')
@@ -237,11 +290,13 @@ export default function AdminCreateStokvel() {
     setSearchError('')
     setSearchOpen(false)
     setSelectedMembers([])
+    setTreasurerUserId(myUserId || '')
     setCreatedStokvel(null)
     setFormError('')
     setInviteError('')
     setInviteOk('')
     setInviteUsername('')
+    setInviteEmail('')
   }
 
   const toastEl =
@@ -298,6 +353,27 @@ export default function AdminCreateStokvel() {
             {inviteOk ? (
               <p className="mt-3 border border-black bg-white p-2 text-sm text-green-900">{inviteOk}</p>
             ) : null}
+
+            <form className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end" onSubmit={handleEmailInvite}>
+              <label className="block min-w-0 flex-1 text-xs font-semibold uppercase text-gray-600">
+                Invite by email
+                <input
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(ev) => setInviteEmail(ev.target.value)}
+                  className="mt-1 w-full border border-black bg-white px-3 py-2 text-sm text-black"
+                  placeholder="member@example.com"
+                  autoComplete="off"
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={inviteSubmitting || !inviteEmail.trim()}
+                className="border border-black bg-white px-4 py-2 text-sm font-medium text-black hover:bg-gray-100 disabled:opacity-50"
+              >
+                {inviteSubmitting ? 'Sending…' : 'Send invite'}
+              </button>
+            </form>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -517,6 +593,26 @@ export default function AdminCreateStokvel() {
             ) : (
               <p className="text-xs text-gray-500">No extra members selected (optional).</p>
             )}
+            <div className="border border-black bg-gray-50 p-3">
+              <label className="block text-xs font-semibold uppercase text-gray-600">
+                Assign treasurer
+                <select
+                  value={treasurerUserId || myUserId || ''}
+                  onChange={(ev) => setTreasurerUserId(ev.target.value)}
+                  className="mt-1 w-full border border-black bg-white px-3 py-2 text-sm"
+                >
+                  {myUserId ? <option value={myUserId}>{myTreasurerLabel}</option> : null}
+                  {selectedMembers.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="mt-2 text-xs text-gray-600">
+                Every group must have a treasurer. Select one member here.
+              </p>
+            </div>
           </div>
         ) : null}
 
@@ -547,6 +643,13 @@ export default function AdminCreateStokvel() {
                   {selectedMembers.length === 0
                     ? 'None'
                     : `${selectedMembers.length} selected`}
+                </li>
+                <li>
+                  <span className="text-gray-600">Treasurer:</span>{' '}
+                  {(treasurerUserId || myUserId) === myUserId
+                    ? myTreasurerLabel
+                    : selectedMembers.find((m) => m.id === (treasurerUserId || myUserId))?.label ||
+                      'Selected member'}
                 </li>
               </ul>
               {selectedMembers.length > 0 ? (

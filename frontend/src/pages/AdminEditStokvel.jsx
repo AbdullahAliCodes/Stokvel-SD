@@ -22,6 +22,10 @@ function parseApiError(text) {
   }
 }
 
+function confirmAction(message) {
+  return window.confirm(message)
+}
+
 export default function AdminEditStokvel() {
   const { id } = useParams()
   const { session } = useSession()
@@ -41,6 +45,17 @@ export default function AdminEditStokvel() {
   const [memberInviteLoading, setMemberInviteLoading] = useState(false)
   const [memberInviteMsg, setMemberInviteMsg] = useState('')
   const [memberInviteErr, setMemberInviteErr] = useState('')
+  const [meetings, setMeetings] = useState([])
+  const [meetingError, setMeetingError] = useState('')
+  const [meetingInfo, setMeetingInfo] = useState('')
+  const [meetingSaving, setMeetingSaving] = useState(false)
+  const [meetingForm, setMeetingForm] = useState({
+    title: '',
+    meetingDate: '',
+    meetingLink: '',
+    agenda: '',
+  })
+  const [minutesDraft, setMinutesDraft] = useState({})
 
   useEffect(() => {
     if (!session?.access_token || !id) return
@@ -50,13 +65,21 @@ export default function AdminEditStokvel() {
     async function load() {
       setLoading(true)
       setError('')
+      setMeetingError('')
       try {
-        const res = await fetch(apiUrl(`/api/admin/stokvels/${id}`), {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        })
-        const text = await res.text()
+        const [res, meetingsRes] = await Promise.all([
+          fetch(apiUrl(`/api/admin/stokvels/${id}`), {
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          }),
+          fetch(apiUrl(`/api/stokvels/${id}/meetings`), {
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          }),
+        ])
+        const [text, meetingsText] = await Promise.all([res.text(), meetingsRes.text()])
         if (!res.ok) throw new Error(parseApiError(text))
+        if (!meetingsRes.ok) throw new Error(parseApiError(meetingsText))
         const data = JSON.parse(text)
+        const meetingsData = JSON.parse(meetingsText)
         const s = data.stokvel
         if (!cancelled && s) {
           setName(s.name ?? '')
@@ -67,6 +90,7 @@ export default function AdminEditStokvel() {
           )
           setPayoutStrategy(s.payout_strategy ?? 'Auto-Rotate')
           setCycleLength(s.cycle_length != null ? String(s.cycle_length) : '12')
+          setMeetings(Array.isArray(meetingsData.meetings) ? meetingsData.meetings : [])
         }
       } catch (e) {
         if (!cancelled) setError(e.message ?? String(e))
@@ -84,6 +108,7 @@ export default function AdminEditStokvel() {
   async function handleSubmit(e) {
     e.preventDefault()
     if (!session?.access_token || !id) return
+    if (!confirmAction('Save group configuration changes?')) return
     setSaving(true)
     setError('')
     try {
@@ -117,6 +142,7 @@ export default function AdminEditStokvel() {
   async function handleAddMember(e) {
     e.preventDefault()
     if (!session?.access_token || !id) return
+    if (!confirmAction(`Add "${memberUsername.trim()}" to this group?`)) return
     setMemberInviteErr('')
     setMemberInviteMsg('')
     setMemberInviteLoading(true)
@@ -137,6 +163,113 @@ export default function AdminEditStokvel() {
       setMemberInviteErr(err.message ?? String(err))
     } finally {
       setMemberInviteLoading(false)
+    }
+  }
+
+  async function handleCreateMeeting(e) {
+    e.preventDefault()
+    if (!session?.access_token || !id) return
+    if (!confirmAction('Schedule this meeting and send member notifications?')) return
+    setMeetingSaving(true)
+    setMeetingError('')
+    setMeetingInfo('')
+    try {
+      const res = await fetch(apiUrl(`/api/stokvels/${id}/meetings`), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify(meetingForm),
+      })
+      const text = await res.text()
+      if (!res.ok) throw new Error(parseApiError(text))
+      const data = JSON.parse(text)
+      if (data.meeting) {
+        setMeetings((prev) =>
+          [...prev, data.meeting].sort(
+            (a, b) => new Date(a.meeting_date).getTime() - new Date(b.meeting_date).getTime(),
+          ),
+        )
+        setMinutesDraft((prev) => ({ ...prev, [data.meeting.id]: data.meeting.minutes ?? '' }))
+      }
+      setMeetingForm({ title: '', meetingDate: '', meetingLink: '', agenda: '' })
+      setMeetingInfo('Meeting scheduled and notifications sent.')
+    } catch (err) {
+      setMeetingError(err.message ?? String(err))
+    } finally {
+      setMeetingSaving(false)
+    }
+  }
+
+  async function handleSaveMinutes(meetingId) {
+    if (!session?.access_token || !id) return
+    if (!confirmAction('Save updated meeting minutes?')) return
+    setMeetingSaving(true)
+    setMeetingError('')
+    setMeetingInfo('')
+    try {
+      const res = await fetch(apiUrl(`/api/stokvels/${id}/meetings/${meetingId}/minutes`), {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ minutes: minutesDraft[meetingId] ?? '' }),
+      })
+      const text = await res.text()
+      if (!res.ok) throw new Error(parseApiError(text))
+      const data = JSON.parse(text)
+      if (data.meeting) {
+        setMeetings((prev) => prev.map((m) => (m.id === meetingId ? data.meeting : m)))
+      }
+      setMeetingInfo('Minutes saved.')
+    } catch (err) {
+      setMeetingError(err.message ?? String(err))
+    } finally {
+      setMeetingSaving(false)
+    }
+  }
+
+  async function handleDeleteMeeting(meetingId) {
+    if (!session?.access_token || !id) return
+    if (!confirmAction('Delete this meeting? This action cannot be undone.')) return
+    setMeetingSaving(true)
+    setMeetingError('')
+    setMeetingInfo('')
+    try {
+      const res = await fetch(apiUrl(`/api/stokvels/${id}/meetings/${meetingId}`), {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      const text = await res.text()
+      if (!res.ok) throw new Error(parseApiError(text))
+      setMeetings((prev) => prev.filter((m) => m.id !== meetingId))
+      setMeetingInfo('Meeting deleted.')
+    } catch (err) {
+      setMeetingError(err.message ?? String(err))
+    } finally {
+      setMeetingSaving(false)
+    }
+  }
+
+  async function handleDeleteStokvel() {
+    if (!session?.access_token || !id) return
+    if (!confirmAction('Delete this entire stokvel and all related data? This cannot be undone.')) return
+    setSaving(true)
+    setError('')
+    try {
+      const res = await fetch(apiUrl(`/api/admin/stokvels/${id}`), {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      const text = await res.text()
+      if (!res.ok) throw new Error(parseApiError(text))
+      navigate('/admin/groups')
+    } catch (err) {
+      setError(err.message ?? String(err))
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -231,6 +364,14 @@ export default function AdminEditStokvel() {
             <button type="submit" disabled={saving} className={btnPrimary}>
               {saving ? 'Saving…' : 'Save changes'}
             </button>
+            <button
+              type="button"
+              onClick={handleDeleteStokvel}
+              disabled={saving}
+              className="inline-flex items-center rounded-lg border border-red-400/40 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-200 transition hover:bg-red-500/20 disabled:opacity-50"
+            >
+              {saving ? 'Working…' : 'Delete stokvel'}
+            </button>
             <Link to="/admin/groups" className={`${btnSecondary} inline-flex items-center px-4 py-2.5`}>
               Cancel
             </Link>
@@ -276,6 +417,140 @@ export default function AdminEditStokvel() {
               {memberInviteLoading ? 'Adding…' : 'Add member'}
             </button>
           </form>
+        </div>
+
+        <div className="mt-10 max-w-2xl border-t border-white/10 pt-8">
+          <h2 className="mb-1 text-lg font-semibold text-white">Meetings & agenda</h2>
+          <p className={`mb-4 text-sm ${pageSubtitle}`}>
+            Admins and treasurers can schedule meetings, set agendas, and record minutes.
+          </p>
+          {meetingError ? (
+            <p className={`${errorBox} mb-3`} role="alert">
+              {meetingError}
+            </p>
+          ) : null}
+          {meetingInfo ? (
+            <p
+              className="mb-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200"
+              role="status"
+            >
+              {meetingInfo}
+            </p>
+          ) : null}
+
+          <form onSubmit={handleCreateMeeting} className="mb-6 grid gap-3 sm:grid-cols-2">
+            <label className={`${labelDark} sm:col-span-2`}>
+              Meeting title
+              <input
+                type="text"
+                value={meetingForm.title}
+                onChange={(ev) =>
+                  setMeetingForm((prev) => ({ ...prev, title: ev.target.value }))
+                }
+                className={inputDark}
+                required
+              />
+            </label>
+            <label className={labelDark}>
+              Date & time
+              <input
+                type="datetime-local"
+                value={meetingForm.meetingDate}
+                onChange={(ev) =>
+                  setMeetingForm((prev) => ({ ...prev, meetingDate: ev.target.value }))
+                }
+                className={inputDark}
+                required
+              />
+            </label>
+            <label className={labelDark}>
+              Meeting link
+              <input
+                type="url"
+                value={meetingForm.meetingLink}
+                onChange={(ev) =>
+                  setMeetingForm((prev) => ({ ...prev, meetingLink: ev.target.value }))
+                }
+                className={inputDark}
+                placeholder="https://..."
+              />
+            </label>
+            <label className={`${labelDark} sm:col-span-2`}>
+              Agenda
+              <textarea
+                rows={4}
+                value={meetingForm.agenda}
+                onChange={(ev) =>
+                  setMeetingForm((prev) => ({ ...prev, agenda: ev.target.value }))
+                }
+                className={inputDark}
+                placeholder="Set the agenda while scheduling"
+              />
+            </label>
+            <div className="sm:col-span-2">
+              <button type="submit" disabled={meetingSaving} className={btnSecondary}>
+                {meetingSaving ? 'Saving…' : 'Schedule meeting'}
+              </button>
+            </div>
+          </form>
+
+          <div className="space-y-3">
+            {meetings.map((m) => (
+              <div key={m.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="font-semibold text-white">{m.title}</p>
+                  <p className="text-xs text-slate-400">
+                    {new Date(m.meeting_date).toLocaleString('en-ZA')}
+                  </p>
+                </div>
+                <p className="mt-2 text-sm text-slate-300">
+                  <span className="font-semibold text-slate-200">Agenda:</span>{' '}
+                  {m.agenda || m.notes || 'No agenda yet.'}
+                </p>
+                {m.meeting_link ? (
+                  <a
+                    href={m.meeting_link}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-2 inline-flex text-sm text-cyan-300 underline"
+                  >
+                    Open meeting link
+                  </a>
+                ) : null}
+                <label className={`${labelDark} mt-3`}>
+                  Minutes
+                  <textarea
+                    rows={3}
+                    value={minutesDraft[m.id] ?? m.minutes ?? ''}
+                    onChange={(ev) =>
+                      setMinutesDraft((prev) => ({ ...prev, [m.id]: ev.target.value }))
+                    }
+                    className={inputDark}
+                    placeholder="Record minutes..."
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => handleSaveMinutes(m.id)}
+                  disabled={meetingSaving}
+                  className={btnSecondary}
+                >
+                  Save minutes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteMeeting(m.id)}
+                  disabled={meetingSaving}
+                  className="ml-2 inline-flex rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-200 transition hover:bg-red-500/20"
+                >
+                  Delete meeting
+                </button>
+              </div>
+            ))}
+            {meetings.length === 0 ? (
+              <p className="text-xs text-slate-500">No meetings scheduled yet.</p>
+            ) : null}
+          </div>
         </div>
         </>
       )}
