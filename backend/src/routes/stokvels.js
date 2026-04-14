@@ -10,6 +10,32 @@ import { getServiceSupabase } from '../utils/supabaseAdmin.js'
 
 const router = Router()
 
+function normalizeMembersCount(raw) {
+  const n = Number(raw)
+  if (!Number.isInteger(n) || n < 1 || n > 500) return null
+  return n
+}
+
+function normalizeMemberDetails(raw, limit = 500) {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((m) => ({
+      name: typeof m?.name === 'string' ? m.name.trim() : '',
+      email: typeof m?.email === 'string' ? m.email.trim().toLowerCase() : '',
+      role: typeof m?.role === 'string' ? m.role.trim() : '',
+    }))
+    .filter((m) => m.name || m.email || m.role)
+    .slice(0, limit)
+}
+
+function normalizeDocuments(raw, limit = 50) {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((d) => (typeof d === 'string' ? d.trim() : ''))
+    .filter(Boolean)
+    .slice(0, limit)
+}
+
 function userScopedSupabase(req) {
   const token = req.headers.authorization.split(' ')[1]
   return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
@@ -99,7 +125,17 @@ router.get('/', requireAuth, async (req, res) => {
 
 router.post('/', requireAuth, async (req, res) => {
   try {
-    const { name, contributionAmount, memberEmails, treasurerEmail } = req.body
+    const {
+      name,
+      contributionAmount,
+      memberEmails,
+      treasurerEmail,
+      payoutOrder,
+      meetingFrequency,
+      membersCount,
+      memberDetails,
+      documents,
+    } = req.body
 
     if (!name || typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({ error: 'Stokvel name is required' })
@@ -107,7 +143,17 @@ router.post('/', requireAuth, async (req, res) => {
 
     const userSupabase = userScopedSupabase(req)
 
-    const baseRow = { name: name.trim() }
+    const parsedMembersCount = normalizeMembersCount(membersCount)
+    const parsedDetails = normalizeMemberDetails(memberDetails, parsedMembersCount ?? 500)
+    const parsedDocuments = normalizeDocuments(documents)
+    const baseRow = {
+      name: name.trim(),
+      payout_order: typeof payoutOrder === 'string' ? payoutOrder : 'randomize',
+      meeting_frequency: typeof meetingFrequency === 'string' ? meetingFrequency : 'monthly',
+      members_count: parsedMembersCount,
+      member_details: parsedDetails,
+      documents: parsedDocuments,
+    }
     const contributionNum = Number(contributionAmount)
     const includeContribution =
       contributionAmount !== '' &&
