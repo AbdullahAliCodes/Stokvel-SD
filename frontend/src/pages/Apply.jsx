@@ -13,6 +13,9 @@ export default function Apply() {
   const [amount, setAmount] = useState('250')
   const [payoutOrder, setPayoutOrder] = useState('randomize')
   const [meetingFreq, setMeetingFreq] = useState('bi-weekly')
+  const [memberEmailsRaw, setMemberEmailsRaw] = useState('')
+  const [treasurerMode, setTreasurerMode] = useState('self')
+  const [treasurerEmail, setTreasurerEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
@@ -28,6 +31,10 @@ export default function Apply() {
     }
 
     try {
+      const normalizedTreasurerEmail = treasurerEmail.trim().toLowerCase()
+      if (treasurerMode === 'email' && !normalizedTreasurerEmail) {
+        throw new Error('Enter the treasurer email or choose yourself as treasurer.')
+      }
       const res = await fetch(apiUrl('/api/stokvels'), {
         method: 'POST',
         headers: {
@@ -40,6 +47,11 @@ export default function Apply() {
           contributionAmount: amount,
           payoutOrder,
           meetingFrequency: meetingFreq,
+          memberEmails: memberEmailsRaw
+            .split(',')
+            .map((v) => v.trim().toLowerCase())
+            .filter(Boolean),
+          treasurerEmail: treasurerMode === 'email' ? normalizedTreasurerEmail : null,
         }),
       })
 
@@ -108,6 +120,59 @@ export default function Apply() {
 
         <section className="glass p-6">
           <h2 className="mb-4 text-lg font-bold text-white">Member details</h2>
+          <label className={`${labelDark} mb-4 block`}>
+            Member emails (comma-separated)
+            <input
+              type="text"
+              className={inputDark}
+              placeholder="member1@email.com, member2@email.com"
+              value={memberEmailsRaw}
+              onChange={(e) => setMemberEmailsRaw(e.target.value)}
+            />
+            <span className="mt-1 block text-xs text-slate-500">
+              These members are invited after admin approval of your group request.
+            </span>
+          </label>
+          <div className="mb-4 rounded-xl border border-white/10 bg-black/20 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+              Assign treasurer
+            </p>
+            <div className="mt-3 flex flex-col gap-2 text-sm text-slate-300">
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="treasurerMode"
+                  className="accent-emerald-500"
+                  checked={treasurerMode === 'self'}
+                  onChange={() => setTreasurerMode('self')}
+                />
+                I will be the treasurer
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="treasurerMode"
+                  className="accent-emerald-500"
+                  checked={treasurerMode === 'email'}
+                  onChange={() => setTreasurerMode('email')}
+                />
+                Assign another treasurer by email
+              </label>
+            </div>
+            {treasurerMode === 'email' ? (
+              <label className={`${labelDark} mt-3 block`}>
+                Treasurer email
+                <input
+                  type="email"
+                  className={inputDark}
+                  placeholder="treasurer@example.com"
+                  value={treasurerEmail}
+                  onChange={(e) => setTreasurerEmail(e.target.value)}
+                  required
+                />
+              </label>
+            ) : null}
+          </div>
           <div className={tableWrap}>
             <table className="w-full text-left text-sm text-slate-200">
               <thead>

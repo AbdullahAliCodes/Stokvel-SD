@@ -51,7 +51,7 @@ export default function AdminLayout() {
             <PlusCircle className="h-4 w-4 shrink-0 text-white" aria-hidden />
             Create New Group
           </NavLink>
-          <NavLink to="/account" className={linkClass}>
+          <NavLink to="/admin/account" className={linkClass}>
             <User className="h-4 w-4 shrink-0 text-violet-400" aria-hidden />
             Account
           </NavLink>

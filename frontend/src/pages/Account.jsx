@@ -28,6 +28,7 @@ export default function Account() {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
 
   useEffect(() => {
     if (!session?.access_token) return
@@ -49,6 +50,7 @@ export default function Account() {
           setFirstName(p.firstName ?? '')
           setLastName(p.lastName ?? '')
           setUsername(p.username ?? '')
+          setEmail(p.email ?? '')
         }
       } catch (e) {
         if (!cancelled) setError(e.message ?? String(e))
@@ -80,6 +82,7 @@ export default function Account() {
           firstName,
           lastName,
           username: username.trim() === '' ? null : username,
+          email,
         }),
       })
       const text = await res.text()
@@ -90,6 +93,7 @@ export default function Account() {
         setFirstName(p.firstName ?? '')
         setLastName(p.lastName ?? '')
         setUsername(p.username ?? '')
+        setEmail(p.email ?? '')
       }
       setOk('Profile updated.')
     } catch (err) {
@@ -143,6 +147,18 @@ export default function Account() {
               className={inputDark}
               autoComplete="family-name"
             />
+          </label>
+          <label className={labelDark}>
+            Email
+            <input
+              type="email"
+              value={email}
+              onChange={(ev) => setEmail(ev.target.value)}
+              className={inputDark}
+              autoComplete="email"
+              required
+            />
+            <span className="text-xs text-slate-500">Required for invitation and status emails.</span>
           </label>
           <label className={labelDark}>
             Username

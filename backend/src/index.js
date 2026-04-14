@@ -6,11 +6,60 @@ import { requireAuth } from './middleware/auth.js'
 import stokvelsRouter from './routes/stokvels.js'
 import adminStokvelsRouter from './routes/adminStokvels.js'
 import profileRouter from './routes/profile.js'
+import invitationsRouter from './routes/invitations.js'
 import { getServiceSupabase } from './utils/supabaseAdmin.js'
 import { ensurePlatformAdminsInStokvel } from './utils/platformAdminStokvelMembers.js'
+import { createInvitation, normalizeInviteEmail } from './utils/invitations.js'
 
 const app = express()
 const PORT = Number(process.env.PORT) || 5000
+const DASHBOARD_CACHE_TTL_MS = 30_000
+const dashboardCache = new Map()
+
+function hrNow() {
+  return process.hrtime.bigint()
+}
+
+function elapsedMs(start) {
+  return Number(process.hrtime.bigint() - start) / 1_000_000
+}
+
+function createUserSupabaseFromReq(req) {
+  const token = req.headers.authorization.split(' ')[1]
+  return createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_ANON_KEY,
+    {
+      global: {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    },
+  )
+}
+
+function cacheKey(kind, userId) {
+  return `${kind}:${userId}`
+}
+
+function readDashboardCache(kind, userId) {
+  const key = cacheKey(kind, userId)
+  const hit = dashboardCache.get(key)
+  if (!hit) return null
+  if (Date.now() - hit.ts > DASHBOARD_CACHE_TTL_MS) {
+    dashboardCache.delete(key)
+    return null
+  }
+  return hit.payload
+}
+
+function writeDashboardCache(kind, userId, payload) {
+  dashboardCache.set(cacheKey(kind, userId), { ts: Date.now(), payload })
+}
+
+function clearDashboardCacheForUser(userId) {
+  dashboardCache.delete(cacheKey('my-stokvels', userId))
+  dashboardCache.delete(cacheKey('my-meetings', userId))
+}
 
 const allowedOrigins = [
   'http://localhost:5173',
@@ -48,6 +97,7 @@ app.get('/api/health', (_req, res) => {
 
 app.use('/api/admin', adminStokvelsRouter)
 app.use('/api/profile', profileRouter)
+app.use('/api/invitations', invitationsRouter)
 
 app.get('/api/me', requireAuth, (req, res) => {
   try {
@@ -66,21 +116,21 @@ app.get('/api/me', requireAuth, (req, res) => {
 })
 
 app.get('/api/my-stokvels', requireAuth, async (req, res) => {
+  const started = hrNow()
   try {
-    const token = req.headers.authorization.split(' ')[1]
-    const userSupabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_ANON_KEY,
-      {
-        global: {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      },
-    )
+    const cached = readDashboardCache('my-stokvels', req.user.id)
+    if (cached) {
+      console.log(`[perf] GET /api/my-stokvels ${elapsedMs(started).toFixed(1)}ms (cache) user=${req.user.id}`)
+      return res.json(cached)
+    }
+
+    const userSupabase = createUserSupabaseFromReq(req)
 
     const { data, error } = await userSupabase
       .from('stokvel_members')
-      .select('group_role, stokvels(*)')
+      .select(
+        'group_role, stokvels(id, name, status, contribution_amount, type, payout_strategy, cycle_length)',
+      )
       .eq('user_id', req.user.id)
 
     if (error) {
@@ -90,27 +140,84 @@ app.get('/api/my-stokvels', requireAuth, async (req, res) => {
 
     const memberships = (data ?? []).filter((row) => row?.stokvels?.id)
 
-    res.json({ success: true, memberships })
+    const payload = { success: true, memberships }
+    writeDashboardCache('my-stokvels', req.user.id, payload)
+    res.json(payload)
+    console.log(`[perf] GET /api/my-stokvels ${elapsedMs(started).toFixed(1)}ms user=${req.user.id}`)
   } catch (err) {
     console.error('GET /api/my-stokvels:', err)
     res.status(500).json({ error: 'Internal Server Error' })
   }
 })
 
-app.post('/api/stokvels', requireAuth, async (req, res) => {
+app.get('/api/my-meetings', requireAuth, async (req, res) => {
+  const started = hrNow()
   try {
-    const token = req.headers.authorization.split(' ')[1]
-    const userSupabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_ANON_KEY,
-      {
-        global: {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      },
-    )
+    const cached = readDashboardCache('my-meetings', req.user.id)
+    if (cached) {
+      console.log(`[perf] GET /api/my-meetings ${elapsedMs(started).toFixed(1)}ms (cache) user=${req.user.id}`)
+      return res.json(cached)
+    }
 
-    const { name, contributionAmount, meetingFrequency, payoutOrder } = req.body
+    const userSupabase = createUserSupabaseFromReq(req)
+
+    const { data: memberships, error: memberErr } = await userSupabase
+      .from('stokvel_members')
+      .select('stokvel_id')
+      .eq('user_id', req.user.id)
+    if (memberErr) {
+      console.error('GET /api/my-meetings memberships:', memberErr)
+      return res.status(500).json({ error: memberErr.message })
+    }
+
+    const stokvelIds = [...new Set((memberships ?? []).map((m) => m.stokvel_id).filter(Boolean))]
+    if (stokvelIds.length === 0) {
+      console.log(`[perf] GET /api/my-meetings ${elapsedMs(started).toFixed(1)}ms user=${req.user.id}`)
+      return res.json({ success: true, meetings: [] })
+    }
+
+    const [meetingsRes, groupsRes] = await Promise.all([
+      userSupabase
+        .from('meetings')
+        .select('id, stokvel_id, title, meeting_date, meeting_link, agenda, minutes, notes, created_at')
+        .in('stokvel_id', stokvelIds)
+        .order('meeting_date', { ascending: true }),
+      userSupabase.from('stokvels').select('id, name').in('id', stokvelIds),
+    ])
+
+    if (meetingsRes.error) {
+      console.error('GET /api/my-meetings meetings:', meetingsRes.error)
+      return res.status(500).json({ error: meetingsRes.error.message })
+    }
+    if (groupsRes.error) {
+      console.error('GET /api/my-meetings groups:', groupsRes.error)
+      return res.status(500).json({ error: groupsRes.error.message })
+    }
+
+    const groupNameById = new Map((groupsRes.data ?? []).map((g) => [g.id, g.name || 'Unnamed group']))
+    const meetings = (meetingsRes.data ?? []).map((m) => ({
+      ...m,
+      groupName: groupNameById.get(m.stokvel_id) || 'Unnamed group',
+    }))
+
+    console.log(
+      `[perf] GET /api/my-meetings ${elapsedMs(started).toFixed(1)}ms user=${req.user.id} groups=${stokvelIds.length} meetings=${meetings.length}`,
+    )
+    const payload = { success: true, meetings }
+    writeDashboardCache('my-meetings', req.user.id, payload)
+    return res.json(payload)
+  } catch (err) {
+    console.error('GET /api/my-meetings:', err)
+    return res.status(500).json({ error: 'Internal Server Error' })
+  }
+})
+
+app.post('/api/stokvels', requireAuth, async (req, res) => {
+  const started = hrNow()
+  try {
+    const userSupabase = createUserSupabaseFromReq(req)
+
+    const { name, contributionAmount, meetingFrequency, payoutOrder, treasurerEmail } = req.body
 
     void contributionAmount
     void meetingFrequency
@@ -144,6 +251,23 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
       })
     }
 
+    const normalizedTreasurerEmail = normalizeInviteEmail(treasurerEmail)
+    const creatorEmail = normalizeInviteEmail(req.user.email)
+    if (normalizedTreasurerEmail && normalizedTreasurerEmail !== creatorEmail) {
+      const writer = getServiceSupabase() ?? userSupabase
+      const { error: treasurerInviteError } = await createInvitation(writer, {
+        stokvelId: newStokvel.id,
+        email: normalizedTreasurerEmail,
+        invitedBy: req.user.id,
+        status: 'pending_group_request',
+        groupRole: 'treasurer',
+      })
+      if (treasurerInviteError) {
+        console.error('treasurer invitation:', treasurerInviteError)
+        return res.status(500).json({ error: treasurerInviteError.message })
+      }
+    }
+
     const svc = getServiceSupabase()
     if (svc) {
       const { error: syncErr } = await ensurePlatformAdminsInStokvel(svc, newStokvel.id)
@@ -163,7 +287,9 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
       )
     }
 
+    clearDashboardCacheForUser(req.user.id)
     res.status(201).json({ success: true, stokvel: newStokvel })
+    console.log(`[perf] POST /api/stokvels ${elapsedMs(started).toFixed(1)}ms user=${req.user.id}`)
   } catch (err) {
     console.error('POST /api/stokvels:', err)
     res.status(500).json({ error: 'Internal Server Error' })

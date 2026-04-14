@@ -8,6 +8,13 @@ import {
   groupRoleForUserProfile,
 } from '../utils/platformAdminStokvelMembers.js'
 import { normalizeUsername } from '../utils/username.js'
+import {
+  createInvitation,
+  normalizeInviteEmail,
+  sendGroupAddedEmail,
+  sendGroupStatusEmail,
+  sendInvitationEmail,
+} from '../utils/invitations.js'
 
 const router = Router()
 
@@ -115,6 +122,50 @@ function normalizeInitialMemberIds(raw, creatorId) {
     if (out.length >= 40) break
   }
   return out
+}
+
+function normalizeTreasurerUserId(raw) {
+  if (typeof raw !== 'string') return ''
+  const v = raw.trim()
+  return UUID_RE.test(v) ? v : ''
+}
+
+async function getGroupAndCreatorContact(client, stokvelId) {
+  const { data: stokvel, error: stokvelError } = await client
+    .from('stokvels')
+    .select('id, name')
+    .eq('id', stokvelId)
+    .maybeSingle()
+  if (stokvelError || !stokvel) return { stokvel: null, creatorEmail: '', creatorId: null }
+
+  const { data: creatorRow } = await client
+    .from('stokvel_members')
+    .select('user_id')
+    .eq('stokvel_id', stokvelId)
+    .eq('group_role', 'treasurer')
+    .maybeSingle()
+
+  const creatorId = creatorRow?.user_id || null
+  if (!creatorId) return { stokvel, creatorEmail: '', creatorId: null }
+
+  const { data: profile } = await client
+    .from('profiles')
+    .select('email')
+    .eq('id', creatorId)
+    .maybeSingle()
+
+  return { stokvel, creatorEmail: profile?.email || '', creatorId }
+}
+
+async function notifyMemberAdded(client, { userId, groupName, role }) {
+  const { data: profile } = await client
+    .from('profiles')
+    .select('email')
+    .eq('id', userId)
+    .maybeSingle()
+  const to = normalizeInviteEmail(profile?.email)
+  if (!to) return
+  await sendGroupAddedEmail({ to, groupName, role })
 }
 
 router.get('/users', requireAuth, requireAdmin, async (req, res) => {
@@ -254,6 +305,7 @@ router.post('/stokvels', requireAuth, requireAdmin, async (req, res) => {
       payoutStrategy,
       cycleLength,
       initialMemberIds,
+      treasurerUserId,
     } = req.body ?? {}
 
     const trimmedName = typeof name === 'string' ? name.trim() : ''
@@ -320,11 +372,21 @@ router.post('/stokvels', requireAuth, requireAdmin, async (req, res) => {
       })
     }
 
+    const extraIds = normalizeInitialMemberIds(initialMemberIds, req.user.id)
+    const allSelectableIds = new Set([req.user.id, ...extraIds])
+    const requestedTreasurerId = normalizeTreasurerUserId(treasurerUserId) || req.user.id
+    if (!allSelectableIds.has(requestedTreasurerId)) {
+      return res.status(400).json({
+        error: 'Treasurer must be you or one of the selected initial members.',
+      })
+    }
+
+    const creatorRole = requestedTreasurerId === req.user.id ? 'treasurer' : 'admin'
     const { error: memberError } = await client.from('stokvel_members').insert([
       {
         stokvel_id: stokvel.id,
         user_id: req.user.id,
-        group_role: 'admin',
+        group_role: creatorRole,
       },
     ])
 
@@ -344,7 +406,6 @@ router.post('/stokvels', requireAuth, requireAdmin, async (req, res) => {
       })
     }
 
-    const extraIds = normalizeInitialMemberIds(initialMemberIds, req.user.id)
     if (extraIds.length > 0) {
       const { data: profRows, error: profErr } = await client
         .from('profiles')
@@ -362,7 +423,12 @@ router.post('/stokvels', requireAuth, requireAdmin, async (req, res) => {
       const memberRows = extraIds.map((user_id) => ({
         stokvel_id: stokvel.id,
         user_id,
-        group_role: roleById.get(user_id) === 'admin' ? 'admin' : 'member',
+        group_role:
+          user_id === requestedTreasurerId
+            ? 'treasurer'
+            : roleById.get(user_id) === 'admin'
+              ? 'admin'
+              : 'member',
       }))
 
       const { error: extraError } = await client.from('stokvel_members').insert(memberRows)
@@ -391,6 +457,18 @@ router.post('/stokvels', requireAuth, requireAdmin, async (req, res) => {
           'Failed to attach all platform admins to this stokvel; group was not created.',
       })
     }
+
+    // Fire-and-forget style notifications for members added during create.
+    const allAddedIds = normalizeInitialMemberIds(initialMemberIds, req.user.id)
+    await Promise.all(
+      allAddedIds.map((userId) =>
+        notifyMemberAdded(client, {
+          userId,
+          groupName: stokvel.name,
+          role: 'member',
+        }),
+      ),
+    )
 
     return res.status(201).json({ success: true, stokvel })
   } catch (err) {
@@ -444,7 +522,7 @@ router.post('/stokvels/:stokvelId/members', requireAuth, requireAdmin, async (re
 
     const { data: group, error: groupError } = await client
       .from('stokvels')
-      .select('id')
+      .select('id, name')
       .eq('id', stokvelId)
       .maybeSingle()
 
@@ -492,9 +570,63 @@ router.post('/stokvels/:stokvelId/members', requireAuth, requireAdmin, async (re
       return res.status(500).json({ error: insertError.message || 'Failed to add member' })
     }
 
+    await notifyMemberAdded(client, {
+      userId: targetUserId,
+      groupName: group.name,
+      role: invitedGroupRole,
+    })
+
     return res.status(201).json({ success: true, userId: targetUserId })
   } catch (err) {
     console.error('POST /api/admin/stokvels/:stokvelId/members:', err)
+    return res.status(500).json({ error: 'Internal Server Error' })
+  }
+})
+
+router.post('/stokvels/:stokvelId/invitations', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const client = dbClient(req)
+    const { stokvelId } = req.params
+    const email = normalizeInviteEmail(req.body?.email)
+    if (!email) return res.status(400).json({ error: 'Provide a valid email address.' })
+
+    const { data: group, error: groupError } = await client
+      .from('stokvels')
+      .select('id, name')
+      .eq('id', stokvelId)
+      .maybeSingle()
+    if (groupError) return res.status(500).json({ error: groupError.message })
+    if (!group) return res.status(404).json({ error: 'Stokvel not found' })
+
+    const { data: existingProfile } = await client
+      .from('profiles')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle()
+
+    if (existingProfile?.id) {
+      const role = await groupRoleForUserProfile(client, existingProfile.id)
+      const { error: upsertErr } = await client.from('stokvel_members').upsert(
+        { stokvel_id: stokvelId, user_id: existingProfile.id, group_role: role },
+        { onConflict: 'stokvel_id,user_id' },
+      )
+      if (upsertErr) return res.status(500).json({ error: upsertErr.message })
+      await sendGroupAddedEmail({ to: email, groupName: group.name, role })
+      return res.status(201).json({ success: true, mode: 'added_existing_user' })
+    }
+
+    const { data: invite, error: inviteError } = await createInvitation(client, {
+      stokvelId,
+      email,
+      invitedBy: req.user.id,
+      status: 'pending',
+    })
+    if (inviteError) return res.status(500).json({ error: inviteError.message })
+
+    await sendInvitationEmail({ to: email, groupName: group.name, token: invite.token })
+    return res.status(201).json({ success: true, mode: 'invite_sent' })
+  } catch (err) {
+    console.error('POST /api/admin/stokvels/:stokvelId/invitations:', err)
     return res.status(500).json({ error: 'Internal Server Error' })
   }
 })
@@ -641,9 +773,137 @@ router.patch('/stokvels/:stokvelId', requireAuth, requireAdmin, async (req, res)
       return res.status(404).json({ error: 'Stokvel not found after update.' })
     }
 
+    if ('status' in patch) {
+      const { creatorEmail } = await getGroupAndCreatorContact(client, stokvelId)
+      const recipient = normalizeInviteEmail(creatorEmail)
+      if (recipient && (patch.status === 'active' || patch.status === 'rejected')) {
+        await sendGroupStatusEmail({
+          to: recipient,
+          groupName: updated.name,
+          status: patch.status,
+        })
+      }
+
+      if (patch.status === 'active') {
+        const { data: pendingInvites, error: invitesError } = await client
+          .from('invitations')
+          .select('id, email, group_role')
+          .eq('stokvel_id', stokvelId)
+          .eq('status', 'pending_group_request')
+
+        if (!invitesError && Array.isArray(pendingInvites)) {
+          for (const invite of pendingInvites) {
+            const inviteEmail = normalizeInviteEmail(invite.email)
+            if (!inviteEmail) continue
+
+            const { data: profile } = await client
+              .from('profiles')
+              .select('id')
+              .eq('email', inviteEmail)
+              .maybeSingle()
+
+            const inviteRole =
+              typeof invite.group_role === 'string' && invite.group_role.trim()
+                ? invite.group_role.trim().toLowerCase()
+                : null
+            if (profile?.id) {
+              const role = inviteRole || (await groupRoleForUserProfile(client, profile.id))
+              const { error: insErr } = await client.from('stokvel_members').upsert(
+                {
+                  stokvel_id: stokvelId,
+                  user_id: profile.id,
+                  group_role: role,
+                },
+                { onConflict: 'stokvel_id,user_id' },
+              )
+              if (!insErr) {
+                await sendGroupAddedEmail({ to: inviteEmail, groupName: updated.name, role })
+              }
+            } else {
+              const { data: created } = await createInvitation(client, {
+                stokvelId,
+                email: inviteEmail,
+                invitedBy: req.user.id,
+                status: 'pending',
+                groupRole: inviteRole,
+              })
+              if (created?.token) {
+                await sendInvitationEmail({
+                  to: inviteEmail,
+                  groupName: updated.name,
+                  token: created.token,
+                })
+              }
+            }
+
+            await client.from('invitations').update({ status: 'processed' }).eq('id', invite.id)
+          }
+        }
+      }
+    }
+
     return res.json({ success: true, stokvel: updated })
   } catch (err) {
     console.error('PATCH /api/admin/stokvels:', err)
+    return res.status(500).json({ error: 'Internal Server Error' })
+  }
+})
+
+router.delete('/stokvels/:stokvelId', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const client = dbClient(req)
+    const { stokvelId } = req.params
+
+    const { data: existing, error: exErr } = await client
+      .from('stokvels')
+      .select('id, name')
+      .eq('id', stokvelId)
+      .maybeSingle()
+    if (exErr) return res.status(500).json({ error: exErr.message })
+    if (!existing) return res.status(404).json({ error: 'Stokvel not found' })
+
+    const { error: memberDeleteErr } = await client
+      .from('stokvel_members')
+      .delete()
+      .eq('stokvel_id', stokvelId)
+    if (memberDeleteErr) return res.status(500).json({ error: memberDeleteErr.message })
+
+    const { error: invitationDeleteErr } = await client
+      .from('invitations')
+      .delete()
+      .eq('stokvel_id', stokvelId)
+    if (invitationDeleteErr) return res.status(500).json({ error: invitationDeleteErr.message })
+
+    const { error: meetingDeleteErr } = await client
+      .from('meetings')
+      .delete()
+      .eq('stokvel_id', stokvelId)
+    if (meetingDeleteErr) return res.status(500).json({ error: meetingDeleteErr.message })
+
+    const { error: contributionDeleteErr } = await client
+      .from('contributions')
+      .delete()
+      .eq('stokvel_id', stokvelId)
+    if (contributionDeleteErr) return res.status(500).json({ error: contributionDeleteErr.message })
+
+    const { error: payoutDeleteErr } = await client
+      .from('payouts')
+      .delete()
+      .eq('stokvel_id', stokvelId)
+    if (payoutDeleteErr) return res.status(500).json({ error: payoutDeleteErr.message })
+
+    const { error: issueDeleteErr } = await client
+      .from('issues')
+      .delete()
+      .eq('stokvel_id', stokvelId)
+    if (issueDeleteErr) return res.status(500).json({ error: issueDeleteErr.message })
+
+    const { error: stokvelDeleteErr } = await client.from('stokvels').delete().eq('id', stokvelId)
+    if (stokvelDeleteErr) return res.status(500).json({ error: stokvelDeleteErr.message })
+
+    return res.json({ success: true, deletedId: stokvelId })
+  } catch (err) {
+    console.error('DELETE /api/admin/stokvels/:stokvelId:', err)
     return res.status(500).json({ error: 'Internal Server Error' })
   }
 })
