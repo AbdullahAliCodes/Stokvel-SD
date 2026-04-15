@@ -139,13 +139,57 @@ function normalizeMembersCount(raw) {
 function normalizeMemberDetails(raw, limit = 500) {
   if (!Array.isArray(raw)) return []
   return raw
-    .map((m) => ({
-      name: typeof m?.name === 'string' ? m.name.trim() : '',
-      email: typeof m?.email === 'string' ? m.email.trim().toLowerCase() : '',
-      role: typeof m?.role === 'string' ? m.role.trim() : '',
-    }))
+    .map((m) => {
+      const maybeUid = typeof m?.userId === 'string' ? m.userId.trim() : ''
+      const userId = UUID_RE.test(maybeUid) ? maybeUid : ''
+      return {
+        userId,
+        name: typeof m?.name === 'string' ? m.name.trim() : '',
+        email: typeof m?.email === 'string' ? m.email.trim().toLowerCase() : '',
+        role: typeof m?.role === 'string' ? m.role.trim() : '',
+      }
+    })
     .filter((m) => m.name || m.email || m.role)
     .slice(0, limit)
+}
+
+function normalizeProfilePatchEmail(value) {
+  const email = typeof value === 'string' ? value.trim().toLowerCase() : ''
+  if (!email) return ''
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : ''
+}
+
+/**
+ * When admin create supplies an email for a user in this stokvel, persist it on `profiles`
+ * if the profile row still has no email (does not overwrite existing contact email).
+ */
+async function applyMemberDetailEmailsToProfiles(client, memberDetails, allowedUserIds) {
+  if (!Array.isArray(memberDetails) || memberDetails.length === 0) return
+  const allowed = allowedUserIds instanceof Set ? allowedUserIds : new Set(allowedUserIds)
+  for (const row of memberDetails) {
+    const uid = typeof row.userId === 'string' ? row.userId.trim() : ''
+    if (!UUID_RE.test(uid) || !allowed.has(uid)) continue
+    const email = normalizeProfilePatchEmail(row.email)
+    if (!email) continue
+    const { data: prof, error: selErr } = await client
+      .from('profiles')
+      .select('id, email')
+      .eq('id', uid)
+      .maybeSingle()
+    if (selErr) {
+      console.error('applyMemberDetailEmailsToProfiles select:', selErr)
+      continue
+    }
+    if (!prof) continue
+    if (String(prof.email || '').trim()) continue
+    const { error: upErr } = await client.from('profiles').update({
+      email,
+      updated_at: new Date().toISOString(),
+    }).eq('id', uid)
+    if (upErr) {
+      console.error('applyMemberDetailEmailsToProfiles update:', uid, upErr.message)
+    }
+  }
 }
 
 function normalizeDocuments(raw, limit = 50) {
@@ -204,17 +248,18 @@ router.get('/users', requireAuth, requireAdmin, async (req, res) => {
 
     const client = dbClient(req)
     const pattern = `%${escapeIlikePattern(q)}%`
-    const sel = 'id, first_name, last_name, username'
+    const sel = 'id, first_name, last_name, username, email'
 
     const run = (col) => client.from('profiles').select(sel).ilike(col, pattern).limit(15)
 
-    const [byFirst, byLast, byUsername] = await Promise.all([
+    const [byFirst, byLast, byUsername, byEmail] = await Promise.all([
       run('first_name'),
       run('last_name'),
       run('username'),
+      run('email'),
     ])
 
-    const firstErr = byFirst.error || byLast.error || byUsername.error
+    const firstErr = byFirst.error || byLast.error || byUsername.error || byEmail.error
     if (firstErr) {
       console.error('GET /api/admin/users:', firstErr)
       return res.status(500).json({
@@ -225,7 +270,7 @@ router.get('/users', requireAuth, requireAdmin, async (req, res) => {
     }
 
     const byId = new Map()
-    for (const chunk of [byFirst.data, byLast.data, byUsername.data]) {
+    for (const chunk of [byFirst.data, byLast.data, byUsername.data, byEmail.data]) {
       for (const row of chunk ?? []) {
         byId.set(row.id, row)
       }
@@ -243,6 +288,7 @@ router.get('/users', requireAuth, requireAdmin, async (req, res) => {
         username: uname,
         firstName: r.first_name ?? '',
         lastName: r.last_name ?? '',
+        email: typeof r.email === 'string' ? r.email.trim() : '',
         label,
       }
     })
@@ -381,6 +427,9 @@ router.post('/stokvels', requireAuth, requireAdmin, async (req, res) => {
         .json({ error: 'A stokvel with this name already exists. Choose a different name.' })
     }
 
+    const membersCountNorm = normalizeMembersCount(membersCount)
+    const normalizedMemberDetails = normalizeMemberDetails(memberDetails, membersCountNorm ?? 500)
+
     const insertRow = {
       name: trimmedName,
       type,
@@ -389,11 +438,8 @@ router.post('/stokvels', requireAuth, requireAdmin, async (req, res) => {
       payout_order: typeof payoutOrder === 'string' ? payoutOrder : 'randomize',
       meeting_frequency: typeof meetingFrequency === 'string' ? meetingFrequency : 'monthly',
       cycle_length: cycle,
-      members_count: normalizeMembersCount(membersCount),
-      member_details: normalizeMemberDetails(
-        memberDetails,
-        normalizeMembersCount(membersCount) ?? 500,
-      ),
+      members_count: membersCountNorm,
+      member_details: normalizedMemberDetails,
       documents: normalizeDocuments(documents),
       status: 'active',
     }
@@ -412,7 +458,8 @@ router.post('/stokvels', requireAuth, requireAdmin, async (req, res) => {
     }
 
     const extraIds = normalizeInitialMemberIds(initialMemberIds, req.user.id)
-    const allSelectableIds = new Set([req.user.id, ...extraIds])
+    const allowedProfileEmailIds = new Set([req.user.id, ...extraIds])
+    const allSelectableIds = allowedProfileEmailIds
     const requestedTreasurerId = normalizeTreasurerUserId(treasurerUserId) || req.user.id
     if (!allSelectableIds.has(requestedTreasurerId)) {
       return res.status(400).json({
@@ -496,6 +543,8 @@ router.post('/stokvels', requireAuth, requireAdmin, async (req, res) => {
           'Failed to attach all platform admins to this stokvel; group was not created.',
       })
     }
+
+    await applyMemberDetailEmailsToProfiles(client, normalizedMemberDetails, allowedProfileEmailIds)
 
     // Fire-and-forget style notifications for members added during create.
     const allAddedIds = normalizeInitialMemberIds(initialMemberIds, req.user.id)

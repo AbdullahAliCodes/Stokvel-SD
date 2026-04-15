@@ -4,8 +4,8 @@ import { apiUrl } from '../utils/api'
 import {
   pageTitle,
   pageSubtitle,
-  inputDark,
-  labelDark,
+  inputLight,
+  labelLight,
   btnPrimary,
   errorBox,
 } from '../ui'
@@ -117,7 +117,7 @@ export default function Account() {
       ) : null}
       {ok ? (
         <p
-          className="mb-4 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200"
+          className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
           role="status"
         >
           {ok}
@@ -125,52 +125,52 @@ export default function Account() {
       ) : null}
 
       {loading ? (
-        <p className="text-sm text-slate-500">Loading…</p>
+        <p className="text-sm text-stone-500">Loading…</p>
       ) : (
         <form onSubmit={handleSubmit} className="max-w-lg space-y-4">
-          <label className={labelDark}>
+          <label className={labelLight}>
             First name
             <input
               type="text"
               value={firstName}
               onChange={(ev) => setFirstName(ev.target.value)}
-              className={inputDark}
+              className={inputLight}
               autoComplete="given-name"
             />
           </label>
-          <label className={labelDark}>
+          <label className={labelLight}>
             Last name
             <input
               type="text"
               value={lastName}
               onChange={(ev) => setLastName(ev.target.value)}
-              className={inputDark}
+              className={inputLight}
               autoComplete="family-name"
             />
           </label>
-          <label className={labelDark}>
+          <label className={labelLight}>
             Email
             <input
               type="email"
               value={email}
               onChange={(ev) => setEmail(ev.target.value)}
-              className={inputDark}
+              className={inputLight}
               autoComplete="email"
               required
             />
-            <span className="text-xs text-slate-500">Required for invitation and status emails.</span>
+            <span className="text-xs text-stone-500">Required for invitation and status emails.</span>
           </label>
-          <label className={labelDark}>
+          <label className={labelLight}>
             Username
             <input
               type="text"
               value={username}
               onChange={(ev) => setUsername(ev.target.value)}
-              className={inputDark}
+              className={inputLight}
               autoComplete="username"
               placeholder="3–30 letters, numbers, underscore"
             />
-            <span className="text-xs text-slate-500">Leave empty to clear username (if allowed).</span>
+            <span className="text-xs text-stone-500">Leave empty to clear username (if allowed).</span>
           </label>
           <button type="submit" disabled={saving} className={btnPrimary}>
             {saving ? 'Saving…' : 'Save profile'}

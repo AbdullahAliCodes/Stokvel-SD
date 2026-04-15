@@ -76,14 +76,22 @@ function normalizeMembersCount(raw) {
   return n
 }
 
+const UUID_RE_MEMBER_DETAILS =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
 function normalizeMemberDetails(raw, limit = 500) {
   if (!Array.isArray(raw)) return []
   return raw
-    .map((m) => ({
-      name: typeof m?.name === 'string' ? m.name.trim() : '',
-      email: typeof m?.email === 'string' ? m.email.trim().toLowerCase() : '',
-      role: typeof m?.role === 'string' ? m.role.trim() : '',
-    }))
+    .map((m) => {
+      const maybeUid = typeof m?.userId === 'string' ? m.userId.trim() : ''
+      const userId = UUID_RE_MEMBER_DETAILS.test(maybeUid) ? maybeUid : ''
+      return {
+        userId,
+        name: typeof m?.name === 'string' ? m.name.trim() : '',
+        email: typeof m?.email === 'string' ? m.email.trim().toLowerCase() : '',
+        role: typeof m?.role === 'string' ? m.role.trim() : '',
+      }
+    })
     .filter((m) => m.name || m.email || m.role)
     .slice(0, limit)
 }

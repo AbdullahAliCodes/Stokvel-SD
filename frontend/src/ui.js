@@ -1,30 +1,36 @@
-/** Shared Tailwind class fragments for the Stokvel portal (dark glass UI). */
+/** Shared Tailwind class fragments (light, earthy pastel forms + tables). */
 
 export const pageTitle =
-  'text-2xl font-bold tracking-widest text-cyan-400 uppercase sm:text-3xl'
+  'text-2xl font-bold tracking-wide text-emerald-800 uppercase sm:text-3xl'
 
-export const pageSubtitle = 'text-sm text-slate-400'
+export const pageSubtitle = 'text-sm text-stone-500'
 
-export const inputDark =
-  'w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-blue-400/50 focus:outline-none focus:ring-1 focus:ring-blue-400/25'
+export const inputLight =
+  'w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-800 placeholder:text-stone-400 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/50'
 
-export const labelDark = 'flex flex-col gap-1.5 text-left text-sm text-slate-300'
+export const labelLight =
+  'flex flex-col gap-1.5 text-left text-sm font-medium text-stone-700'
 
 export const btnPrimary =
-  'rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-900/30 transition hover:bg-emerald-500 disabled:opacity-50'
+  'rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 disabled:opacity-50'
 
 export const btnSecondary =
-  'rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10'
+  'rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-sm transition hover:bg-stone-100 disabled:opacity-50'
 
 export const btnGhost =
-  'rounded-lg px-3 py-2 text-sm text-slate-400 transition hover:bg-white/5 hover:text-white'
+  'rounded-lg px-3 py-2 text-sm text-stone-600 transition hover:bg-stone-100 hover:text-stone-900'
 
-export const tableWrap = 'glass overflow-hidden rounded-2xl'
+/** White card shell (replaces dark “glass” in admin + light surfaces). */
+export const cardLight =
+  'rounded-2xl border border-stone-200 bg-white shadow-sm'
+
+export const tableWrap = `${cardLight} overflow-hidden`
 
 export const tableHead =
-  'bg-white/10 text-left text-xs font-semibold uppercase tracking-wide text-slate-300'
+  'bg-stone-100 text-left text-xs font-semibold uppercase tracking-wide text-stone-600'
 
-export const tableRow = 'border-b border-white/5 transition hover:bg-white/[0.03]'
+export const tableRow =
+  'border-b border-stone-100 transition hover:bg-stone-50/80'
 
 export const errorBox =
-  'rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200'
+  'rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800'

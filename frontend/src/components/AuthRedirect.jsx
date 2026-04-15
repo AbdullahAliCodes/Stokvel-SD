@@ -17,7 +17,7 @@ export default function AuthRedirect() {
   }
 
   if (String(userRole).toLowerCase() === 'admin') {
-    return <Navigate to="/admin" replace />
+    return <Navigate to="/admin/groups" replace />
   }
 
   return <Navigate to="/dashboard" replace />
