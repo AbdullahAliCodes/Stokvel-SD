@@ -4,6 +4,7 @@ import { useSession } from '../context/SessionContext'
 import { apiUrl } from '../utils/api'
 import { btnPrimary, errorBox, pageSubtitle, tableHead, tableRow, tableWrap } from '../ui'
 import { readViewCache, writeViewCache } from '../utils/viewCache'
+import MarketRatesWidget from '../components/MarketRatesWidget'
 
 function formatZAR(n) {
   const num = Number(n)
@@ -205,7 +206,6 @@ export default function SingleStokvel() {
   const memberCount = members.length
   const monthlyContribution = Number(effectiveStokvel?.contribution_amount) || 0
   const expectedPayout = monthlyContribution
-  const savingsProjection = monthlyContribution * memberCount * 12
   const canManageTreasurer = ['treasurer', 'admin'].includes(membership?.group_role)
   const myGroupRole = members.find((m) => m.user_id === session?.user?.id)?.group_role || membership?.group_role
   const canManageMeetings = ['treasurer', 'admin'].includes(myGroupRole)
@@ -376,11 +376,8 @@ export default function SingleStokvel() {
   const statCards = [
     { label: 'Total contribution', value: formatZAR(totalContribution) },
     { label: 'Expected payout', value: formatZAR(expectedPayout) },
-    { label: 'Live interest rate', value: '0%' },
-    {
-      label: 'Savings projection',
-      value: memberCount > 0 ? formatZAR(savingsProjection) : formatZAR(0),
-    },
+    { label: 'Monthly contribution', value: formatZAR(monthlyContribution) },
+    { label: 'Members', value: String(memberCount) },
   ]
 
   return (
@@ -464,18 +461,7 @@ export default function SingleStokvel() {
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div className="glass flex h-52 flex-col justify-between p-6">
-              <span className="text-sm font-bold text-white">Savings projection (TDD logic)</span>
-              <div className="flex h-28 items-end gap-2">
-                <div className="h-8 w-full rounded-t bg-slate-700" />
-                <div className="h-12 w-full rounded-t bg-slate-600" />
-                <div className="h-20 w-full rounded-t bg-blue-500" />
-                <div className="h-[7.5rem] w-full rounded-t bg-emerald-500" />
-              </div>
-              <p className="text-center text-[10px] text-slate-500">
-                Projected growth based on Prime Rate
-              </p>
-            </div>
+            <MarketRatesWidget memberMonthlyContribution={monthlyContribution} />
             <div className="glass p-6">
               <span className="text-sm font-bold text-white">Quick Pay</span>
               <button
