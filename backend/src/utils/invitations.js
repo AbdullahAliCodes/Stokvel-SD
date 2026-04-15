@@ -49,7 +49,7 @@ export async function sendGroupAddedEmail({ to, groupName, role = 'member' }) {
     from: process.env.EMAIL_USER,
     to,
     subject: `Added to ${groupName}`,
-    text: `You were added to the stokvel "${groupName}" as ${role}. Sign in to view it on your dashboard.`,
+    text: `Dear Member,\n\nYou have been added to the stokvel "${groupName}" with the role of ${role}. Please sign in to your dashboard to view the group details.\n\nKind regards,\nStokvel Team`,
   })
 }
 
@@ -59,7 +59,7 @@ export async function sendInvitationEmail({ to, groupName, token }) {
     from: process.env.EMAIL_USER,
     to,
     subject: `Invitation to join ${groupName}`,
-    text: `You have been invited to join "${groupName}". Accept invitation: ${link}`,
+    text: `Dear Member,\n\nYou are invited to join the stokvel "${groupName}". Please accept your invitation using the link below:\n${link}\n\nKind regards,\nStokvel Team`,
   })
 }
 
@@ -69,7 +69,8 @@ export async function sendGroupStatusEmail({ to, groupName, status }) {
     from: process.env.EMAIL_USER,
     to,
     subject: `Your group request was ${statusText}`,
-    text: `Your group "${groupName}" was ${statusText} by an admin.`,
+    text: `Dear Member,\n\nYour request for the group "${groupName}" has been ${statusText}.\n\nKind regards,\nStokvel Team`,
+    
   })
 }
 
@@ -86,14 +87,20 @@ export async function sendMeetingScheduledEmail({
     to,
     subject: `New meeting scheduled: ${title}`,
     text: [
+      'Dear Member,',
+      '',
       `A new meeting has been scheduled for "${groupName}".`,
       '',
       `Title: ${title}`,
       `Date: ${meetingDate}`,
-      `Link: ${meetingLink || 'No link provided yet.'}`,
+      `Link: ${meetingLink || 'Not provided.'}`,
       '',
       'Agenda:',
-      agenda || 'No agenda provided.',
+      agenda || 'Not provided.',
+      '',
+      'Kind regards,',
+      'Stokvel Team',
     ].join('\n'),
+    
   })
 }
