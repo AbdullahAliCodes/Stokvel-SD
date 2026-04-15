@@ -31,14 +31,14 @@ const meetings = [
 export default function Meetings() {
   return (
     <div>
-      <h1 className="mb-2 flex items-center gap-2 text-2xl font-bold tracking-wide text-white">
-        <i className="fa-solid fa-calendar-days text-cyan-400" aria-hidden />
+      <h1 className="mb-2 flex items-center gap-2 text-2xl font-bold tracking-wide text-emerald-800">
+        <i className="fa-solid fa-calendar-days text-emerald-700" aria-hidden />
         Upcoming meetings
       </h1>
       <p className={`mb-6 ${pageSubtitle}`}>Tap a row for details.</p>
 
       <div className={tableWrap}>
-        <table className="w-full min-w-[640px] text-left text-sm text-slate-200">
+        <table className="w-full min-w-[640px] text-left text-sm text-stone-800">
           <thead>
             <tr className={tableHead}>
               <th className="p-3">Meeting</th>
@@ -50,11 +50,11 @@ export default function Meetings() {
           </thead>
           <tbody>
             {meetings.map((m) => (
-              <tr key={m.id} className="group border-b border-white/5">
+              <tr key={m.id} className="group border-b border-stone-100">
                 <td className="p-0">
                   <Link
                     to={`/meetings/${m.id}`}
-                    className="block cursor-pointer p-3 text-white group-hover:bg-white/[0.06]"
+                    className="block cursor-pointer p-3 font-medium text-stone-800 group-hover:bg-stone-50"
                   >
                     {m.name}
                   </Link>
@@ -62,7 +62,7 @@ export default function Meetings() {
                 <td className="p-0">
                   <Link
                     to={`/meetings/${m.id}`}
-                    className="block cursor-pointer p-3 text-slate-300 group-hover:bg-white/[0.06]"
+                    className="block cursor-pointer p-3 text-stone-600 group-hover:bg-stone-50"
                   >
                     {m.group}
                   </Link>
@@ -70,7 +70,7 @@ export default function Meetings() {
                 <td className="p-0">
                   <Link
                     to={`/meetings/${m.id}`}
-                    className="block cursor-pointer p-3 text-emerald-300/90 group-hover:bg-white/[0.06]"
+                    className="block cursor-pointer p-3 font-medium text-emerald-800 group-hover:bg-stone-50"
                   >
                     {m.role}
                   </Link>
@@ -78,7 +78,7 @@ export default function Meetings() {
                 <td className="p-0">
                   <Link
                     to={`/meetings/${m.id}`}
-                    className="block cursor-pointer p-3 text-slate-400 group-hover:bg-white/[0.06]"
+                    className="block cursor-pointer p-3 text-stone-500 group-hover:bg-stone-50"
                   >
                     {m.notes}
                   </Link>
@@ -86,7 +86,7 @@ export default function Meetings() {
                 <td className="p-0">
                   <Link
                     to={`/meetings/${m.id}`}
-                    className="block cursor-pointer p-3 text-slate-300 group-hover:bg-white/[0.06]"
+                    className="block cursor-pointer p-3 text-stone-600 group-hover:bg-stone-50"
                   >
                     {m.date}
                   </Link>

@@ -2,7 +2,16 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSession } from '../context/SessionContext'
 import { apiUrl } from '../utils/api'
-import { btnPrimary, errorBox, inputLight, labelLight, tableHead, tableRow, tableWrap } from '../ui'
+import {
+  btnPrimary,
+  cardLight,
+  errorBox,
+  inputLight,
+  labelLight,
+  tableHead,
+  tableRow,
+  tableWrap,
+} from '../ui'
 
 export default function Apply() {
   const navigate = useNavigate()
@@ -109,14 +118,14 @@ export default function Apply() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl text-white">
-      <h1 className="mb-8 border-b border-white/10 pb-4 text-2xl font-bold tracking-wide text-cyan-400">
+    <div className="mx-auto max-w-2xl text-stone-800">
+      <h1 className="mb-8 border-b border-stone-200 pb-4 text-2xl font-bold tracking-wide text-emerald-800">
         Stokvel application
       </h1>
 
       <form className="space-y-10" onSubmit={handleSubmit}>
-        <section className="glass p-6">
-          <h2 className="mb-4 text-lg font-bold text-white">Personal info</h2>
+        <section className={`${cardLight} p-6`}>
+          <h2 className="mb-4 text-lg font-bold text-stone-800">Personal info</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className={labelLight}>
               Name
@@ -133,8 +142,8 @@ export default function Apply() {
           </div>
         </section>
 
-        <section className="glass p-6">
-          <h2 className="mb-4 text-lg font-bold text-white">Stokvel details</h2>
+        <section className={`${cardLight} p-6`}>
+          <h2 className="mb-4 text-lg font-bold text-stone-800">Stokvel details</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className={labelLight}>
               Stokvel name
@@ -160,13 +169,13 @@ export default function Apply() {
           </div>
         </section>
 
-        <section className="glass p-6">
-          <h2 className="mb-4 text-lg font-bold text-white">Member details</h2>
-          <div className="mb-4 rounded-xl border border-white/10 bg-black/20 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+        <section className={`${cardLight} p-6`}>
+          <h2 className="mb-4 text-lg font-bold text-stone-800">Member details</h2>
+          <div className="mb-4 rounded-xl border border-stone-200 bg-stone-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
               Assign treasurer
             </p>
-            <div className="mt-3 flex flex-col gap-2 text-sm text-slate-300">
+            <div className="mt-3 flex flex-col gap-2 text-sm text-stone-700">
               <label className="flex items-center gap-2">
                 <input
                   type="radio"
@@ -203,7 +212,7 @@ export default function Apply() {
             ) : null}
           </div>
           <div className={tableWrap}>
-            <table className="w-full text-left text-sm text-slate-200">
+            <table className="w-full text-left text-sm text-stone-800">
               <thead>
                 <tr className={tableHead}>
                   <th className="p-2">#</th>
@@ -214,7 +223,7 @@ export default function Apply() {
               <tbody>
                 {memberDetails.map((m, idx) => (
                   <tr key={`member-${idx}`} className={tableRow}>
-                    <td className="p-2 text-slate-400">{idx + 1}</td>
+                    <td className="p-2 text-stone-500">{idx + 1}</td>
                     <td className="p-2">
                       <input
                         className={`${inputLight} text-sm`}
@@ -246,12 +255,12 @@ export default function Apply() {
             />
           </label>
           {documentFiles.length > 0 ? (
-            <p className="mt-2 text-xs text-slate-400">{documentFiles.length} file(s) selected.</p>
+            <p className="mt-2 text-xs text-stone-500">{documentFiles.length} file(s) selected.</p>
           ) : null}
         </section>
 
-        <section className="glass p-6">
-          <h2 className="mb-4 text-lg font-bold text-white">Contribution amount</h2>
+        <section className={`${cardLight} p-6`}>
+          <h2 className="mb-4 text-lg font-bold text-stone-800">Contribution amount</h2>
           <label className={labelLight}>
             Monthly (ZAR)
             <input
@@ -267,9 +276,9 @@ export default function Apply() {
           </label>
         </section>
 
-        <section className="glass p-6">
-          <h2 className="mb-4 text-lg font-bold text-white">Payout order</h2>
-          <div className="flex flex-col gap-3 text-sm text-slate-300">
+        <section className={`${cardLight} p-6`}>
+          <h2 className="mb-4 text-lg font-bold text-stone-800">Payout order</h2>
+          <div className="flex flex-col gap-3 text-sm text-stone-700">
             <label className="flex items-center gap-2">
               <input
                 type="radio"
@@ -293,8 +302,8 @@ export default function Apply() {
           </div>
         </section>
 
-        <section className="glass p-6">
-          <h2 className="mb-4 text-lg font-bold text-white">Meeting frequency</h2>
+        <section className={`${cardLight} p-6`}>
+          <h2 className="mb-4 text-lg font-bold text-stone-800">Meeting frequency</h2>
           <select
             className={`${inputLight} max-w-xs`}
             value={meetingFreq}

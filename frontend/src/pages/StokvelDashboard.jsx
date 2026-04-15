@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { LayoutDashboard } from 'lucide-react'
 import { useSession } from '../context/SessionContext'
 import { apiUrl } from '../utils/api'
-import { btnPrimary, errorBox, pageSubtitle } from '../ui'
+import { btnPrimary, cardLight, errorBox, pageSubtitle } from '../ui'
 import { readViewCache, writeViewCache } from '../utils/viewCache'
 
 function formatRole(role) {
@@ -26,10 +26,10 @@ function StatusBadge({ status }) {
 
   const tone =
     s === 'active'
-      ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
+      ? 'border border-emerald-200 bg-emerald-100 text-emerald-800'
       : s === 'rejected'
-        ? 'border-red-500/50 bg-red-500/15 text-red-200'
-        : 'border-cyan-500/40 bg-cyan-500/10 text-cyan-200'
+        ? 'border border-red-200 bg-red-50 text-red-800'
+        : 'border border-amber-200 bg-amber-50 text-amber-800'
 
   return (
     <span className={`rounded border px-2 py-0.5 text-xs font-bold uppercase ${tone}`}>
@@ -101,8 +101,8 @@ export default function StokvelDashboard() {
 
   return (
     <div>
-      <h1 className="mb-1 flex items-center gap-2 text-2xl font-bold tracking-widest text-cyan-400 uppercase sm:text-3xl">
-        <LayoutDashboard className="h-8 w-8 text-blue-400" aria-hidden />
+      <h1 className="mb-1 flex items-center gap-2 text-2xl font-bold tracking-widest text-emerald-800 uppercase sm:text-3xl">
+        <LayoutDashboard className="h-8 w-8 text-emerald-700" aria-hidden />
         My stokvels
       </h1>
       <p className={`mb-4 ${pageSubtitle}`}>
@@ -121,9 +121,9 @@ export default function StokvelDashboard() {
       {error ? <p className={`mb-4 ${errorBox}`}>{error}</p> : null}
 
       {memberships === null ? (
-        <p className="text-sm text-slate-500">Loading…</p>
+        <p className="text-sm text-stone-500">Loading…</p>
       ) : memberships.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-white/20 bg-white/[0.02] p-12 text-center text-slate-400">
+        <div className="rounded-2xl border border-dashed border-stone-300 bg-stone-50 p-12 text-center text-stone-500">
           You are not part of any stokvel yet.
         </div>
       ) : (
@@ -134,19 +134,22 @@ export default function StokvelDashboard() {
             const past = meetingFeed.filter((m) => new Date(m.meeting_date).getTime() < now).slice(-5).reverse()
             return (
               <section className="mb-8 grid gap-4 lg:grid-cols-2">
-                <div className="glass border-t-4 border-cyan-500/70 p-4">
-                  <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-cyan-300">
+                <div className={`${cardLight} border-t-4 border-emerald-700 p-4`}>
+                  <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-emerald-800">
                     Upcoming meetings calendar
                   </h2>
                   {upcoming.length === 0 ? (
-                    <p className="text-xs text-slate-500">No upcoming meetings.</p>
+                    <p className="text-xs text-stone-500">No upcoming meetings.</p>
                   ) : (
                     <ul className="space-y-2">
                       {upcoming.map((m) => (
-                        <li key={m.id} className="rounded border border-white/10 bg-white/[0.03] p-3">
-                          <p className="text-sm font-semibold text-white">{m.title}</p>
-                          <p className="text-xs text-slate-300">{m.groupName}</p>
-                          <p className="text-xs text-cyan-200">
+                        <li
+                          key={m.id}
+                          className="rounded-lg border border-stone-200 bg-white p-3 shadow-sm"
+                        >
+                          <p className="text-sm font-semibold text-stone-800">{m.title}</p>
+                          <p className="text-xs text-stone-500">{m.groupName}</p>
+                          <p className="text-xs text-stone-500">
                             {new Date(m.meeting_date).toLocaleString('en-ZA')}
                           </p>
                         </li>
@@ -154,19 +157,22 @@ export default function StokvelDashboard() {
                     </ul>
                   )}
                 </div>
-                <div className="glass border-t-4 border-slate-500/60 p-4">
-                  <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-300">
+                <div className={`${cardLight} border-t-4 border-stone-300 p-4`}>
+                  <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-emerald-800">
                     Past meetings
                   </h2>
                   {past.length === 0 ? (
-                    <p className="text-xs text-slate-500">No past meetings.</p>
+                    <p className="text-xs text-stone-500">No past meetings.</p>
                   ) : (
                     <ul className="space-y-2">
                       {past.map((m) => (
-                        <li key={m.id} className="rounded border border-white/10 bg-white/[0.03] p-3">
-                          <p className="text-sm font-semibold text-white">{m.title}</p>
-                          <p className="text-xs text-slate-300">{m.groupName}</p>
-                          <p className="text-xs text-slate-400">
+                        <li
+                          key={m.id}
+                          className="rounded-lg border border-stone-200 bg-white p-3 shadow-sm"
+                        >
+                          <p className="text-sm font-semibold text-stone-800">{m.title}</p>
+                          <p className="text-xs text-stone-500">{m.groupName}</p>
+                          <p className="text-xs text-stone-500">
                             {new Date(m.meeting_date).toLocaleString('en-ZA')}
                           </p>
                         </li>
@@ -190,19 +196,19 @@ export default function StokvelDashboard() {
                 <li key={sid}>
                   <Link
                     to={`/stokvels/${sid}`}
-                    className={`glass block p-5 transition hover:border-white/20 hover:bg-white/[0.07] ${
-                      rejected ? 'border border-red-500/25 card-blue opacity-95' : 'card-blue'
+                    className={`block rounded-2xl border border-stone-200 bg-white p-5 shadow-sm transition hover:border-stone-300 hover:shadow-md border-l-4 ${
+                      rejected ? 'border-l-red-500 opacity-95' : 'border-l-emerald-700'
                     }`}
                   >
                     <div className="mb-2 flex items-start justify-between gap-2">
-                      <h2 className="text-lg font-semibold leading-tight text-white">
+                      <h2 className="text-lg font-semibold leading-tight text-stone-800">
                         {stokvel?.name ?? 'Unnamed group'}
                       </h2>
                       <StatusBadge status={stokvel?.status} />
                     </div>
-                    <p className="text-sm text-slate-400">
+                    <p className="text-sm text-stone-500">
                       Role:{' '}
-                      <span className="font-medium text-emerald-400">{formatRole(m.group_role)}</span>
+                      <span className="font-medium text-emerald-800">{formatRole(m.group_role)}</span>
                     </p>
                   </Link>
                 </li>
@@ -213,7 +219,7 @@ export default function StokvelDashboard() {
               <>
                 {activeList.length > 0 ? (
                   <>
-                    <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-400">
+                    <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-emerald-800">
                       Active stokvels
                     </h2>
                     <ul className="mb-10 grid gap-4 sm:grid-cols-2">{activeList.map(card)}</ul>
@@ -221,7 +227,7 @@ export default function StokvelDashboard() {
                 ) : null}
                 {otherList.length > 0 ? (
                   <>
-                    <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-400">
+                    <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-emerald-800">
                       Pending &amp; declined
                     </h2>
                     <ul className="grid gap-4 sm:grid-cols-2">{otherList.map(card)}</ul>

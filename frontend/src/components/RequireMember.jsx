@@ -6,7 +6,7 @@ export default function RequireMember() {
 
   if (userRole === null || userRole === undefined) {
     return (
-      <div className="flex h-screen items-center justify-center p-8 text-gray-500">
+      <div className="flex h-screen items-center justify-center bg-[#F4F5F0] p-8 text-stone-600">
         Loading your dashboard...
       </div>
     )
