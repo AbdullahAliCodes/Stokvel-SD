@@ -17,6 +17,18 @@ npm install
 npm run dev
 ```
 
+Create a backend env file before starting the API:
+
+```bash
+cd backend
+copy .env.example .env
+```
+
+Then open `backend/.env` and set:
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (needed for admin operations; optional for basic user routes)
+
 The API listens on **http://localhost:5000** (override with the `PORT` environment variable). On some Macs, AirPlay Receiver uses port 5000; turn it off in System Settings → AirDrop & Handoff if the server fails to bind. If you change `PORT`, update the `proxy.target` in `frontend/vite.config.js` to match.
 
 For production-style runs:

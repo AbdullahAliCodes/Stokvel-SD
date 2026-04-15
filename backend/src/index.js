@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
+import multer from 'multer'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth } from './middleware/auth.js'
 import stokvelsRouter from './routes/stokvels.js'
@@ -10,11 +11,19 @@ import invitationsRouter from './routes/invitations.js'
 import { getServiceSupabase } from './utils/supabaseAdmin.js'
 import { ensurePlatformAdminsInStokvel } from './utils/platformAdminStokvelMembers.js'
 import { createInvitation, normalizeInviteEmail } from './utils/invitations.js'
+import cron from 'node-cron'
+import { fetchRepoRateFromFred } from './jobs/fetchRates.js'
+import marketRatesRouter from './routes/marketRates.js'
 
 const app = express()
 const PORT = Number(process.env.PORT) || 5000
 const DASHBOARD_CACHE_TTL_MS = 30_000
 const dashboardCache = new Map()
+const DOCUMENTS_BUCKET = process.env.SUPABASE_DOCUMENTS_BUCKET || 'stokvel-documents'
+const documentsUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 10 },
+})
 
 function hrNow() {
   return process.hrtime.bigint()
@@ -61,6 +70,32 @@ function clearDashboardCacheForUser(userId) {
   dashboardCache.delete(cacheKey('my-meetings', userId))
 }
 
+function normalizeMembersCount(raw) {
+  const n = Number(raw)
+  if (!Number.isInteger(n) || n < 1 || n > 500) return null
+  return n
+}
+
+function normalizeMemberDetails(raw, limit = 500) {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((m) => ({
+      name: typeof m?.name === 'string' ? m.name.trim() : '',
+      email: typeof m?.email === 'string' ? m.email.trim().toLowerCase() : '',
+      role: typeof m?.role === 'string' ? m.role.trim() : '',
+    }))
+    .filter((m) => m.name || m.email || m.role)
+    .slice(0, limit)
+}
+
+function normalizeDocuments(raw, limit = 50) {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((d) => (typeof d === 'string' ? d.trim() : ''))
+    .filter(Boolean)
+    .slice(0, limit)
+}
+
 const allowedOrigins = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
@@ -82,6 +117,14 @@ app.use(
 )
 app.use(express.json())
 
+function safeFileName(name) {
+  return String(name || 'document')
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
 // Health Check Route
 app.get('/', (req, res) => {
   res.json({
@@ -95,9 +138,61 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'Stokvel API' })
 })
 
+app.post('/api/uploads/documents', requireAuth, (req, res) => {
+  documentsUpload.array('documents', 10)(req, res, async (err) => {
+    if (err) {
+      return res.status(400).json({ error: err.message || 'Upload failed' })
+    }
+    try {
+      const svc = getServiceSupabase()
+      if (!svc) {
+        return res.status(500).json({
+          error: 'Document upload requires SUPABASE_SERVICE_ROLE_KEY on the API server.',
+        })
+      }
+      const files = Array.isArray(req.files) ? req.files : []
+      if (files.length === 0) {
+        return res.status(400).json({ error: 'Select at least one document.' })
+      }
+
+      const { error: bucketError } = await svc.storage.createBucket(DOCUMENTS_BUCKET, {
+        public: true,
+        fileSizeLimit: 10 * 1024 * 1024,
+      })
+      if (bucketError && !String(bucketError.message || '').toLowerCase().includes('already')) {
+        return res.status(500).json({ error: bucketError.message })
+      }
+
+      const uploaded = []
+      for (const file of files) {
+        const stamp = Date.now()
+        const key = `${req.user.id}/${stamp}-${Math.random().toString(36).slice(2, 8)}-${safeFileName(file.originalname)}`
+        const { error: uploadError } = await svc.storage
+          .from(DOCUMENTS_BUCKET)
+          .upload(key, file.buffer, {
+            contentType: file.mimetype || 'application/octet-stream',
+            upsert: false,
+          })
+        if (uploadError) {
+          return res.status(500).json({ error: uploadError.message })
+        }
+        const { data: pub } = svc.storage.from(DOCUMENTS_BUCKET).getPublicUrl(key)
+        uploaded.push(pub?.publicUrl || key)
+      }
+
+      return res.status(201).json({ success: true, documents: uploaded })
+    } catch (uploadErr) {
+      console.error('POST /api/uploads/documents:', uploadErr)
+      return res.status(500).json({ error: 'Internal Server Error' })
+    }
+  })
+})
+
 app.use('/api/admin', adminStokvelsRouter)
 app.use('/api/profile', profileRouter)
 app.use('/api/invitations', invitationsRouter)
+app.use('/api/market-rates', marketRatesRouter)
+app.use('/api/v1/market-rates', marketRatesRouter)
 
 app.get('/api/me', requireAuth, (req, res) => {
   try {
@@ -217,15 +312,38 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
   try {
     const userSupabase = createUserSupabaseFromReq(req)
 
-    const { name, contributionAmount, meetingFrequency, payoutOrder, treasurerEmail } = req.body
+    const {
+      name,
+      contributionAmount,
+      meetingFrequency,
+      payoutOrder,
+      treasurerEmail,
+      membersCount,
+      memberDetails,
+      documents,
+    } = req.body
 
     void contributionAmount
     void meetingFrequency
     void payoutOrder
 
+    const parsedMembersCount = normalizeMembersCount(membersCount)
+    const parsedDetails = normalizeMemberDetails(memberDetails, parsedMembersCount ?? 500)
+    const parsedDocuments = normalizeDocuments(documents)
+    const insertRow = {
+      name,
+      status: 'pending',
+      contribution_amount: Number(contributionAmount) || 0,
+      payout_order: typeof payoutOrder === 'string' ? payoutOrder : 'randomize',
+      meeting_frequency: typeof meetingFrequency === 'string' ? meetingFrequency : 'monthly',
+      members_count: parsedMembersCount,
+      member_details: parsedDetails,
+      documents: parsedDocuments,
+    }
+
     const { data: newStokvel, error: stokvelError } = await userSupabase
       .from('stokvels')
-      .insert([{ name, status: 'pending' }])
+      .insert([insertRow])
       .select()
       .single()
 
@@ -301,4 +419,22 @@ app.use('/api/stokvels', stokvelsRouter)
 
 app.listen(PORT, () => {
   console.log(`Stokvel API listening on port ${PORT}`)
+
+  if (process.env.FRED_API_KEY?.trim()) {
+    cron.schedule(
+      '0 6 * * *',
+      () => {
+        void fetchRepoRateFromFred()
+      },
+      { timezone: 'Africa/Johannesburg' },
+    )
+    console.log(
+      '[FRED] Scheduled daily SA policy rate sync (06:00 Africa/Johannesburg)',
+    )
+    void fetchRepoRateFromFred()
+  } else {
+    console.warn(
+      '[FRED] FRED_API_KEY not set; market_data will not auto-sync (set key in .env)',
+    )
+  }
 })

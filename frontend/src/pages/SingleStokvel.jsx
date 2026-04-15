@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useSession } from '../context/SessionContext'
 import { apiUrl } from '../utils/api'
 import { btnPrimary, errorBox, pageSubtitle, tableHead, tableRow, tableWrap } from '../ui'
 import { readViewCache, writeViewCache } from '../utils/viewCache'
+import MarketRatesWidget from '../components/MarketRatesWidget'
 
 function formatZAR(n) {
   const num = Number(n)
@@ -38,6 +39,176 @@ function confirmAction(message) {
   return window.confirm(message)
 }
 
+function QuickPayModal({
+  groupName,
+  stokvelId,
+  session,
+  monthlyContribution,
+  onSuccess,
+  onClose,
+  onRecordError,
+  onDebugStep,
+}) {
+  const [amount, setAmount] = useState(String(monthlyContribution || ''))
+  const [error, setError] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [paystackReady, setPaystackReady] = useState(Boolean(window.PaystackPop?.setup))
+  const paystackRef = useRef(window.PaystackPop ?? null)
+  const paystackFormRef = useRef(null)
+  const parsedAmount = Number(amount)
+  const paystackAmount = Number.isFinite(parsedAmount) && parsedAmount > 0 ? parsedAmount * 100 : 0
+
+  useEffect(() => {
+    if (window.PaystackPop?.setup) {
+      paystackRef.current = window.PaystackPop
+      setPaystackReady(true)
+      return
+    }
+    const existing = document.querySelector('script[data-paystack-inline="true"]')
+    const onLoad = () => {
+      paystackRef.current = window.PaystackPop ?? null
+      setPaystackReady(Boolean(window.PaystackPop?.setup))
+    }
+    const onError = () => {
+      setPaystackReady(false)
+      setError('Could not load Paystack.')
+      onDebugStep?.('Paystack script failed to load')
+    }
+    if (existing) {
+      existing.addEventListener('load', onLoad)
+      existing.addEventListener('error', onError)
+      return () => {
+        existing.removeEventListener('load', onLoad)
+        existing.removeEventListener('error', onError)
+      }
+    }
+    const script = document.createElement('script')
+    script.src = 'https://js.paystack.co/v1/inline.js'
+    script.async = true
+    script.dataset.paystackInline = 'true'
+    script.addEventListener('load', onLoad)
+    script.addEventListener('error', onError)
+    const parent = paystackFormRef.current || document.body
+    parent.appendChild(script)
+    return () => {
+      script.removeEventListener('load', onLoad)
+      script.removeEventListener('error', onError)
+    }
+  }, [onDebugStep])
+
+  async function verifyAndRecord(transaction, parsedAmountLocal) {
+    const reference = transaction?.reference || transaction?.trxref || transaction?.trans || null
+    setLoading(true)
+    try {
+      if (!reference) {
+        throw new Error('Payment completed but reference is missing.')
+      }
+      const res = await fetch(apiUrl(`/api/stokvels/${stokvelId}/payments/verify`), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ reference, amount: parsedAmountLocal }),
+      })
+      const text = await res.text()
+      let json = {}
+      try {
+        json = text ? JSON.parse(text) : {}
+      } catch {
+        json = {}
+      }
+      if (!res.ok) throw new Error(parseApiError(text))
+      if (!json?.success) throw new Error('Payment was verified but could not be recorded.')
+      onSuccess(parsedAmountLocal, json.contribution ?? null)
+      onClose() // only close AFTER everything succeeds
+    } catch (e) {
+      setError(e.message)
+      onRecordError?.(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleSubmit(e) {
+    e?.preventDefault?.()
+    onDebugStep?.('Pay Now clicked')
+    if (!amount || Number.isNaN(parsedAmount) || parsedAmount <= 0) {
+      setError('Please enter a valid amount')
+      onDebugStep?.('Validation failed: invalid amount')
+      return
+    }
+    setError(null)
+    onDebugStep?.('Opening Paystack popup')
+    try {
+      const paystack = paystackRef.current
+      if (!paystackReady || !paystack?.setup) {
+        throw new Error('Paystack is still loading. Please try again.')
+      }
+      const handler = paystack.setup({
+        key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
+        email: session.user.email,
+        amount: paystackAmount,
+        currency: 'ZAR',
+        ref: `${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
+        callback: (transaction) => {
+          void verifyAndRecord(transaction, parsedAmount)
+        },
+        onClose: () => {
+          onDebugStep?.('Paystack popup closed/cancelled')
+          setError('Payment was cancelled')
+        },
+      })
+      handler.openIframe()
+      onDebugStep?.('Paystack popup opened')
+    } catch (e) {
+      const message = e?.message || 'Could not open Paystack popup.'
+      onDebugStep?.(`Popup open failed: ${message}`)
+      setError(message)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <form
+        ref={paystackFormRef}
+        onSubmit={handleSubmit}
+        className="glass w-full max-w-sm border border-white/10 p-6"
+      >
+        <h2 className="mb-4 text-lg font-bold text-white">Quick Pay</h2>
+        <p className="mb-4 text-sm text-slate-400">
+          Contributing to <strong className="text-white">{groupName}</strong>
+        </p>
+        <input
+          type="number"
+          min="1"
+          placeholder="Amount (R)"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          className="mb-4 w-full rounded border border-white/15 bg-white/5 p-2 text-sm text-white placeholder:text-slate-500 focus:border-cyan-500/50 focus:outline-none"
+        />
+        {error && <p className="mb-3 text-xs text-red-400">{error}</p>}
+        <div className="flex gap-3">
+          <button
+            type="submit"
+            disabled={loading}
+            className={`${btnPrimary} flex-1 py-2 text-sm disabled:opacity-50`}
+          >
+            {loading ? 'Recording…' : !paystackReady ? 'Loading payment…' : 'Pay Now'}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 rounded border border-white/20 py-2 text-sm font-semibold text-slate-200 hover:bg-white/10"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
 export default function SingleStokvel() {
   const { id } = useParams()
   const { session } = useSession()
@@ -47,9 +218,6 @@ export default function SingleStokvel() {
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
   const [quickPayOpen, setQuickPayOpen] = useState(false)
-  const [quickPayAmount, setQuickPayAmount] = useState('')
-  const [quickPayLoading, setQuickPayLoading] = useState(false)
-  const [quickPayError, setQuickPayError] = useState(null)
   const [totalContribution, setTotalContribution] = useState(0)
   const [contributions, setContributions] = useState([])
   const [meetings, setMeetings] = useState([])
@@ -71,47 +239,7 @@ export default function SingleStokvel() {
   const [editingMeetingId, setEditingMeetingId] = useState('')
   const [editDraft, setEditDraft] = useState({})
   const [minutesDraft, setMinutesDraft] = useState({})
-
-  async function handleQuickPay() {
-    if (!session?.access_token) return
-    const parsed = Number(quickPayAmount)
-    if (!quickPayAmount || Number.isNaN(parsed) || parsed <= 0) {
-      setQuickPayError('Please enter a valid amount')
-      return
-    }
-    setQuickPayLoading(true)
-    setQuickPayError(null)
-    try {
-      const res = await fetch(apiUrl(`/api/stokvels/${id}/contributions`), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ amount: parsed }),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`)
-  
-      setTotalContribution((prev) => prev + parsed)
-      setContributions((prev) => [
-        {
-          id: json.contribution.id,
-          amount: parsed,
-          paid_at: json.contribution.paid_at,
-          user_id: json.contribution.user_id,
-          profiles: members.find((m) => m.user_id === json.contribution.user_id)?.profiles ?? null,
-        },
-        ...prev,
-      ])
-      setQuickPayOpen(false)
-      setQuickPayAmount('')
-    } catch (e) {
-      setQuickPayError(e.message)
-    } finally {
-      setQuickPayLoading(false)
-    }
-  }
+  const [paymentDebug, setPaymentDebug] = useState('')
 
   useEffect(() => {
     if (!session || !id) {
@@ -205,7 +333,6 @@ export default function SingleStokvel() {
   const memberCount = members.length
   const monthlyContribution = Number(effectiveStokvel?.contribution_amount) || 0
   const expectedPayout = monthlyContribution
-  const savingsProjection = monthlyContribution * memberCount * 12
   const canManageTreasurer = ['treasurer', 'admin'].includes(membership?.group_role)
   const myGroupRole = members.find((m) => m.user_id === session?.user?.id)?.group_role || membership?.group_role
   const canManageMeetings = ['treasurer', 'admin'].includes(myGroupRole)
@@ -214,6 +341,37 @@ export default function SingleStokvel() {
   const nowTs = Date.now()
   const upcomingMeetings = meetings.filter((m) => new Date(m.meeting_date).getTime() >= nowTs)
   const pastMeetings = meetings.filter((m) => new Date(m.meeting_date).getTime() < nowTs)
+
+  async function refreshContributionData() {
+    if (!session?.access_token || !id) return
+    try {
+      const res = await fetch(apiUrl(`/api/stokvels/${id}`), {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      const text = await res.text()
+      if (!res.ok) throw new Error(parseApiError(text))
+      const json = JSON.parse(text)
+      const nextContributions = Array.isArray(json.contributions) ? json.contributions : []
+      const nextTotal = Number(json.totalContribution ?? 0)
+      const nextMembers = Array.isArray(json.members) ? json.members : []
+      setTotalContribution(nextTotal)
+      setContributions(nextContributions)
+      setMembers(nextMembers)
+      setPaymentDebug('Server refresh complete')
+      const cacheKey = `stokvel_detail:${session.user.id}:${id}`
+      writeViewCache(cacheKey, {
+        membership: json.membership ?? membership,
+        stokvel: json.stokvel ?? effectiveStokvel,
+        members: nextMembers,
+        totalContribution: nextTotal,
+        contributions: nextContributions,
+        meetings,
+      })
+    } catch {
+      setPaymentDebug('Server refresh failed (kept optimistic UI)')
+      // Keep optimistic UI if refetch fails.
+    }
+  }
 
   function toDatetimeLocalValue(value) {
     if (!value) return ''
@@ -376,11 +534,8 @@ export default function SingleStokvel() {
   const statCards = [
     { label: 'Total contribution', value: formatZAR(totalContribution) },
     { label: 'Expected payout', value: formatZAR(expectedPayout) },
-    { label: 'Live interest rate', value: '0%' },
-    {
-      label: 'Savings projection',
-      value: memberCount > 0 ? formatZAR(savingsProjection) : formatZAR(0),
-    },
+    { label: 'Monthly contribution', value: formatZAR(monthlyContribution) },
+    { label: 'Members', value: String(memberCount) },
   ]
 
   return (
@@ -464,20 +619,14 @@ export default function SingleStokvel() {
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div className="glass flex h-52 flex-col justify-between p-6">
-              <span className="text-sm font-bold text-white">Savings projection (TDD logic)</span>
-              <div className="flex h-28 items-end gap-2">
-                <div className="h-8 w-full rounded-t bg-slate-700" />
-                <div className="h-12 w-full rounded-t bg-slate-600" />
-                <div className="h-20 w-full rounded-t bg-blue-500" />
-                <div className="h-[7.5rem] w-full rounded-t bg-emerald-500" />
-              </div>
-              <p className="text-center text-[10px] text-slate-500">
-                Projected growth based on Prime Rate
-              </p>
-            </div>
+            <MarketRatesWidget memberMonthlyContribution={monthlyContribution} />
             <div className="glass p-6">
               <span className="text-sm font-bold text-white">Quick Pay</span>
+              {paymentDebug ? (
+                <p className="mt-2 text-xs text-amber-300" role="status">
+                  Payment debug: {paymentDebug}
+                </p>
+              ) : null}
               <button
                 type="button"
                 disabled={!isActiveStokvel}
@@ -847,58 +996,37 @@ export default function SingleStokvel() {
               </section>
             </div>
           </div>
-          {isActiveStokvel ? (
-            <button
-              type="button"
-              onClick={() => setQuickPayOpen(true)}
-              className={`${btnPrimary} mt-8 w-full max-w-md py-4 text-base sm:w-auto sm:px-12`}
-            >
-              Quick Pay
-            </button>
-          ) : null}
-
+          
           {quickPayOpen ? (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-              <div className="glass w-full max-w-sm border border-white/10 p-6">
-                <h2 className="mb-4 text-lg font-bold text-white">Quick Pay</h2>
-                <p className="mb-4 text-sm text-slate-400">
-                  Enter the amount you are contributing to{' '}
-                  <strong className="text-white">{groupName}</strong>.
-                </p>
-                <input
-                  type="number"
-                  min="1"
-                  placeholder="Amount (R)"
-                  value={quickPayAmount}
-                  onChange={(e) => setQuickPayAmount(e.target.value)}
-                  className="mb-2 w-full rounded border border-white/15 bg-white/5 p-2 text-sm text-white placeholder:text-slate-500 focus:border-cyan-500/50 focus:outline-none"
-                />
-                {quickPayError ? (
-                  <p className="mb-2 text-xs text-red-400">{quickPayError}</p>
-                ) : null}
-                <div className="mt-4 flex gap-3">
-                  <button
-                    type="button"
-                    onClick={handleQuickPay}
-                    disabled={quickPayLoading}
-                    className={`${btnPrimary} flex-1 py-2 text-sm disabled:opacity-50`}
-                  >
-                    {quickPayLoading ? 'Submitting…' : 'Submit Payment'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setQuickPayOpen(false)
-                      setQuickPayError(null)
-                      setQuickPayAmount('')
-                    }}
-                    className="flex-1 rounded border border-white/20 py-2 text-sm font-semibold text-slate-200 hover:bg-white/10"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            </div>
+            <QuickPayModal
+              groupName={groupName}
+              stokvelId={id}
+              session={session}
+              monthlyContribution={monthlyContribution}
+              onClose={() => setQuickPayOpen(false)}
+              onDebugStep={setPaymentDebug}
+              onRecordError={(message) =>
+                setError(`Payment succeeded, but contribution was not recorded: ${message}`)
+              }
+              onSuccess={(paidAmount, contribution) => {
+                setPaymentDebug('UI update started')
+                setQuickPayOpen(false)
+                const effectiveAmount = Number(contribution?.amount ?? paidAmount) || 0
+                const myProfile = members.find((m) => m.user_id === session?.user?.id)?.profiles ?? null
+                setTotalContribution((prev) => prev + effectiveAmount)
+                setContributions((prev) => [
+                  {
+                    id: contribution?.id ?? `local-${Date.now()}`,
+                    amount: effectiveAmount,
+                    paid_at: contribution?.paid_at ?? new Date().toISOString(),
+                    user_id: contribution?.user_id ?? session?.user?.id ?? null,
+                    profiles: myProfile,
+                  },
+                  ...prev,
+                ])
+                setPaymentDebug('Optimistic UI updated, refreshing from server')
+              }}
+            />
           ) : null}
         </>
       ) : null}
