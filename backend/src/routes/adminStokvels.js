@@ -204,17 +204,18 @@ router.get('/users', requireAuth, requireAdmin, async (req, res) => {
 
     const client = dbClient(req)
     const pattern = `%${escapeIlikePattern(q)}%`
-    const sel = 'id, first_name, last_name, username'
+    const sel = 'id, first_name, last_name, username, email'
 
     const run = (col) => client.from('profiles').select(sel).ilike(col, pattern).limit(15)
 
-    const [byFirst, byLast, byUsername] = await Promise.all([
+    const [byFirst, byLast, byUsername, byEmail] = await Promise.all([
       run('first_name'),
       run('last_name'),
       run('username'),
+      run('email'),
     ])
 
-    const firstErr = byFirst.error || byLast.error || byUsername.error
+    const firstErr = byFirst.error || byLast.error || byUsername.error || byEmail.error
     if (firstErr) {
       console.error('GET /api/admin/users:', firstErr)
       return res.status(500).json({
@@ -225,7 +226,7 @@ router.get('/users', requireAuth, requireAdmin, async (req, res) => {
     }
 
     const byId = new Map()
-    for (const chunk of [byFirst.data, byLast.data, byUsername.data]) {
+    for (const chunk of [byFirst.data, byLast.data, byUsername.data, byEmail.data]) {
       for (const row of chunk ?? []) {
         byId.set(row.id, row)
       }
@@ -243,6 +244,7 @@ router.get('/users', requireAuth, requireAdmin, async (req, res) => {
         username: uname,
         firstName: r.first_name ?? '',
         lastName: r.last_name ?? '',
+        email: typeof r.email === 'string' ? r.email.trim() : '',
         label,
       }
     })
