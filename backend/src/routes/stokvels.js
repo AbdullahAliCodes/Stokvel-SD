@@ -7,6 +7,7 @@ import {
   sendMeetingScheduledEmail,
 } from '../utils/invitations.js'
 import { getServiceSupabase } from '../utils/supabaseAdmin.js'
+import axios from 'axios'
 
 const router = Router()
 
@@ -604,6 +605,52 @@ router.post('/:id/contributions', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('POST contributions:', err)
     res.status(500).json({ error: 'Internal Server Error' })
+  }
+})
+
+// POST /api/stokvels/:id/payments/verify
+router.post('/:id/payments/verify', requireAuth, async (req, res) => {
+  try {
+    const { reference, amount } = req.body
+    const stokvel_id = req.params.id
+    const user_id = req.user.id
+    if (!reference || typeof reference !== 'string') {
+      return res.status(400).json({ error: 'Payment reference is required.' })
+    }
+
+    let paystackResponse
+    try {
+      paystackResponse = await axios.get(
+        `https://api.paystack.co/transaction/verify/${reference}`,
+        { headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` } },
+      )
+    } catch (verifyErr) {
+      const paystackMessage =
+        verifyErr?.response?.data?.message || verifyErr?.message || 'Paystack verification failed'
+      console.error('POST payments/verify paystack error:', paystackMessage)
+      return res.status(502).json({ error: `Paystack verify failed: ${paystackMessage}` })
+    }
+    const { data } = paystackResponse
+
+    if (data.data.status !== 'success') {
+      return res.status(400).json({ error: 'Payment not successful' })
+    }
+
+    const verified_amount = data.data.amount / 100
+
+    const userSupabase = userScopedSupabase(req)
+    const { data: contribution, error } = await userSupabase
+      .from('contributions')
+      .insert([{ stokvel_id, user_id, amount: verified_amount }])
+      .select('id, stokvel_id, user_id, amount, paid_at')
+      .single()
+
+    if (error) return res.status(500).json({ error: error.message })
+
+    res.json({ success: true, contribution })
+  } catch (err) {
+    console.error('POST payments/verify:', err)
+    res.status(500).json({ error: 'Verification failed' })
   }
 })
 
