@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSession } from '../context/SessionContext'
 import { apiUrl } from '../utils/api'
-import { btnPrimary, errorBox, inputDark, labelDark, tableHead, tableRow, tableWrap } from '../ui'
+import { btnPrimary, errorBox, inputLight, labelLight, tableHead, tableRow, tableWrap } from '../ui'
 
 export default function Apply() {
   const navigate = useNavigate()
@@ -118,17 +118,17 @@ export default function Apply() {
         <section className="glass p-6">
           <h2 className="mb-4 text-lg font-bold text-white">Personal info</h2>
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className={labelDark}>
+            <label className={labelLight}>
               Name
-              <input className={inputDark} placeholder="Jane" />
+              <input className={inputLight} placeholder="Jane" />
             </label>
-            <label className={labelDark}>
+            <label className={labelLight}>
               Surname
-              <input className={inputDark} placeholder="Doe" />
+              <input className={inputLight} placeholder="Doe" />
             </label>
-            <label className={`${labelDark} sm:col-span-2`}>
+            <label className={`${labelLight} sm:col-span-2`}>
               Email
-              <input type="email" className={inputDark} placeholder="jane@example.com" />
+              <input type="email" className={inputLight} placeholder="jane@example.com" />
             </label>
           </div>
         </section>
@@ -136,22 +136,22 @@ export default function Apply() {
         <section className="glass p-6">
           <h2 className="mb-4 text-lg font-bold text-white">Stokvel details</h2>
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className={labelDark}>
+            <label className={labelLight}>
               Stokvel name
               <input
-                className={inputDark}
+                className={inputLight}
                 placeholder="Avoille Stokvel"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
               />
             </label>
-            <label className={labelDark}>
+            <label className={labelLight}>
               Members count
               <input
                 type="number"
                 min={1}
-                className={inputDark}
+                className={inputLight}
                 placeholder="12"
                 value={membersCount}
                 onChange={(e) => updateMembersCount(e.target.value)}
@@ -189,11 +189,11 @@ export default function Apply() {
               </label>
             </div>
             {treasurerMode === 'email' ? (
-              <label className={`${labelDark} mt-3 block`}>
+              <label className={`${labelLight} mt-3 block`}>
                 Treasurer email
                 <input
                   type="email"
-                  className={inputDark}
+                  className={inputLight}
                   placeholder="treasurer@example.com"
                   value={treasurerEmail}
                   onChange={(e) => setTreasurerEmail(e.target.value)}
@@ -217,7 +217,7 @@ export default function Apply() {
                     <td className="p-2 text-slate-400">{idx + 1}</td>
                     <td className="p-2">
                       <input
-                        className={`${inputDark} text-sm`}
+                        className={`${inputLight} text-sm`}
                         placeholder={`Member ${idx + 1}`}
                         value={m.name}
                         onChange={(e) => updateMember(idx, 'name', e.target.value)}
@@ -225,7 +225,7 @@ export default function Apply() {
                     </td>
                     <td className="p-2">
                       <input
-                        className={`${inputDark} text-sm`}
+                        className={`${inputLight} text-sm`}
                         placeholder="member@example.com"
                         value={m.email}
                         onChange={(e) => updateMember(idx, 'email', e.target.value)}
@@ -236,12 +236,12 @@ export default function Apply() {
               </tbody>
             </table>
           </div>
-          <label className={`${labelDark} mt-4 block`}>
+          <label className={`${labelLight} mt-4 block`}>
             Documents (upload files)
             <input
               type="file"
               multiple
-              className={inputDark}
+              className={inputLight}
               onChange={(e) => setDocumentFiles(Array.from(e.target.files || []))}
             />
           </label>
@@ -252,13 +252,13 @@ export default function Apply() {
 
         <section className="glass p-6">
           <h2 className="mb-4 text-lg font-bold text-white">Contribution amount</h2>
-          <label className={labelDark}>
+          <label className={labelLight}>
             Monthly (ZAR)
             <input
               type="number"
               min={0}
               step="0.01"
-              className={`${inputDark} max-w-xs`}
+              className={`${inputLight} max-w-xs`}
               placeholder="500"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
@@ -296,7 +296,7 @@ export default function Apply() {
         <section className="glass p-6">
           <h2 className="mb-4 text-lg font-bold text-white">Meeting frequency</h2>
           <select
-            className={`${inputDark} max-w-xs`}
+            className={`${inputLight} max-w-xs`}
             value={meetingFreq}
             onChange={(e) => setMeetingFreq(e.target.value)}
           >

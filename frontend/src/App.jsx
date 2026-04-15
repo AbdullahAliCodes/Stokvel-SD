@@ -17,7 +17,6 @@ import PublicLayout from './layouts/PublicLayout'
 import DashboardLayout from './layouts/DashboardLayout'
 import AdminLayout from './layouts/AdminLayout'
 import Apply from './pages/Apply'
-import AdminDashboard from './pages/AdminDashboard'
 import AdminPlaceholder from './pages/AdminPlaceholder'
 import AdminCreateStokvel from './pages/AdminCreateStokvel'
 import AdminGroups from './pages/AdminGroups'
@@ -121,7 +120,7 @@ export default function App() {
 
             <Route element={<RequireAdmin />}>
               <Route path="/admin" element={<AdminLayout />}>
-                <Route index element={<AdminDashboard />} />
+                <Route index element={<Navigate to="/admin/groups" replace />} />
                 <Route path="groups" element={<AdminGroups />} />
                 <Route path="groups/:id/review" element={<AdminReviewStokvel />} />
                 <Route path="groups/:id/edit" element={<AdminEditStokvel />} />

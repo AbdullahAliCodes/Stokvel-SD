@@ -19,9 +19,10 @@ import { apiUrl } from "../utils/api";
 import {
   btnPrimary,
   btnSecondary,
+  cardLight,
   errorBox,
-  inputDark,
-  labelDark,
+  inputLight,
+  labelLight,
 } from "../ui";
 
 const MAX_GROUP_MEMBERS = 12;
@@ -706,25 +707,25 @@ export default function AdminCreateStokvel() {
 
   if (createdStokvel) {
     return (
-      <div className="mx-auto max-w-2xl space-y-6 text-white">
-        <section className="glass p-6">
-          <h1 className="text-xl font-bold text-cyan-400">Group created</h1>
-          <p className="mt-2 text-slate-300">
+      <div className="mx-auto max-w-2xl space-y-6 text-stone-800">
+        <section className={`${cardLight} p-6`}>
+          <h1 className="text-xl font-bold text-emerald-800">Group created</h1>
+          <p className="mt-2 text-stone-600">
             {createdStokvel.name} is live. Add members below or open the
             dashboard.
           </p>
         </section>
-        <section className="glass p-6">
+        <section className={`${cardLight} p-6`}>
           <form
             className="flex flex-col gap-3 sm:flex-row sm:items-end"
             onSubmit={handleInvite}
           >
-            <label className={`${labelDark} min-w-0 flex-1`}>
+            <label className={`${labelLight} min-w-0 flex-1`}>
               Add by username
               <input
                 value={inviteUsername}
                 onChange={(e) => setInviteUsername(e.target.value)}
-                className={inputDark}
+                className={inputLight}
               />
             </label>
             <button
@@ -739,13 +740,13 @@ export default function AdminCreateStokvel() {
             className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end"
             onSubmit={handleEmailInvite}
           >
-            <label className={`${labelDark} min-w-0 flex-1`}>
+            <label className={`${labelLight} min-w-0 flex-1`}>
               Invite by email
               <input
                 type="email"
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
-                className={inputDark}
+                className={inputLight}
               />
             </label>
             <button
@@ -760,7 +761,7 @@ export default function AdminCreateStokvel() {
             <p className={`${errorBox} mt-3`}>{inviteError}</p>
           ) : null}
           {inviteOk ? (
-            <p className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+            <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
               {inviteOk}
             </p>
           ) : null}
@@ -776,16 +777,16 @@ export default function AdminCreateStokvel() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-3 pb-10 text-white sm:px-0">
-      <h1 className="mb-6 border-b border-white/10 pb-4 text-2xl font-bold tracking-wide text-cyan-400">
+    <div className="mx-auto max-w-2xl px-3 pb-10 text-stone-800 sm:px-0">
+      <h1 className="mb-6 border-b border-stone-200 pb-4 text-2xl font-bold tracking-wide text-emerald-800">
         Admin stokvel creation
       </h1>
       {formError ? <p className={`${errorBox} mb-4`}>{formError}</p> : null}
 
       <form className="flex flex-col gap-6" onSubmit={(e) => e.preventDefault()}>
-        <div className="glass overflow-hidden rounded-2xl transition-shadow duration-200">
+        <div className={`${cardLight} overflow-hidden transition-shadow duration-200`}>
           <nav
-            className="flex border-b border-white/10 bg-slate-950/40"
+            className="flex border-b border-stone-200 bg-stone-50/90"
             aria-label="Form steps"
           >
             {[
@@ -801,8 +802,8 @@ export default function AdminCreateStokvel() {
                 }
                 className={`relative flex-1 px-3 py-3.5 text-sm font-medium transition-colors duration-200 sm:px-4 sm:text-base ${
                   activeTab === tab.id
-                    ? "border-b-2 border-cyan-400 bg-white/5 text-cyan-400"
-                    : "border-b-2 border-transparent text-slate-400 hover:bg-white/4 hover:text-slate-200"
+                    ? "border-b-2 border-emerald-700 bg-emerald-50/70 text-emerald-800"
+                    : "border-b-2 border-transparent text-stone-500 hover:bg-stone-100 hover:text-stone-800"
                 }`}
               >
                 {tab.label}
@@ -813,22 +814,22 @@ export default function AdminCreateStokvel() {
           <div className="p-5 sm:p-6">
             {activeTab === "details" ? (
               <div className="space-y-4">
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-stone-500">
                   Core stokvel settings. You can move to Members when ready.
                 </p>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <label className={`${labelDark} sm:col-span-2`}>
+                  <label className={`${labelLight} sm:col-span-2`}>
                     Group name
                     <input
-                      className={inputDark}
+                      className={inputLight}
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                     />
                   </label>
-                  <label className={labelDark}>
+                  <label className={labelLight}>
                     Type
                     <select
-                      className={inputDark}
+                      className={inputLight}
                       value={type}
                       onChange={(e) => setType(e.target.value)}
                     >
@@ -839,21 +840,21 @@ export default function AdminCreateStokvel() {
                       </option>
                     </select>
                   </label>
-                  <label className={labelDark}>
+                  <label className={labelLight}>
                     Contribution amount (ZAR)
                     <input
                       type="number"
                       min="0"
                       step="0.01"
-                      className={inputDark}
+                      className={inputLight}
                       value={contributionAmount}
                       onChange={(e) => setContributionAmount(e.target.value)}
                     />
                   </label>
-                  <label className={labelDark}>
+                  <label className={labelLight}>
                     Payout schedule
                     <select
-                      className={inputDark}
+                      className={inputLight}
                       value={payoutStrategy}
                       onChange={(e) => setPayoutStrategy(e.target.value)}
                     >
@@ -861,10 +862,10 @@ export default function AdminCreateStokvel() {
                       <option value="Auto-Rotate">Auto-Rotate</option>
                     </select>
                   </label>
-                  <label className={labelDark}>
+                  <label className={labelLight}>
                     Payout order
                     <select
-                      className={inputDark}
+                      className={inputLight}
                       value={payoutOrder}
                       onChange={(e) => setPayoutOrder(e.target.value)}
                     >
@@ -872,10 +873,10 @@ export default function AdminCreateStokvel() {
                       <option value="manual">Manual</option>
                     </select>
                   </label>
-                  <label className={labelDark}>
+                  <label className={labelLight}>
                     Meeting frequency
                     <select
-                      className={inputDark}
+                      className={inputLight}
                       value={meetingFrequency}
                       onChange={(e) => setMeetingFrequency(e.target.value)}
                     >
@@ -890,17 +891,18 @@ export default function AdminCreateStokvel() {
 
             {activeTab === "members" ? (
               <div className="space-y-5">
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-stone-500">
                   Search registered users.{" "}
-                  <span className="text-slate-200">Add new member</span> enables
-                  when there are no matches. Max {MAX_GROUP_MEMBERS} including
-                  you. Cycle length:{" "}
-                  <span className="text-slate-200">{cycleLength}</span>. Use{" "}
-                  <span className="text-slate-200">Add email</span> when a profile
-                  has no address.
+                  <span className="font-medium text-stone-800">Add new member</span>{" "}
+                  enables when there are no matches. Max {MAX_GROUP_MEMBERS}{" "}
+                  including you. Cycle length:{" "}
+                  <span className="font-medium text-stone-800">{cycleLength}</span>
+                  . Use{" "}
+                  <span className="font-medium text-stone-800">Add email</span> when
+                  a profile has no address.
                 </p>
 
-                <label className={`${labelDark} block`}>
+                <label className={`${labelLight} block`}>
                   Add members
                   <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-stretch">
                     <div className="relative min-w-0 flex-1">
@@ -915,16 +917,16 @@ export default function AdminCreateStokvel() {
                         onBlur={() =>
                           setTimeout(() => setSearchOpen(false), 200)
                         }
-                        className={inputDark}
+                        className={inputLight}
                         placeholder="Search by name, username, or email…"
                       />
                       {searchOpen &&
                       (searchLoading ||
                         searchResults.length > 0 ||
                         searchError) ? (
-                        <ul className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-white/15 bg-slate-900 shadow-xl">
+                        <ul className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-stone-200 bg-white shadow-lg">
                           {searchLoading ? (
-                            <li className="px-3 py-2 text-xs text-slate-400">
+                            <li className="px-3 py-2 text-xs text-stone-500">
                               Searching...
                             </li>
                           ) : null}
@@ -936,7 +938,7 @@ export default function AdminCreateStokvel() {
                           {!searchLoading &&
                           !searchError &&
                           searchResults.length > 0 ? (
-                            <li className="sticky top-0 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)] gap-2 border-b border-white/10 bg-slate-950 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                            <li className="sticky top-0 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)] gap-2 border-b border-stone-200 bg-stone-100 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-stone-600">
                               <span>Username</span>
                               <span>Name</span>
                               <span>Email</span>
@@ -958,12 +960,12 @@ export default function AdminCreateStokvel() {
                               return (
                                 <li
                                   key={u.id}
-                                  className="border-b border-white/5 last:border-0"
+                                  className="border-b border-stone-100 last:border-0"
                                 >
                                   <button
                                     type="button"
                                     disabled={atMemberCap}
-                                    className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)] gap-2 px-3 py-2 text-left text-xs text-slate-200 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+                                    className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)] gap-2 px-3 py-2 text-left text-xs text-stone-800 transition-colors hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
                                     onMouseDown={(ev) => {
                                       ev.preventDefault();
                                       selectUser(u);
@@ -1002,21 +1004,21 @@ export default function AdminCreateStokvel() {
                 </label>
 
                 {atMemberCap ? (
-                  <p className="text-xs text-amber-200/90">
+                  <p className="text-xs font-medium text-amber-800">
                     Member limit reached ({MAX_GROUP_MEMBERS}).
                   </p>
                 ) : null}
                 {!myUserId ? (
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-stone-500">
                     Sign in to add members.
                   </p>
                 ) : null}
 
                 {/* Desktop table */}
-                <div className="hidden overflow-x-auto rounded-xl border border-white/10 md:block">
+                <div className="hidden overflow-x-auto rounded-xl border border-stone-200 md:block">
                   <table className="w-full min-w-[560px] text-left text-sm">
                     <thead>
-                      <tr className="border-b border-white/10 bg-white/5 text-xs uppercase tracking-wide text-slate-400">
+                      <tr className="border-b border-stone-200 bg-stone-100 text-xs uppercase tracking-wide text-stone-600">
                         <th className="px-4 py-3">#</th>
                         <th className="px-4 py-3">Username</th>
                         <th className="px-4 py-3">Name</th>
@@ -1029,12 +1031,12 @@ export default function AdminCreateStokvel() {
                       {selectedMembers.map((m, idx) => (
                         <tr
                           key={m.id}
-                          className="border-b border-white/5 transition-colors last:border-0 hover:bg-white/2"
+                          className="border-b border-stone-100 transition-colors last:border-0 hover:bg-stone-50"
                         >
-                          <td className="px-4 py-3 text-slate-400">
+                          <td className="px-4 py-3 text-stone-500">
                             {idx + 1}
                           </td>
-                          <td className="px-4 py-3 text-slate-200">
+                          <td className="px-4 py-3 text-stone-800">
                             <span
                               className="block max-w-32 truncate"
                               title={displayUsername(m)}
@@ -1042,7 +1044,7 @@ export default function AdminCreateStokvel() {
                               {displayUsername(m)}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-slate-200">
+                          <td className="px-4 py-3 text-stone-800">
                             <span
                               className="block max-w-40 truncate"
                               title={displayName(m)}
@@ -1050,12 +1052,12 @@ export default function AdminCreateStokvel() {
                               {displayName(m)}
                             </span>
                           </td>
-                          <td className="min-w-40 px-4 py-3 text-slate-200">
+                          <td className="min-w-40 px-4 py-3 text-stone-800">
                             {memberShowsEmailInput(m, creatorEmail) ? (
                               <button
                                 type="button"
                                 onClick={() => openEmailPopover(m)}
-                                className={`${btnSecondary} inline-flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors hover:border-cyan-400/40`}
+                                className={`${btnSecondary} inline-flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors hover:border-emerald-600/50`}
                               >
                                 <MailPlus className="h-3.5 w-3.5 shrink-0" />
                                 Add email
@@ -1072,7 +1074,7 @@ export default function AdminCreateStokvel() {
                           <td className="px-4 py-3">
                             {m.isPending ? (
                               <select
-                                className={inputDark}
+                                className={inputLight}
                                 value="Member"
                                 disabled
                                 aria-label={`Role for ${m.label}`}
@@ -1083,7 +1085,7 @@ export default function AdminCreateStokvel() {
                               </select>
                             ) : (
                               <select
-                                className={inputDark}
+                                className={inputLight}
                                 value={m.role}
                                 onChange={(e) =>
                                   setMemberRole(m.id, e.target.value)
@@ -1098,12 +1100,12 @@ export default function AdminCreateStokvel() {
                           </td>
                           <td className="px-2 py-3 text-right">
                             {m.isCreator || m.id === myUserId ? (
-                              <span className="text-xs text-slate-500">—</span>
+                              <span className="text-xs text-stone-400">—</span>
                             ) : (
                               <button
                                 type="button"
                                 onClick={() => removeMember(m.id)}
-                                className={`${btnSecondary} p-2 transition-colors hover:border-red-400/40 hover:text-red-200`}
+                                className={`${btnSecondary} p-2 transition-colors hover:border-red-300 hover:text-red-700`}
                                 aria-label="Remove member"
                               >
                                 <X className="h-4 w-4" />
@@ -1121,11 +1123,11 @@ export default function AdminCreateStokvel() {
                   {selectedMembers.map((m, idx) => (
                     <li
                       key={m.id}
-                      className="rounded-xl border border-white/10 bg-white/4 p-4 transition-colors hover:bg-white/6"
+                      className="rounded-xl border border-stone-200 bg-stone-50 p-4 transition-colors hover:bg-stone-100/80"
                     >
                       <div className="flex gap-3">
                         <div
-                          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-lg font-semibold text-cyan-400"
+                          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-stone-200 bg-white text-lg font-semibold text-emerald-800"
                           aria-hidden
                         >
                           {memberAvatarLetter(m)}
@@ -1133,18 +1135,18 @@ export default function AdminCreateStokvel() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">
                             <div>
-                              <p className="font-medium text-white">
+                              <p className="font-medium text-stone-900">
                                 {displayName(m)}
                               </p>
-                              <p className="text-sm text-slate-400">
+                              <p className="text-sm text-stone-600">
                                 {displayUsername(m)}
                               </p>
-                              <p className="mt-1 text-xs text-slate-500">
+                              <p className="mt-1 text-xs text-stone-500">
                                 Row {idx + 1}
                                 {memberShowsEmailInput(m, creatorEmail) ? null : (
                                   <>
                                     {" · "}
-                                    <span className="text-slate-400">
+                                    <span className="text-stone-600">
                                       {displayEmailReadOnly(m, creatorEmail)}
                                     </span>
                                   </>
@@ -1173,11 +1175,11 @@ export default function AdminCreateStokvel() {
                             </button>
                           ) : null}
                           <div className="mt-3">
-                            <label className={`${labelDark} text-xs`}>
+                            <label className={`${labelLight} text-xs`}>
                               Role
                               {m.isPending ? (
                                 <select
-                                  className={`${inputDark} mt-1`}
+                                  className={`${inputLight} mt-1`}
                                   value="Member"
                                   disabled
                                 >
@@ -1187,7 +1189,7 @@ export default function AdminCreateStokvel() {
                                 </select>
                               ) : (
                                 <select
-                                  className={`${inputDark} mt-1`}
+                                  className={`${inputLight} mt-1`}
                                   value={m.role}
                                   onChange={(e) =>
                                     setMemberRole(m.id, e.target.value)
@@ -1207,14 +1209,14 @@ export default function AdminCreateStokvel() {
                 </ul>
 
                 {selectedMembers.length === 0 ? (
-                  <p className="text-xs text-slate-400">Loading your row…</p>
+                  <p className="text-xs text-stone-500">Loading your row…</p>
                 ) : null}
               </div>
             ) : null}
 
             {activeTab === "documents" ? (
               <div className="space-y-4">
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-stone-500">
                   Constitution PDFs only, max {PDF_MAX_BYTES / (1024 * 1024)}MB
                   each. Drag files here or click to browse.
                 </p>
@@ -1252,25 +1254,25 @@ export default function AdminCreateStokvel() {
                   }}
                   className={`flex w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-12 text-center transition-all duration-200 ${
                     dropzoneActive
-                      ? "border-cyan-400 bg-cyan-400/5"
-                      : "border-slate-600 bg-white/2 hover:border-slate-500 hover:bg-white/4"
+                      ? "border-emerald-600 bg-emerald-50/80"
+                      : "border-stone-400 bg-stone-50/50 hover:border-stone-500 hover:bg-stone-100/80"
                   }`}
                 >
                   <div
                     className={`rounded-full p-4 transition-colors duration-200 ${
-                      dropzoneActive ? "bg-cyan-400/15" : "bg-white/5"
+                      dropzoneActive ? "bg-emerald-100" : "bg-stone-100"
                     }`}
                   >
                     <Upload
-                      className={`h-8 w-8 ${dropzoneActive ? "text-cyan-400" : "text-slate-400"}`}
+                      className={`h-8 w-8 ${dropzoneActive ? "text-emerald-700" : "text-stone-500"}`}
                       aria-hidden
                     />
                   </div>
                   <div>
-                    <p className="font-medium text-slate-200">
+                    <p className="font-medium text-stone-800">
                       Drop PDFs here or click to upload
                     </p>
-                    <p className="mt-1 text-sm text-slate-500">
+                    <p className="mt-1 text-sm text-stone-500">
                       Stokvel constitution · PDF only
                     </p>
                   </div>
@@ -1281,14 +1283,14 @@ export default function AdminCreateStokvel() {
                     {documentFiles.map((file, i) => (
                       <li
                         key={`${file.name}-${i}-${file.size}`}
-                        className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/4 px-4 py-3 transition-colors hover:bg-white/6"
+                        className="flex items-center gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3 shadow-sm transition-colors hover:bg-stone-50"
                       >
-                        <FileText className="h-5 w-5 shrink-0 text-cyan-400/90" />
+                        <FileText className="h-5 w-5 shrink-0 text-emerald-700" />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-slate-100">
+                          <p className="truncate text-sm font-medium text-stone-900">
                             {file.name}
                           </p>
-                          <p className="text-xs text-slate-500">
+                          <p className="text-xs text-stone-500">
                             {formatFileSize(file.size)}
                           </p>
                         </div>
@@ -1307,7 +1309,7 @@ export default function AdminCreateStokvel() {
               </div>
             ) : null}
 
-            <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-6">
+            <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-stone-200 pt-6">
               <button
                 type="button"
                 onClick={goTabPrev}
@@ -1330,7 +1332,7 @@ export default function AdminCreateStokvel() {
           </div>
         </div>
 
-        <div className="sticky bottom-0 z-10 -mx-3 border-t border-white/10 bg-slate-950/90 px-3 py-4 backdrop-blur-sm sm:mx-0 sm:rounded-xl sm:border sm:border-white/10 sm:px-4">
+        <div className="sticky bottom-0 z-10 -mx-3 border-t border-stone-200 bg-[#F4F5F0]/95 px-3 py-4 backdrop-blur-sm sm:mx-0 sm:rounded-xl sm:border sm:border-stone-200 sm:bg-white sm:px-4 sm:shadow-sm">
           <button
             type="button"
             onClick={handleCreate}
@@ -1358,19 +1360,19 @@ export default function AdminCreateStokvel() {
               setEmailPopoverError("");
             }}
           />
-          <div className="glass relative z-10 w-full max-w-md rounded-2xl border border-white/15 p-6 shadow-2xl">
+          <div className={`${cardLight} relative z-10 w-full max-w-md p-6 shadow-xl`}>
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <h2
                   id="email-popover-title"
-                  className="text-lg font-semibold text-white"
+                  className="text-lg font-semibold text-stone-900"
                 >
                   {emailPopoverMember.isPending &&
                   emailPopoverMember.pendingUsername
                     ? "Add contact email (optional)"
                     : "Add email"}
                 </h2>
-                <p className="mt-1 text-sm text-slate-400">
+                <p className="mt-1 text-sm text-stone-500">
                   {displayName(emailPopoverMember)} ·{" "}
                   {displayUsername(emailPopoverMember)}
                 </p>
@@ -1387,12 +1389,12 @@ export default function AdminCreateStokvel() {
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <label className={labelDark}>
+            <label className={labelLight}>
               Email
               <input
                 type="email"
                 autoComplete="email"
-                className={inputDark}
+                className={inputLight}
                 value={emailPopoverDraft}
                 onChange={(e) => {
                   setEmailPopoverDraft(e.target.value);

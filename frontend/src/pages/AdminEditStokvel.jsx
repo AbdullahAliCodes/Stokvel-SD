@@ -6,11 +6,12 @@ import { apiUrl } from '../utils/api'
 import {
   pageTitle,
   pageSubtitle,
-  inputDark,
-  labelDark,
+  inputLight,
+  labelLight,
   btnPrimary,
   btnSecondary,
   errorBox,
+  cardLight,
 } from '../ui'
 
 function parseApiError(text) {
@@ -277,7 +278,7 @@ export default function AdminEditStokvel() {
     <div>
       <Link
         to="/admin/groups"
-        className="mb-4 inline-flex items-center gap-1 text-sm text-cyan-400 hover:text-cyan-300"
+        className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-emerald-800 hover:text-emerald-900"
       >
         <ChevronLeft className="h-4 w-4" aria-hidden />
         Back to groups
@@ -292,40 +293,40 @@ export default function AdminEditStokvel() {
       ) : null}
 
       {loading ? (
-        <p className="text-sm text-slate-500">Loading…</p>
+        <p className="text-sm text-stone-500">Loading…</p>
       ) : (
         <>
         <form onSubmit={handleSubmit} className="max-w-lg space-y-4">
-          <label className={labelDark}>
+          <label className={labelLight}>
             Group name
             <input
               type="text"
               required
               value={name}
               onChange={(ev) => setName(ev.target.value)}
-              className={inputDark}
+              className={inputLight}
             />
           </label>
-          <label className={labelDark}>
+          <label className={labelLight}>
             Type
-            <select value={type} onChange={(ev) => setType(ev.target.value)} className={inputDark}>
+            <select value={type} onChange={(ev) => setType(ev.target.value)} className={inputLight}>
               <option value="Rotating">Rotating</option>
               <option value="Fixed">Fixed</option>
             </select>
           </label>
-          <label className={labelDark}>
+          <label className={labelLight}>
             Status
             <select
               value={status}
               onChange={(ev) => setStatus(ev.target.value)}
-              className={inputDark}
+              className={inputLight}
             >
               <option value="pending">Pending</option>
               <option value="active">Active</option>
               <option value="rejected">Rejected</option>
             </select>
           </label>
-          <label className={labelDark}>
+          <label className={labelLight}>
             Contribution (ZAR)
             <input
               type="number"
@@ -334,21 +335,21 @@ export default function AdminEditStokvel() {
               required
               value={contributionAmount}
               onChange={(ev) => setContributionAmount(ev.target.value)}
-              className={inputDark}
+              className={inputLight}
             />
           </label>
-          <label className={labelDark}>
+          <label className={labelLight}>
             Payout schedule
             <select
               value={payoutStrategy}
               onChange={(ev) => setPayoutStrategy(ev.target.value)}
-              className={inputDark}
+              className={inputLight}
             >
               <option value="Manual">Manual</option>
               <option value="Auto-Rotate">Auto-Rotate</option>
             </select>
           </label>
-          <label className={labelDark}>
+          <label className={labelLight}>
             Cycle length
             <input
               type="number"
@@ -357,7 +358,7 @@ export default function AdminEditStokvel() {
               required
               value={cycleLength}
               onChange={(ev) => setCycleLength(ev.target.value)}
-              className={inputDark}
+              className={inputLight}
             />
           </label>
           <div className="flex flex-wrap gap-3 pt-2">
@@ -368,7 +369,7 @@ export default function AdminEditStokvel() {
               type="button"
               onClick={handleDeleteStokvel}
               disabled={saving}
-              className="inline-flex items-center rounded-lg border border-red-400/40 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-200 transition hover:bg-red-500/20 disabled:opacity-50"
+              className="inline-flex items-center rounded-lg border border-red-300 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-800 transition hover:bg-red-100 disabled:opacity-50"
             >
               {saving ? 'Working…' : 'Delete stokvel'}
             </button>
@@ -378,10 +379,12 @@ export default function AdminEditStokvel() {
           </div>
         </form>
 
-        <div className="mt-10 max-w-lg border-t border-white/10 pt-8">
-          <h2 className="mb-1 text-lg font-semibold text-white">Add member by username</h2>
+        <div className="mt-10 max-w-lg border-t border-stone-200 pt-8">
+          <h2 className="mb-1 text-lg font-semibold text-emerald-800">Add member by username</h2>
           <p className={`mb-4 text-sm ${pageSubtitle}`}>
-            Looks up <code className="text-xs text-slate-300">profiles.username</code>. They will see
+            Looks up{' '}
+            <code className="rounded bg-stone-100 px-1 text-xs text-stone-700">profiles.username</code>.
+            They will see
             this stokvel on their My stokvels page.
           </p>
           {memberInviteErr ? (
@@ -391,20 +394,20 @@ export default function AdminEditStokvel() {
           ) : null}
           {memberInviteMsg ? (
             <p
-              className="mb-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200"
+              className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
               role="status"
             >
               {memberInviteMsg}
             </p>
           ) : null}
           <form onSubmit={handleAddMember} className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <label className={`${labelDark} min-w-0 flex-1`}>
+            <label className={`${labelLight} min-w-0 flex-1`}>
               Username
               <input
                 type="text"
                 value={memberUsername}
                 onChange={(ev) => setMemberUsername(ev.target.value)}
-                className={inputDark}
+                className={inputLight}
                 placeholder="e.g. sipho_k"
                 autoComplete="off"
               />
@@ -419,8 +422,8 @@ export default function AdminEditStokvel() {
           </form>
         </div>
 
-        <div className="mt-10 max-w-2xl border-t border-white/10 pt-8">
-          <h2 className="mb-1 text-lg font-semibold text-white">Meetings & agenda</h2>
+        <div className="mt-10 max-w-2xl border-t border-stone-200 pt-8">
+          <h2 className="mb-1 text-lg font-semibold text-emerald-800">Meetings & agenda</h2>
           <p className={`mb-4 text-sm ${pageSubtitle}`}>
             Admins and treasurers can schedule meetings, set agendas, and record minutes.
           </p>
@@ -431,7 +434,7 @@ export default function AdminEditStokvel() {
           ) : null}
           {meetingInfo ? (
             <p
-              className="mb-3 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200"
+              className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
               role="status"
             >
               {meetingInfo}
@@ -439,7 +442,7 @@ export default function AdminEditStokvel() {
           ) : null}
 
           <form onSubmit={handleCreateMeeting} className="mb-6 grid gap-3 sm:grid-cols-2">
-            <label className={`${labelDark} sm:col-span-2`}>
+            <label className={`${labelLight} sm:col-span-2`}>
               Meeting title
               <input
                 type="text"
@@ -447,11 +450,11 @@ export default function AdminEditStokvel() {
                 onChange={(ev) =>
                   setMeetingForm((prev) => ({ ...prev, title: ev.target.value }))
                 }
-                className={inputDark}
+                className={inputLight}
                 required
               />
             </label>
-            <label className={labelDark}>
+            <label className={labelLight}>
               Date & time
               <input
                 type="datetime-local"
@@ -459,11 +462,11 @@ export default function AdminEditStokvel() {
                 onChange={(ev) =>
                   setMeetingForm((prev) => ({ ...prev, meetingDate: ev.target.value }))
                 }
-                className={inputDark}
+                className={inputLight}
                 required
               />
             </label>
-            <label className={labelDark}>
+            <label className={labelLight}>
               Meeting link
               <input
                 type="url"
@@ -471,11 +474,11 @@ export default function AdminEditStokvel() {
                 onChange={(ev) =>
                   setMeetingForm((prev) => ({ ...prev, meetingLink: ev.target.value }))
                 }
-                className={inputDark}
+                className={inputLight}
                 placeholder="https://..."
               />
             </label>
-            <label className={`${labelDark} sm:col-span-2`}>
+            <label className={`${labelLight} sm:col-span-2`}>
               Agenda
               <textarea
                 rows={4}
@@ -483,7 +486,7 @@ export default function AdminEditStokvel() {
                 onChange={(ev) =>
                   setMeetingForm((prev) => ({ ...prev, agenda: ev.target.value }))
                 }
-                className={inputDark}
+                className={inputLight}
                 placeholder="Set the agenda while scheduling"
               />
             </label>
@@ -496,15 +499,15 @@ export default function AdminEditStokvel() {
 
           <div className="space-y-3">
             {meetings.map((m) => (
-              <div key={m.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+              <div key={m.id} className={`${cardLight} space-y-2 p-4`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="font-semibold text-white">{m.title}</p>
-                  <p className="text-xs text-slate-400">
+                  <p className="font-semibold text-stone-900">{m.title}</p>
+                  <p className="text-xs text-stone-500">
                     {new Date(m.meeting_date).toLocaleString('en-ZA')}
                   </p>
                 </div>
-                <p className="mt-2 text-sm text-slate-300">
-                  <span className="font-semibold text-slate-200">Agenda:</span>{' '}
+                <p className="mt-2 text-sm text-stone-700">
+                  <span className="font-semibold text-stone-800">Agenda:</span>{' '}
                   {m.agenda || m.notes || 'No agenda yet.'}
                 </p>
                 {m.meeting_link ? (
@@ -512,12 +515,12 @@ export default function AdminEditStokvel() {
                     href={m.meeting_link}
                     target="_blank"
                     rel="noreferrer"
-                    className="mt-2 inline-flex text-sm text-cyan-300 underline"
+                    className="mt-2 inline-flex text-sm font-medium text-emerald-800 underline decoration-emerald-800/40 underline-offset-2 hover:text-emerald-900"
                   >
                     Open meeting link
                   </a>
                 ) : null}
-                <label className={`${labelDark} mt-3`}>
+                <label className={`${labelLight} mt-3`}>
                   Minutes
                   <textarea
                     rows={3}
@@ -525,7 +528,7 @@ export default function AdminEditStokvel() {
                     onChange={(ev) =>
                       setMinutesDraft((prev) => ({ ...prev, [m.id]: ev.target.value }))
                     }
-                    className={inputDark}
+                    className={inputLight}
                     placeholder="Record minutes..."
                   />
                 </label>
@@ -541,14 +544,14 @@ export default function AdminEditStokvel() {
                   type="button"
                   onClick={() => handleDeleteMeeting(m.id)}
                   disabled={meetingSaving}
-                  className="ml-2 inline-flex rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-200 transition hover:bg-red-500/20"
+                  className="ml-2 inline-flex rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-800 transition hover:bg-red-100"
                 >
                   Delete meeting
                 </button>
               </div>
             ))}
             {meetings.length === 0 ? (
-              <p className="text-xs text-slate-500">No meetings scheduled yet.</p>
+              <p className="text-xs text-stone-500">No meetings scheduled yet.</p>
             ) : null}
           </div>
         </div>

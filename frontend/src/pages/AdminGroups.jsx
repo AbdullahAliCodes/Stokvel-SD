@@ -22,9 +22,9 @@ function statusMatches(g, target) {
 function GroupsTable({ title, groups, action }) {
   return (
     <div className="mb-10">
-      <h2 className="mb-3 text-lg font-bold text-white">{title}</h2>
+      <h2 className="mb-3 text-lg font-bold text-stone-900">{title}</h2>
       <div className={tableWrap}>
-        <table className="w-full min-w-[640px] text-left text-sm text-slate-200">
+        <table className="w-full min-w-[640px] text-left text-sm text-stone-800">
           <thead>
             <tr className={tableHead}>
               <th className="p-3">Name</th>
@@ -38,27 +38,27 @@ function GroupsTable({ title, groups, action }) {
           <tbody>
             {groups.length === 0 ? (
               <tr className={tableRow}>
-                <td colSpan={6} className="p-6 text-center text-slate-500 italic">
+                <td colSpan={6} className="p-6 text-center text-stone-500 italic">
                   No groups in this list.
                 </td>
               </tr>
             ) : (
               groups.map((s) => (
                 <tr key={s.id} className={tableRow}>
-                  <td className="p-3 font-medium text-white">
+                  <td className="p-3 font-medium text-stone-900">
                     <Link
                       to={`/stokvels/${s.id}`}
-                      className="underline-offset-2 hover:text-cyan-300 hover:underline"
+                      className="text-emerald-800 underline-offset-2 hover:text-emerald-900 hover:underline"
                     >
                       {s.name}
                     </Link>
                   </td>
-                  <td className="p-3 text-slate-400">{s.type ?? '—'}</td>
-                  <td className="p-3 capitalize text-slate-400">{s.status ?? '—'}</td>
-                  <td className="p-3 text-slate-400">
+                  <td className="p-3 text-stone-600">{s.type ?? '—'}</td>
+                  <td className="p-3 capitalize text-stone-600">{s.status ?? '—'}</td>
+                  <td className="p-3 text-stone-600">
                     {s.contribution_amount != null ? `R ${s.contribution_amount}` : '—'}
                   </td>
-                  <td className="p-3 text-slate-400">{s.cycle_length ?? '—'}</td>
+                  <td className="p-3 text-stone-600">{s.cycle_length ?? '—'}</td>
                   <td className="p-3">{action(s)}</td>
                 </tr>
               ))
@@ -132,7 +132,7 @@ export default function AdminGroups() {
       ) : null}
 
       {rows === null ? (
-        <p className="text-sm text-slate-500">Loading…</p>
+        <p className="text-sm text-stone-500">Loading…</p>
       ) : (
         <>
           <GroupsTable
@@ -141,7 +141,7 @@ export default function AdminGroups() {
             action={(s) => (
               <Link
                 to={`/admin/groups/${s.id}/review`}
-                className="inline-flex rounded-lg border border-blue-400/40 bg-blue-500/15 px-3 py-1.5 text-xs font-semibold text-blue-200 transition hover:bg-blue-500/25"
+                className="inline-flex rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-900 transition hover:bg-blue-100"
               >
                 View application
               </Link>
@@ -166,7 +166,7 @@ export default function AdminGroups() {
             action={(s) => (
               <Link
                 to={`/admin/groups/${s.id}/edit`}
-                className={`${btnSecondary} inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-300`}
+                className={`${btnSecondary} inline-flex items-center gap-1.5 px-3 py-1.5 text-xs`}
               >
                 <Pencil className="h-3.5 w-3.5" aria-hidden />
                 View
