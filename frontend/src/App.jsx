@@ -129,10 +129,6 @@ export default function App() {
                   path="tickets"
                   element={<AdminPlaceholder title="Issue Tickets" />}
                 />
-                <Route
-                  path="reports"
-                  element={<AdminPlaceholder title="Reports" />}
-                />
                 <Route path="create-group" element={<AdminCreateStokvel />} />
               </Route>
             </Route>

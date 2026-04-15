@@ -793,10 +793,11 @@ export default function AdminCreateStokvel() {
               { id: "details", label: "Details" },
               { id: "members", label: "Members" },
               { id: "documents", label: "Documents" },
-            ].map((tab) => (
+            ].map((tab, stepIdx) => (
               <button
                 key={tab.id}
                 type="button"
+                aria-label={`Step ${stepIdx + 1}: ${tab.label}`}
                 onClick={() =>
                   setActiveTab(/** @type {'details' | 'members' | 'documents'} */ (tab.id))
                 }
@@ -806,6 +807,15 @@ export default function AdminCreateStokvel() {
                     : "border-b-2 border-transparent text-stone-500 hover:bg-stone-100 hover:text-stone-800"
                 }`}
               >
+                <span
+                  className={
+                    activeTab === tab.id
+                      ? "text-emerald-900/75"
+                      : "text-stone-500"
+                  }
+                >
+                  {stepIdx + 1}.
+                </span>{" "}
                 {tab.label}
               </button>
             ))}
@@ -1309,38 +1319,42 @@ export default function AdminCreateStokvel() {
               </div>
             ) : null}
 
-            <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-stone-200 pt-6">
-              <button
-                type="button"
-                onClick={goTabPrev}
-                disabled={activeTab === "details"}
-                className={`${btnSecondary} inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-40`}
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Previous
-              </button>
-              <button
-                type="button"
-                onClick={goTabNext}
-                disabled={activeTab === "documents"}
-                className={`${btnSecondary} inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-40`}
-              >
-                Next
-                <ChevronRight className="h-4 w-4" />
-              </button>
+            <div
+              className={`mt-8 flex flex-wrap items-center gap-3 border-t border-stone-200 pt-6 ${
+                activeTab === "details" ? "justify-end" : "justify-between"
+              }`}
+            >
+              {activeTab !== "details" ? (
+                <button
+                  type="button"
+                  onClick={goTabPrev}
+                  className={`${btnSecondary} inline-flex items-center gap-2`}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </button>
+              ) : null}
+              {activeTab === "documents" ? (
+                <button
+                  type="button"
+                  onClick={handleCreate}
+                  disabled={submitting || uploadingDocs}
+                  className={`${btnPrimary} inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60`}
+                >
+                  {submitting || uploadingDocs ? "Creating..." : "Create stokvel"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={goTabNext}
+                  className={`${btnSecondary} inline-flex items-center gap-2`}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              )}
             </div>
           </div>
-        </div>
-
-        <div className="sticky bottom-0 z-10 -mx-3 border-t border-stone-200 bg-[#F4F5F0]/95 px-3 py-4 backdrop-blur-sm sm:mx-0 sm:rounded-xl sm:border sm:border-stone-200 sm:bg-white sm:px-4 sm:shadow-sm">
-          <button
-            type="button"
-            onClick={handleCreate}
-            disabled={submitting || uploadingDocs}
-            className={`${btnPrimary} w-full py-4 text-base uppercase tracking-wide transition-opacity duration-200 disabled:opacity-60`}
-          >
-            {submitting || uploadingDocs ? "Creating..." : "Create stokvel"}
-          </button>
         </div>
       </form>
 

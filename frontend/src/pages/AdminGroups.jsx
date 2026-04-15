@@ -3,7 +3,16 @@ import { Link } from 'react-router-dom'
 import { Pencil } from 'lucide-react'
 import { useSession } from '../context/SessionContext'
 import { apiUrl } from '../utils/api'
-import { pageTitle, pageSubtitle, tableWrap, tableHead, tableRow, errorBox, btnSecondary } from '../ui'
+import {
+  pageTitle,
+  pageSubtitle,
+  tableWrap,
+  tableHead,
+  tableRow,
+  errorBox,
+  btnSecondary,
+  cardLight,
+} from '../ui'
 import { readViewCache, writeViewCache } from '../utils/viewCache'
 
 function parseApiError(text) {
@@ -19,11 +28,17 @@ function statusMatches(g, target) {
   return String(g?.status ?? '').toLowerCase() === target
 }
 
-function GroupsTable({ title, groups, action }) {
+function GroupsTable({ title, groups, action, embedded }) {
+  const tableShell = embedded
+    ? 'overflow-hidden rounded-xl border border-stone-200 bg-white'
+    : tableWrap
+
   return (
-    <div className="mb-10">
-      <h2 className="mb-3 text-lg font-bold text-stone-900">{title}</h2>
-      <div className={tableWrap}>
+    <div className={title ? 'mb-10' : ''}>
+      {title ? (
+        <h2 className="mb-3 text-lg font-bold text-stone-900">{title}</h2>
+      ) : null}
+      <div className={tableShell}>
         <table className="w-full min-w-[640px] text-left text-sm text-stone-800">
           <thead>
             <tr className={tableHead}>
@@ -70,10 +85,19 @@ function GroupsTable({ title, groups, action }) {
   )
 }
 
+const GROUP_TABS = /** @type {const} */ ([
+  { id: 'active', label: 'Active' },
+  { id: 'pending', label: 'Pending' },
+  { id: 'rejected', label: 'Rejected' },
+])
+
 export default function AdminGroups() {
   const { session } = useSession()
   const [rows, setRows] = useState(null)
   const [error, setError] = useState('')
+  const [groupsTab, setGroupsTab] = useState(
+    /** @type {'pending' | 'active' | 'rejected'} */ ('active'),
+  )
 
   useEffect(() => {
     if (!session?.access_token) return
@@ -134,46 +158,83 @@ export default function AdminGroups() {
       {rows === null ? (
         <p className="text-sm text-stone-500">Loading…</p>
       ) : (
-        <>
-          <GroupsTable
-            title="Pending applications"
-            groups={pendingGroups}
-            action={(s) => (
-              <Link
-                to={`/admin/groups/${s.id}/review`}
-                className="inline-flex rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-900 transition hover:bg-blue-100"
-              >
-                View application
-              </Link>
-            )}
-          />
-          <GroupsTable
-            title="Active stokvels"
-            groups={activeGroups}
-            action={(s) => (
-              <Link
-                to={`/admin/groups/${s.id}/edit`}
-                className={`${btnSecondary} inline-flex items-center gap-1.5 px-3 py-1.5 text-xs`}
-              >
-                <Pencil className="h-3.5 w-3.5" aria-hidden />
-                Edit
-              </Link>
-            )}
-          />
-          <GroupsTable
-            title="Rejected applications"
-            groups={rejectedGroups}
-            action={(s) => (
-              <Link
-                to={`/admin/groups/${s.id}/edit`}
-                className={`${btnSecondary} inline-flex items-center gap-1.5 px-3 py-1.5 text-xs`}
-              >
-                <Pencil className="h-3.5 w-3.5" aria-hidden />
-                View
-              </Link>
-            )}
-          />
-        </>
+        <div className={`${cardLight} overflow-hidden transition-shadow duration-200`}>
+          <nav
+            className="flex border-b border-stone-200 bg-stone-50/90"
+            aria-label="Group status"
+          >
+            {GROUP_TABS.map((tab) => {
+              const count =
+                tab.id === 'active'
+                  ? activeGroups.length
+                  : tab.id === 'pending'
+                    ? pendingGroups.length
+                    : rejectedGroups.length
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setGroupsTab(tab.id)}
+                  className={`relative flex-1 px-3 py-3.5 text-sm font-medium transition-colors duration-200 sm:px-4 sm:text-base ${
+                    groupsTab === tab.id
+                      ? 'border-b-2 border-emerald-700 bg-emerald-50/70 text-emerald-800'
+                      : 'border-b-2 border-transparent text-stone-500 hover:bg-stone-100 hover:text-stone-800'
+                  }`}
+                >
+                  {tab.label}
+                  <span className="ml-1 font-normal text-stone-500">({count})</span>
+                </button>
+              )
+            })}
+          </nav>
+
+          <div className="p-4 sm:p-6">
+            {groupsTab === 'active' ? (
+              <GroupsTable
+                embedded
+                groups={activeGroups}
+                action={(s) => (
+                  <Link
+                    to={`/admin/groups/${s.id}/edit`}
+                    className={`${btnSecondary} inline-flex items-center gap-1.5 px-3 py-1.5 text-xs`}
+                  >
+                    <Pencil className="h-3.5 w-3.5" aria-hidden />
+                    Edit
+                  </Link>
+                )}
+              />
+            ) : null}
+            {groupsTab === 'pending' ? (
+              <GroupsTable
+                embedded
+                groups={pendingGroups}
+                action={(s) => (
+                  <Link
+                    to={`/admin/groups/${s.id}/review`}
+                    className="inline-flex rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-900 transition hover:bg-blue-100"
+                  >
+                    View application
+                  </Link>
+                )}
+              />
+            ) : null}
+            {groupsTab === 'rejected' ? (
+              <GroupsTable
+                embedded
+                groups={rejectedGroups}
+                action={(s) => (
+                  <Link
+                    to={`/admin/groups/${s.id}/edit`}
+                    className={`${btnSecondary} inline-flex items-center gap-1.5 px-3 py-1.5 text-xs`}
+                  >
+                    <Pencil className="h-3.5 w-3.5" aria-hidden />
+                    View
+                  </Link>
+                )}
+              />
+            ) : null}
+          </div>
+        </div>
       )}
     </div>
   )

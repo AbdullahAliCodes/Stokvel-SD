@@ -2,7 +2,6 @@ import { NavLink, Outlet } from 'react-router-dom'
 import {
   Users,
   Ticket,
-  FileBarChart,
   PlusCircle,
   LogOut,
   User,
@@ -40,10 +39,6 @@ export default function AdminLayout() {
           <NavLink to="/admin/tickets" className={linkClass}>
             <Ticket className="h-4 w-4 shrink-0 text-red-700" aria-hidden />
             Issue Tickets
-          </NavLink>
-          <NavLink to="/admin/reports" className={linkClass}>
-            <FileBarChart className="h-4 w-4 shrink-0 text-emerald-800" aria-hidden />
-            Logs (CI/CD)
           </NavLink>
           <NavLink to="/admin/create-group" className={linkClass}>
             <PlusCircle className="h-4 w-4 shrink-0 text-stone-800" aria-hidden />
