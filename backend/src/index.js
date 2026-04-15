@@ -10,6 +10,9 @@ import invitationsRouter from './routes/invitations.js'
 import { getServiceSupabase } from './utils/supabaseAdmin.js'
 import { ensurePlatformAdminsInStokvel } from './utils/platformAdminStokvelMembers.js'
 import { createInvitation, normalizeInviteEmail } from './utils/invitations.js'
+import cron from 'node-cron'
+import { fetchRepoRateFromFred } from './jobs/fetchRates.js'
+import marketRatesRouter from './routes/marketRates.js'
 
 const app = express()
 const PORT = Number(process.env.PORT) || 5000
@@ -98,6 +101,8 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/admin', adminStokvelsRouter)
 app.use('/api/profile', profileRouter)
 app.use('/api/invitations', invitationsRouter)
+app.use('/api/market-rates', marketRatesRouter)
+app.use('/api/v1/market-rates', marketRatesRouter)
 
 app.get('/api/me', requireAuth, (req, res) => {
   try {
@@ -301,4 +306,22 @@ app.use('/api/stokvels', stokvelsRouter)
 
 app.listen(PORT, () => {
   console.log(`Stokvel API listening on port ${PORT}`)
+
+  if (process.env.FRED_API_KEY?.trim()) {
+    cron.schedule(
+      '0 6 * * *',
+      () => {
+        void fetchRepoRateFromFred()
+      },
+      { timezone: 'Africa/Johannesburg' },
+    )
+    console.log(
+      '[FRED] Scheduled daily SA policy rate sync (06:00 Africa/Johannesburg)',
+    )
+    void fetchRepoRateFromFred()
+  } else {
+    console.warn(
+      '[FRED] FRED_API_KEY not set; market_data will not auto-sync (set key in .env)',
+    )
+  }
 })
