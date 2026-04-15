@@ -13,7 +13,11 @@ export default function Apply() {
   const [amount, setAmount] = useState('250')
   const [payoutOrder, setPayoutOrder] = useState('randomize')
   const [meetingFreq, setMeetingFreq] = useState('bi-weekly')
-  const [memberEmailsRaw, setMemberEmailsRaw] = useState('')
+  const [documentFiles, setDocumentFiles] = useState([])
+  const [uploadingDocs, setUploadingDocs] = useState(false)
+  const [memberDetails, setMemberDetails] = useState([
+    { name: '', email: '', role: 'Member' },
+  ])
   const [treasurerMode, setTreasurerMode] = useState('self')
   const [treasurerEmail, setTreasurerEmail] = useState('')
   const [loading, setLoading] = useState(false)
@@ -35,6 +39,22 @@ export default function Apply() {
       if (treasurerMode === 'email' && !normalizedTreasurerEmail) {
         throw new Error('Enter the treasurer email or choose yourself as treasurer.')
       }
+      const parsedCount = Number(membersCount)
+      const resolvedCount = Number.isInteger(parsedCount) && parsedCount > 0 ? parsedCount : memberDetails.length
+      let documentUrls = []
+      if (documentFiles.length > 0) {
+        setUploadingDocs(true)
+        const fd = new FormData()
+        documentFiles.forEach((file) => fd.append('documents', file))
+        const uploadRes = await fetch(apiUrl('/api/uploads/documents'), {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${session.access_token}` },
+          body: fd,
+        })
+        const uploadData = await uploadRes.json()
+        if (!uploadRes.ok) throw new Error(uploadData.error || 'Failed to upload documents')
+        documentUrls = Array.isArray(uploadData.documents) ? uploadData.documents : []
+      }
       const res = await fetch(apiUrl('/api/stokvels'), {
         method: 'POST',
         headers: {
@@ -42,15 +62,18 @@ export default function Apply() {
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          name,
-          membersCount,
+          name: name.trim(),
+          membersCount: resolvedCount,
           contributionAmount: amount,
           payoutOrder,
           meetingFrequency: meetingFreq,
-          memberEmails: memberEmailsRaw
-            .split(',')
-            .map((v) => v.trim().toLowerCase())
-            .filter(Boolean),
+          memberDetails: memberDetails.map((m) => ({
+            name: m.name.trim(),
+            email: m.email.trim().toLowerCase(),
+            role: m.role.trim(),
+          })),
+          memberEmails: memberDetails.map((m) => m.email.trim().toLowerCase()).filter(Boolean),
+          documents: documentUrls,
           treasurerEmail: treasurerMode === 'email' ? normalizedTreasurerEmail : null,
         }),
       })
@@ -62,8 +85,27 @@ export default function Apply() {
     } catch (err) {
       setError(err.message)
     } finally {
+      setUploadingDocs(false)
       setLoading(false)
     }
+  }
+
+  function updateMembersCount(value) {
+    setMembersCount(value)
+    const n = Number(value)
+    if (!Number.isInteger(n) || n < 1) return
+    setMemberDetails((prev) => {
+      if (prev.length === n) return prev
+      if (prev.length > n) return prev.slice(0, n)
+      return [
+        ...prev,
+        ...Array.from({ length: n - prev.length }, () => ({ name: '', email: '', role: 'Member' })),
+      ]
+    })
+  }
+
+  function updateMember(idx, key, value) {
+    setMemberDetails((prev) => prev.map((m, i) => (i === idx ? { ...m, [key]: value } : m)))
   }
 
   return (
@@ -112,7 +154,7 @@ export default function Apply() {
                 className={inputDark}
                 placeholder="12"
                 value={membersCount}
-                onChange={(e) => setMembersCount(e.target.value)}
+                onChange={(e) => updateMembersCount(e.target.value)}
               />
             </label>
           </div>
@@ -120,19 +162,6 @@ export default function Apply() {
 
         <section className="glass p-6">
           <h2 className="mb-4 text-lg font-bold text-white">Member details</h2>
-          <label className={`${labelDark} mb-4 block`}>
-            Member emails (comma-separated)
-            <input
-              type="text"
-              className={inputDark}
-              placeholder="member1@email.com, member2@email.com"
-              value={memberEmailsRaw}
-              onChange={(e) => setMemberEmailsRaw(e.target.value)}
-            />
-            <span className="mt-1 block text-xs text-slate-500">
-              These members are invited after admin approval of your group request.
-            </span>
-          </label>
           <div className="mb-4 rounded-xl border border-white/10 bg-black/20 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">
               Assign treasurer
@@ -179,27 +208,46 @@ export default function Apply() {
                 <tr className={tableHead}>
                   <th className="p-2">#</th>
                   <th className="p-2">Name</th>
-                  <th className="p-2">Role</th>
+                  <th className="p-2">Email</th>
                 </tr>
               </thead>
               <tbody>
-                {[1, 2, 3].map((n) => (
-                  <tr key={n} className={tableRow}>
-                    <td className="p-2 text-slate-400">{n}</td>
+                {memberDetails.map((m, idx) => (
+                  <tr key={`member-${idx}`} className={tableRow}>
+                    <td className="p-2 text-slate-400">{idx + 1}</td>
                     <td className="p-2">
                       <input
                         className={`${inputDark} text-sm`}
-                        placeholder={`Member ${n}`}
+                        placeholder={`Member ${idx + 1}`}
+                        value={m.name}
+                        onChange={(e) => updateMember(idx, 'name', e.target.value)}
                       />
                     </td>
                     <td className="p-2">
-                      <input className={`${inputDark} text-sm`} placeholder="Member" />
+                      <input
+                        className={`${inputDark} text-sm`}
+                        placeholder="member@example.com"
+                        value={m.email}
+                        onChange={(e) => updateMember(idx, 'email', e.target.value)}
+                      />
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          <label className={`${labelDark} mt-4 block`}>
+            Documents (upload files)
+            <input
+              type="file"
+              multiple
+              className={inputDark}
+              onChange={(e) => setDocumentFiles(Array.from(e.target.files || []))}
+            />
+          </label>
+          {documentFiles.length > 0 ? (
+            <p className="mt-2 text-xs text-slate-400">{documentFiles.length} file(s) selected.</p>
+          ) : null}
         </section>
 
         <section className="glass p-6">
@@ -265,7 +313,7 @@ export default function Apply() {
           disabled={loading}
           className={`${btnPrimary} w-full py-4 text-base uppercase tracking-wide`}
         >
-          {loading ? 'Submitting…' : 'Submit'}
+          {loading || uploadingDocs ? 'Submitting…' : 'Submit'}
         </button>
       </form>
     </div>

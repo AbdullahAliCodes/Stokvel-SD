@@ -130,6 +130,32 @@ function normalizeTreasurerUserId(raw) {
   return UUID_RE.test(v) ? v : ''
 }
 
+function normalizeMembersCount(raw) {
+  const n = Number(raw)
+  if (!Number.isInteger(n) || n < 1 || n > 500) return null
+  return n
+}
+
+function normalizeMemberDetails(raw, limit = 500) {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((m) => ({
+      name: typeof m?.name === 'string' ? m.name.trim() : '',
+      email: typeof m?.email === 'string' ? m.email.trim().toLowerCase() : '',
+      role: typeof m?.role === 'string' ? m.role.trim() : '',
+    }))
+    .filter((m) => m.name || m.email || m.role)
+    .slice(0, limit)
+}
+
+function normalizeDocuments(raw, limit = 50) {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((d) => (typeof d === 'string' ? d.trim() : ''))
+    .filter(Boolean)
+    .slice(0, limit)
+}
+
 async function getGroupAndCreatorContact(client, stokvelId) {
   const { data: stokvel, error: stokvelError } = await client
     .from('stokvels')
@@ -306,6 +332,11 @@ router.post('/stokvels', requireAuth, requireAdmin, async (req, res) => {
       cycleLength,
       initialMemberIds,
       treasurerUserId,
+      membersCount,
+      payoutOrder,
+      meetingFrequency,
+      memberDetails,
+      documents,
     } = req.body ?? {}
 
     const trimmedName = typeof name === 'string' ? name.trim() : ''
@@ -355,7 +386,15 @@ router.post('/stokvels', requireAuth, requireAdmin, async (req, res) => {
       type,
       contribution_amount: amount,
       payout_strategy: payoutStrategy,
+      payout_order: typeof payoutOrder === 'string' ? payoutOrder : 'randomize',
+      meeting_frequency: typeof meetingFrequency === 'string' ? meetingFrequency : 'monthly',
       cycle_length: cycle,
+      members_count: normalizeMembersCount(membersCount),
+      member_details: normalizeMemberDetails(
+        memberDetails,
+        normalizeMembersCount(membersCount) ?? 500,
+      ),
+      documents: normalizeDocuments(documents),
       status: 'active',
     }
 
