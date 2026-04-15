@@ -332,7 +332,7 @@ export default function SingleStokvel() {
   const isActiveStokvel = stokvelStatus === 'active'
   const memberCount = members.length
   const monthlyContribution = Number(effectiveStokvel?.contribution_amount) || 0
-  const expectedPayout = monthlyContribution
+  const expectedPayout = monthlyContribution * memberCount
   const canManageTreasurer = ['treasurer', 'admin'].includes(membership?.group_role)
   const myGroupRole = members.find((m) => m.user_id === session?.user?.id)?.group_role || membership?.group_role
   const canManageMeetings = ['treasurer', 'admin'].includes(myGroupRole)
