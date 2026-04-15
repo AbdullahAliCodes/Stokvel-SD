@@ -77,7 +77,7 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0f172a] text-slate-300">
+      <div className="flex h-dvh items-center justify-center overflow-hidden bg-[#0f172a] text-slate-300">
         <p className="text-sm tracking-wide">Loading…</p>
       </div>
     )
@@ -90,8 +90,9 @@ export default function App() {
       setBackendData={setBackendData}
       testBackendConnection={testBackendConnection}
     >
-      <BrowserRouter>
-        <Routes>
+      <div className="h-full min-h-0 overflow-hidden">
+        <BrowserRouter>
+          <Routes>
           <Route element={<PublicLayout />}>
             <Route path="/" element={<AuthRedirect />} />
             <Route
@@ -135,8 +136,9 @@ export default function App() {
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
+          </Routes>
+        </BrowserRouter>
+      </div>
     </SessionProvider>
   )
 }
