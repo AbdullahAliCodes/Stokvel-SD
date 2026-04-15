@@ -4,6 +4,7 @@ import { LayoutDashboard } from 'lucide-react'
 import { useSession } from '../context/SessionContext'
 import { apiUrl } from '../utils/api'
 import { btnPrimary, errorBox, pageSubtitle } from '../ui'
+import { readViewCache, writeViewCache } from '../utils/viewCache'
 
 function formatRole(role) {
   if (!role) return 'Member'
@@ -45,6 +46,7 @@ export default function StokvelDashboard() {
   const { session } = useSession()
   const [memberships, setMemberships] = useState(null)
   const [error, setError] = useState(null)
+  const [meetingFeed, setMeetingFeed] = useState([])
 
   useEffect(() => {
     if (!session) return
@@ -53,6 +55,11 @@ export default function StokvelDashboard() {
 
     async function load() {
       setError(null)
+      const cached = readViewCache(`member_dashboard:${session.user.id}`, 180000)
+      if (cached && !cancelled) {
+        setMemberships(Array.isArray(cached.memberships) ? cached.memberships : [])
+        setMeetingFeed(Array.isArray(cached.meetingFeed) ? cached.meetingFeed : [])
+      }
       try {
         const res = await fetch(apiUrl('/api/my-stokvels'), {
           headers: { Authorization: `Bearer ${session.access_token}` },
@@ -63,12 +70,25 @@ export default function StokvelDashboard() {
         }
         const json = JSON.parse(text)
         if (!cancelled) {
-          setMemberships(json.memberships ?? [])
+          const nextMemberships = json.memberships ?? []
+          setMemberships(nextMemberships)
+          const meetingsRes = await fetch(apiUrl('/api/my-meetings'), {
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          })
+          const meetingsText = await meetingsRes.text()
+          const meetingJson = meetingsRes.ok ? JSON.parse(meetingsText) : { meetings: [] }
+          const flat = Array.isArray(meetingJson.meetings) ? meetingJson.meetings : []
+          setMeetingFeed(flat)
+          writeViewCache(`member_dashboard:${session.user.id}`, {
+            memberships: nextMemberships,
+            meetingFeed: flat,
+          })
         }
       } catch (e) {
         if (!cancelled) {
           setError(e.message ?? String(e))
           setMemberships([])
+          setMeetingFeed([])
         }
       }
     }
@@ -108,6 +128,55 @@ export default function StokvelDashboard() {
         </div>
       ) : (
         <>
+          {(() => {
+            const now = Date.now()
+            const upcoming = meetingFeed.filter((m) => new Date(m.meeting_date).getTime() >= now).slice(0, 5)
+            const past = meetingFeed.filter((m) => new Date(m.meeting_date).getTime() < now).slice(-5).reverse()
+            return (
+              <section className="mb-8 grid gap-4 lg:grid-cols-2">
+                <div className="glass border-t-4 border-cyan-500/70 p-4">
+                  <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-cyan-300">
+                    Upcoming meetings calendar
+                  </h2>
+                  {upcoming.length === 0 ? (
+                    <p className="text-xs text-slate-500">No upcoming meetings.</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {upcoming.map((m) => (
+                        <li key={m.id} className="rounded border border-white/10 bg-white/[0.03] p-3">
+                          <p className="text-sm font-semibold text-white">{m.title}</p>
+                          <p className="text-xs text-slate-300">{m.groupName}</p>
+                          <p className="text-xs text-cyan-200">
+                            {new Date(m.meeting_date).toLocaleString('en-ZA')}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div className="glass border-t-4 border-slate-500/60 p-4">
+                  <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-300">
+                    Past meetings
+                  </h2>
+                  {past.length === 0 ? (
+                    <p className="text-xs text-slate-500">No past meetings.</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {past.map((m) => (
+                        <li key={m.id} className="rounded border border-white/10 bg-white/[0.03] p-3">
+                          <p className="text-sm font-semibold text-white">{m.title}</p>
+                          <p className="text-xs text-slate-300">{m.groupName}</p>
+                          <p className="text-xs text-slate-400">
+                            {new Date(m.meeting_date).toLocaleString('en-ZA')}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </section>
+            )
+          })()}
           {(() => {
             const activeList = memberships.filter((m) => stokvelStatusOf(m) === 'active')
             const otherList = memberships.filter((m) => stokvelStatusOf(m) !== 'active')

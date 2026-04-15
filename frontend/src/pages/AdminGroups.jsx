@@ -4,6 +4,7 @@ import { Pencil } from 'lucide-react'
 import { useSession } from '../context/SessionContext'
 import { apiUrl } from '../utils/api'
 import { pageTitle, pageSubtitle, tableWrap, tableHead, tableRow, errorBox, btnSecondary } from '../ui'
+import { readViewCache, writeViewCache } from '../utils/viewCache'
 
 function parseApiError(text) {
   try {
@@ -44,7 +45,14 @@ function GroupsTable({ title, groups, action }) {
             ) : (
               groups.map((s) => (
                 <tr key={s.id} className={tableRow}>
-                  <td className="p-3 font-medium text-white">{s.name}</td>
+                  <td className="p-3 font-medium text-white">
+                    <Link
+                      to={`/stokvels/${s.id}`}
+                      className="underline-offset-2 hover:text-cyan-300 hover:underline"
+                    >
+                      {s.name}
+                    </Link>
+                  </td>
                   <td className="p-3 text-slate-400">{s.type ?? '—'}</td>
                   <td className="p-3 capitalize text-slate-400">{s.status ?? '—'}</td>
                   <td className="p-3 text-slate-400">
@@ -74,6 +82,10 @@ export default function AdminGroups() {
 
     async function load() {
       setError('')
+      const cached = readViewCache(`admin_groups:${session.user.id}`, 180000)
+      if (cached && !cancelled) {
+        setRows(Array.isArray(cached) ? cached : [])
+      }
       try {
         const res = await fetch(apiUrl('/api/admin/stokvels'), {
           headers: { Authorization: `Bearer ${session.access_token}` },
@@ -82,7 +94,9 @@ export default function AdminGroups() {
         if (!res.ok) throw new Error(parseApiError(text))
         const data = JSON.parse(text)
         if (!cancelled) {
-          setRows(Array.isArray(data.stokvels) ? data.stokvels : [])
+          const nextRows = Array.isArray(data.stokvels) ? data.stokvels : []
+          setRows(nextRows)
+          writeViewCache(`admin_groups:${session.user.id}`, nextRows)
         }
       } catch (e) {
         if (!cancelled) {

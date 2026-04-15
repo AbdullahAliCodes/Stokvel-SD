@@ -31,6 +31,7 @@ import MeetingDetails from './pages/MeetingDetails'
 import MyPayout from './pages/MyPayout'
 import Support from './pages/Support'
 import Home from './pages/Home'
+import AcceptInvitation from './pages/AcceptInvitation'
 
 export default function App() {
   const [session, setSession] = useState(null)
@@ -98,6 +99,7 @@ export default function App() {
               path="/auth"
               element={session ? <AuthRedirect /> : <Auth />}
             />
+            <Route path="/accept-invitation" element={<AcceptInvitation />} />
           </Route>
 
           <Route element={<RequireAuth session={session} />}>
@@ -123,6 +125,7 @@ export default function App() {
                 <Route path="groups" element={<AdminGroups />} />
                 <Route path="groups/:id/review" element={<AdminReviewStokvel />} />
                 <Route path="groups/:id/edit" element={<AdminEditStokvel />} />
+                <Route path="account" element={<Account />} />
                 <Route
                   path="tickets"
                   element={<AdminPlaceholder title="Issue Tickets" />}

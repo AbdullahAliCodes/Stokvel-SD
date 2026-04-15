@@ -1,4 +1,4 @@
-import { Navigate, Outlet } from 'react-router-dom'
+import { Outlet } from 'react-router-dom'
 import { useSession } from '../context/SessionContext'
 
 export default function RequireMember() {
@@ -10,10 +10,6 @@ export default function RequireMember() {
         Loading your dashboard...
       </div>
     )
-  }
-
-  if (String(userRole).toLowerCase() === 'admin') {
-    return <Navigate to="/admin" replace />
   }
 
   return <Outlet />
