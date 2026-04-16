@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { pageSubtitle, tableHead, tableWrap } from '../ui'
 
 const meetings = [
@@ -29,6 +29,9 @@ const meetings = [
 ]
 
 export default function Meetings() {
+  const { stokvel_id } = useParams()
+  const meetingBase = stokvel_id ? `/group/${stokvel_id}/meetings` : '/dashboard'
+
   return (
     <div>
       <h1 className="mb-2 flex items-center gap-2 text-2xl font-bold tracking-wide text-emerald-800">
@@ -53,7 +56,7 @@ export default function Meetings() {
               <tr key={m.id} className="group border-b border-stone-100">
                 <td className="p-0">
                   <Link
-                    to={`/meetings/${m.id}`}
+                    to={`${meetingBase}/${m.id}`}
                     className="block cursor-pointer p-3 font-medium text-stone-800 group-hover:bg-stone-50"
                   >
                     {m.name}
@@ -61,7 +64,7 @@ export default function Meetings() {
                 </td>
                 <td className="p-0">
                   <Link
-                    to={`/meetings/${m.id}`}
+                    to={`${meetingBase}/${m.id}`}
                     className="block cursor-pointer p-3 text-stone-600 group-hover:bg-stone-50"
                   >
                     {m.group}
@@ -69,7 +72,7 @@ export default function Meetings() {
                 </td>
                 <td className="p-0">
                   <Link
-                    to={`/meetings/${m.id}`}
+                    to={`${meetingBase}/${m.id}`}
                     className="block cursor-pointer p-3 font-medium text-emerald-800 group-hover:bg-stone-50"
                   >
                     {m.role}
@@ -77,7 +80,7 @@ export default function Meetings() {
                 </td>
                 <td className="p-0">
                   <Link
-                    to={`/meetings/${m.id}`}
+                    to={`${meetingBase}/${m.id}`}
                     className="block cursor-pointer p-3 text-stone-500 group-hover:bg-stone-50"
                   >
                     {m.notes}
@@ -85,7 +88,7 @@ export default function Meetings() {
                 </td>
                 <td className="p-0">
                   <Link
-                    to={`/meetings/${m.id}`}
+                    to={`${meetingBase}/${m.id}`}
                     className="block cursor-pointer p-3 text-stone-600 group-hover:bg-stone-50"
                   >
                     {m.date}

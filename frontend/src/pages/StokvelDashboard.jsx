@@ -1,95 +1,137 @@
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { LayoutDashboard } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Calendar, CreditCard, LayoutDashboard, Users } from 'lucide-react'
 import { useSession } from '../context/SessionContext'
 import { apiUrl } from '../utils/api'
 import { btnPrimary, cardLight, errorBox, pageSubtitle } from '../ui'
 import { readViewCache, writeViewCache } from '../utils/viewCache'
+import QuickPayModal from '../components/QuickPayModal'
 
-function formatRole(role) {
+function formatZAR(n) {
+  const num = Number(n)
+  if (Number.isNaN(num)) return 'R 0'
+  return `R ${Math.round(num).toLocaleString('en-ZA')}`
+}
+
+function formatGroupRole(role) {
   if (!role) return 'Member'
-  return role.charAt(0).toUpperCase() + role.slice(1).toLowerCase()
+  return String(role).charAt(0).toUpperCase() + String(role).slice(1).toLowerCase()
 }
 
-function StatusBadge({ status }) {
-  const s = String(status ?? '').toLowerCase()
-  const label =
-    s === 'active'
-      ? 'Active'
-      : s === 'pending'
-        ? 'Pending'
-        : s === 'rejected'
-          ? 'Rejected'
-          : status
-            ? String(status).charAt(0).toUpperCase() + String(status).slice(1).toLowerCase()
-            : 'Pending'
-
-  const tone =
-    s === 'active'
-      ? 'border border-emerald-200 bg-emerald-100 text-emerald-800'
-      : s === 'rejected'
-        ? 'border border-red-200 bg-red-50 text-red-800'
-        : 'border border-amber-200 bg-amber-50 text-amber-800'
-
-  return (
-    <span className={`rounded border px-2 py-0.5 text-xs font-bold uppercase ${tone}`}>
-      {label}
-    </span>
-  )
+function parseApiError(text) {
+  try {
+    const json = JSON.parse(text)
+    return json.error || text || 'Request failed'
+  } catch {
+    return text || 'Request failed'
+  }
 }
 
-function stokvelStatusOf(m) {
-  return String(m?.stokvels?.status ?? '').toLowerCase()
+function toDisplayDate(value) {
+  if (!value) return '—'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return value
+  return d.toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+function memberProfilesForUser(members, userId) {
+  return members.find((m) => m.user_id === userId)?.profiles ?? null
 }
 
 export default function StokvelDashboard() {
+  const { stokvel_id } = useParams()
+  const navigate = useNavigate()
   const { session } = useSession()
-  const [memberships, setMemberships] = useState(null)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [meetingFeed, setMeetingFeed] = useState([])
+  const [meetingsError, setMeetingsError] = useState('')
+  const [stokvel, setStokvel] = useState(null)
+  const [membership, setMembership] = useState(null)
+  const [members, setMembers] = useState([])
+  const [totalContribution, setTotalContribution] = useState(0)
+  const [meetings, setMeetings] = useState([])
+  const [quickPayOpen, setQuickPayOpen] = useState(false)
+  const [paymentDebug, setPaymentDebug] = useState('')
 
   useEffect(() => {
-    if (!session) return
+    if (!stokvel_id) {
+      navigate('/dashboard', { replace: true })
+      return
+    }
+    if (!session?.access_token || !session?.user?.id) {
+      setLoading(false)
+      return
+    }
 
     let cancelled = false
+    const id = stokvel_id
+    const cacheKey = `stokvel_detail:${session.user.id}:${id}`
 
     async function load() {
+      setLoading(true)
       setError(null)
-      const cached = readViewCache(`member_dashboard:${session.user.id}`, 180000)
+      setMeetingsError('')
+
+      const cached = readViewCache(cacheKey, 120000)
       if (cached && !cancelled) {
-        setMemberships(Array.isArray(cached.memberships) ? cached.memberships : [])
-        setMeetingFeed(Array.isArray(cached.meetingFeed) ? cached.meetingFeed : [])
+        setMembership(cached.membership ?? null)
+        setStokvel(cached.stokvel ?? null)
+        setMembers(Array.isArray(cached.members) ? cached.members : [])
+        setTotalContribution(Number(cached.totalContribution ?? 0))
+        setMeetings(Array.isArray(cached.meetings) ? cached.meetings : [])
+        setLoading(false)
       }
+
       try {
-        const res = await fetch(apiUrl('/api/my-stokvels'), {
+        const res = await fetch(apiUrl(`/api/stokvels/${id}`), {
           headers: { Authorization: `Bearer ${session.access_token}` },
         })
         const text = await res.text()
-        if (!res.ok) {
-          throw new Error(text || `HTTP ${res.status}`)
-        }
+        if (!res.ok) throw new Error(parseApiError(text))
         const json = JSON.parse(text)
-        if (!cancelled) {
-          const nextMemberships = json.memberships ?? []
-          setMemberships(nextMemberships)
-          const meetingsRes = await fetch(apiUrl('/api/my-meetings'), {
+        if (cancelled) return
+        setMembership(json.membership ?? null)
+        setStokvel(json.stokvel ?? null)
+        const nextMembers = Array.isArray(json.members) ? json.members : []
+        setMembers(nextMembers)
+        setTotalContribution(Number(json.totalContribution ?? 0))
+        setMeetingsError('')
+        let nextMeetings = []
+        try {
+          const meetingsRes = await fetch(apiUrl(`/api/stokvels/${id}/meetings`), {
             headers: { Authorization: `Bearer ${session.access_token}` },
           })
           const meetingsText = await meetingsRes.text()
-          const meetingJson = meetingsRes.ok ? JSON.parse(meetingsText) : { meetings: [] }
-          const flat = Array.isArray(meetingJson.meetings) ? meetingJson.meetings : []
-          setMeetingFeed(flat)
-          writeViewCache(`member_dashboard:${session.user.id}`, {
-            memberships: nextMemberships,
-            meetingFeed: flat,
-          })
+          if (!meetingsRes.ok) throw new Error(parseApiError(meetingsText))
+          const meetingsJson = JSON.parse(meetingsText)
+          nextMeetings = Array.isArray(meetingsJson.meetings) ? meetingsJson.meetings : []
+        } catch (meErr) {
+          if (!cancelled) {
+            setMeetingsError(meErr.message ?? String(meErr))
+            nextMeetings = []
+          }
         }
+        if (cancelled) return
+        setMeetings(nextMeetings)
+        writeViewCache(cacheKey, {
+          membership: json.membership ?? null,
+          stokvel: json.stokvel ?? null,
+          members: nextMembers,
+          totalContribution: Number(json.totalContribution ?? 0),
+          contributions: Array.isArray(json.contributions) ? json.contributions : [],
+          meetings: nextMeetings,
+        })
       } catch (e) {
         if (!cancelled) {
           setError(e.message ?? String(e))
-          setMemberships([])
-          setMeetingFeed([])
+          setMeetingsError('')
+          setStokvel(null)
+          setMembership(null)
+          setMembers([])
+          setMeetings([])
         }
+      } finally {
+        if (!cancelled) setLoading(false)
       }
     }
 
@@ -97,147 +139,228 @@ export default function StokvelDashboard() {
     return () => {
       cancelled = true
     }
-  }, [session])
+  }, [session, stokvel_id, navigate])
 
-  return (
-    <div>
-      <h1 className="mb-1 flex items-center gap-2 text-2xl font-bold tracking-widest text-emerald-800 uppercase sm:text-3xl">
-        <LayoutDashboard className="h-8 w-8 text-emerald-700" aria-hidden />
-        My stokvels
-      </h1>
-      <p className={`mb-4 ${pageSubtitle}`}>
-        Active groups are ready to use. Pending applications await admin approval; rejected ones
-        stay listed so you can see the outcome. Open a card for details.
-      </p>
-      <div className="mb-8">
-        <Link
-          to="/apply"
-          className={`${btnPrimary} inline-flex px-10 py-3 text-base`}
-        >
-          Apply to stokvel
+  const effectiveStokvel = stokvel ?? membership?.stokvels ?? null
+  const groupName = effectiveStokvel?.name ?? 'Stokvel'
+  const monthlyContribution = Number(effectiveStokvel?.contribution_amount) || 0
+  const memberCount = members.length
+  const expectedPayout = monthlyContribution * memberCount
+  const myGroupRole =
+    members.find((m) => m.user_id === session?.user?.id)?.group_role || membership?.group_role
+
+  const nextMeeting = useMemo(() => {
+    const nowTs = Date.now()
+    const upcoming = meetings.filter((m) => new Date(m.meeting_date).getTime() >= nowTs)
+    upcoming.sort(
+      (a, b) => new Date(a.meeting_date).getTime() - new Date(b.meeting_date).getTime(),
+    )
+    return upcoming[0] ?? null
+  }, [meetings])
+
+  const detailPath = `/group/${stokvel_id}/stokvels`
+
+  if (!stokvel_id) {
+    return null
+  }
+
+  if (loading && !stokvel && !error) {
+    return (
+      <div className="flex min-h-[200px] items-center justify-center text-sm text-stone-500">
+        Loading dashboard…
+      </div>
+    )
+  }
+
+  if (error && !effectiveStokvel) {
+    return (
+      <div>
+        <h1 className="mb-2 text-2xl font-bold text-emerald-800">Dashboard</h1>
+        <p className={`${errorBox}`}>{error}</p>
+        <Link to="/dashboard" className={`${btnPrimary} mt-4 inline-block`}>
+          Back to gateway
         </Link>
       </div>
+    )
+  }
 
-      {error ? <p className={`mb-4 ${errorBox}`}>{error}</p> : null}
+  const stokvelStatus = String(effectiveStokvel?.status ?? '').toLowerCase()
+  const isActiveStokvel = stokvelStatus === 'active'
 
-      {memberships === null ? (
-        <p className="text-sm text-stone-500">Loading…</p>
-      ) : memberships.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-stone-300 bg-stone-50 p-12 text-center text-stone-500">
-          You are not part of any stokvel yet.
+  return (
+    <div className="space-y-8">
+      <header className="flex flex-col gap-3 border-b border-stone-200 pb-6 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <LayoutDashboard className="h-7 w-7 shrink-0 text-emerald-700" aria-hidden />
+            <h1 className="text-2xl font-bold tracking-tight text-emerald-800 sm:text-3xl">
+              {groupName}
+            </h1>
+            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-emerald-800">
+              {formatGroupRole(myGroupRole)}
+            </span>
+            {!isActiveStokvel && stokvelStatus ? (
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-amber-900">
+                {stokvelStatus}
+              </span>
+            ) : null}
+          </div>
+          <p className={pageSubtitle}>
+            Summary for this group. Open the full stokvel page for meetings, members, and admin
+            tools.
+          </p>
         </div>
-      ) : (
-        <>
-          {(() => {
-            const now = Date.now()
-            const upcoming = meetingFeed.filter((m) => new Date(m.meeting_date).getTime() >= now).slice(0, 5)
-            const past = meetingFeed.filter((m) => new Date(m.meeting_date).getTime() < now).slice(-5).reverse()
-            return (
-              <section className="mb-8 grid gap-4 lg:grid-cols-2">
-                <div className={`${cardLight} border-t-4 border-emerald-700 p-4`}>
-                  <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-emerald-800">
-                    Upcoming meetings calendar
-                  </h2>
-                  {upcoming.length === 0 ? (
-                    <p className="text-xs text-stone-500">No upcoming meetings.</p>
-                  ) : (
-                    <ul className="space-y-2">
-                      {upcoming.map((m) => (
-                        <li
-                          key={m.id}
-                          className="rounded-lg border border-stone-200 bg-white p-3 shadow-sm"
-                        >
-                          <p className="text-sm font-semibold text-stone-800">{m.title}</p>
-                          <p className="text-xs text-stone-500">{m.groupName}</p>
-                          <p className="text-xs text-stone-500">
-                            {new Date(m.meeting_date).toLocaleString('en-ZA')}
-                          </p>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-                <div className={`${cardLight} border-t-4 border-stone-300 p-4`}>
-                  <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-emerald-800">
-                    Past meetings
-                  </h2>
-                  {past.length === 0 ? (
-                    <p className="text-xs text-stone-500">No past meetings.</p>
-                  ) : (
-                    <ul className="space-y-2">
-                      {past.map((m) => (
-                        <li
-                          key={m.id}
-                          className="rounded-lg border border-stone-200 bg-white p-3 shadow-sm"
-                        >
-                          <p className="text-sm font-semibold text-stone-800">{m.title}</p>
-                          <p className="text-xs text-stone-500">{m.groupName}</p>
-                          <p className="text-xs text-stone-500">
-                            {new Date(m.meeting_date).toLocaleString('en-ZA')}
-                          </p>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </section>
-            )
-          })()}
-          {(() => {
-            const activeList = memberships.filter((m) => stokvelStatusOf(m) === 'active')
-            const otherList = memberships.filter((m) => stokvelStatusOf(m) !== 'active')
+        <Link
+          to={detailPath}
+          className="shrink-0 rounded-lg border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-100"
+        >
+          View full details
+        </Link>
+      </header>
 
-            const card = (m) => {
-              const stokvel = m.stokvels
-              const sid = stokvel?.id
-              if (!sid) return null
-              const rejected = stokvelStatusOf(m) === 'rejected'
-              return (
-                <li key={sid}>
-                  <Link
-                    to={`/stokvels/${sid}`}
-                    className={`block rounded-2xl border border-stone-200 bg-white p-5 shadow-sm transition hover:border-stone-300 hover:shadow-md border-l-4 ${
-                      rejected ? 'border-l-red-500 opacity-95' : 'border-l-emerald-700'
-                    }`}
-                  >
-                    <div className="mb-2 flex items-start justify-between gap-2">
-                      <h2 className="text-lg font-semibold leading-tight text-stone-800">
-                        {stokvel?.name ?? 'Unnamed group'}
-                      </h2>
-                      <StatusBadge status={stokvel?.status} />
-                    </div>
-                    <p className="text-sm text-stone-500">
-                      Role:{' '}
-                      <span className="font-medium text-emerald-800">{formatRole(m.group_role)}</span>
-                    </p>
-                  </Link>
-                </li>
-              )
+      {meetingsError ? (
+        <p className={`text-sm ${errorBox}`}>Meetings could not be loaded: {meetingsError}</p>
+      ) : null}
+
+      <section>
+        <h2 className="sr-only">Key figures</h2>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className={`${cardLight} border-t-4 border-emerald-600 p-4`}>
+            <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+              Contributions to date
+            </p>
+            <p className="mt-2 text-2xl font-bold text-stone-800">{formatZAR(totalContribution)}</p>
+            <p className="mt-1 text-xs text-stone-500">Recorded payments for this group</p>
+          </div>
+          <div className={`${cardLight} border-t-4 border-stone-300 p-4`}>
+            <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+              Expected payout (cycle)
+            </p>
+            <p className="mt-2 text-2xl font-bold text-stone-800">{formatZAR(expectedPayout)}</p>
+            <p className="mt-1 text-xs text-stone-500">
+              Monthly × {memberCount} member{memberCount === 1 ? '' : 's'}
+            </p>
+          </div>
+          <div className={`${cardLight} border-t-4 border-emerald-600/70 p-4`}>
+            <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+              Monthly contribution
+            </p>
+            <p className="mt-2 text-2xl font-bold text-stone-800">{formatZAR(monthlyContribution)}</p>
+            <p className="mt-1 text-xs text-stone-500">Per member target</p>
+          </div>
+          <div className={`${cardLight} border-t-4 border-stone-300 p-4`}>
+            <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Members</p>
+            <p className="mt-2 flex items-center gap-2 text-2xl font-bold text-stone-800">
+              <Users className="h-6 w-6 text-emerald-700" aria-hidden />
+              {memberCount}
+            </p>
+            <p className="mt-1 text-xs text-stone-500">In this roster</p>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section className={`${cardLight} border-t-4 border-emerald-700 p-5`}>
+          <div className="mb-4 flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-emerald-700" aria-hidden />
+            <h2 className="text-sm font-bold uppercase tracking-wide text-emerald-800">
+              Next meeting
+            </h2>
+          </div>
+          {nextMeeting ? (
+            <div className="space-y-3">
+              <p className="text-lg font-semibold text-stone-800">{nextMeeting.title ?? 'Meeting'}</p>
+              <p className="text-sm text-stone-600">{toDisplayDate(nextMeeting.meeting_date)}</p>
+              <div>
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-stone-500">
+                  Agenda
+                </p>
+                <p className="text-sm leading-relaxed text-stone-700">
+                  {nextMeeting.agenda || nextMeeting.notes || 'No agenda added yet.'}
+                </p>
+              </div>
+              <Link
+                to={`/group/${stokvel_id}/meetings`}
+                className="inline-block text-sm font-medium text-emerald-800 underline-offset-2 hover:underline"
+              >
+                All meetings
+              </Link>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-stone-200 bg-stone-50/80 px-4 py-8 text-center">
+              <p className="text-sm text-stone-600">No upcoming meetings scheduled.</p>
+              <p className="mt-1 text-xs text-stone-500">
+                When your treasurer adds one, it will show up here.
+              </p>
+            </div>
+          )}
+        </section>
+
+        <section className={`${cardLight} border-t-4 border-stone-300 p-5`}>
+          <div className="mb-4 flex items-center gap-2">
+            <CreditCard className="h-5 w-5 text-emerald-700" aria-hidden />
+            <h2 className="text-sm font-bold uppercase tracking-wide text-emerald-800">
+              Quick pay
+            </h2>
+          </div>
+          <p className="mb-4 text-sm text-stone-600">
+            Pay your monthly contribution securely. Amount defaults to this group&apos;s monthly
+            target.
+          </p>
+          <button
+            type="button"
+            disabled={!isActiveStokvel || !session}
+            className={`${btnPrimary} disabled:cursor-not-allowed disabled:opacity-50`}
+            onClick={() => setQuickPayOpen(true)}
+          >
+            Pay monthly contribution
+          </button>
+          {!isActiveStokvel ? (
+            <p className="mt-2 text-xs text-stone-500">Payments are available when the group is active.</p>
+          ) : null}
+          {paymentDebug ? <p className="mt-2 text-xs text-stone-400">{paymentDebug}</p> : null}
+        </section>
+      </div>
+
+      {quickPayOpen && session ? (
+        <QuickPayModal
+          groupName={groupName}
+          stokvelId={stokvel_id}
+          session={session}
+          monthlyContribution={monthlyContribution}
+          onClose={() => setQuickPayOpen(false)}
+          onDebugStep={setPaymentDebug}
+          onRecordError={(message) => {
+            setError(`Payment succeeded, but contribution was not recorded: ${message}`)
+          }}
+          onSuccess={(paidAmount, contribution) => {
+            setPaymentDebug('Contribution recorded')
+            setQuickPayOpen(false)
+            const effectiveAmount = Number(contribution?.amount ?? paidAmount) || 0
+            setTotalContribution((prev) => prev + effectiveAmount)
+            const cacheKey = `stokvel_detail:${session.user.id}:${stokvel_id}`
+            const cached = readViewCache(cacheKey, 120000)
+            if (cached && typeof cached === 'object') {
+              const prevContrib = Array.isArray(cached.contributions) ? cached.contributions : []
+              const myProfile = memberProfilesForUser(members, session?.user?.id)
+              writeViewCache(cacheKey, {
+                ...cached,
+                totalContribution: Number(cached.totalContribution ?? 0) + effectiveAmount,
+                contributions: [
+                  {
+                    id: contribution?.id ?? `local-${Date.now()}`,
+                    amount: effectiveAmount,
+                    paid_at: contribution?.paid_at ?? new Date().toISOString(),
+                    user_id: contribution?.user_id ?? session?.user?.id ?? null,
+                    profiles: myProfile,
+                  },
+                  ...prevContrib,
+                ],
+              })
             }
-
-            return (
-              <>
-                {activeList.length > 0 ? (
-                  <>
-                    <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-emerald-800">
-                      Active stokvels
-                    </h2>
-                    <ul className="mb-10 grid gap-4 sm:grid-cols-2">{activeList.map(card)}</ul>
-                  </>
-                ) : null}
-                {otherList.length > 0 ? (
-                  <>
-                    <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-emerald-800">
-                      Pending &amp; declined
-                    </h2>
-                    <ul className="grid gap-4 sm:grid-cols-2">{otherList.map(card)}</ul>
-                  </>
-                ) : null}
-              </>
-            )
-          })()}
-        </>
-      )}
+          }}
+        />
+      ) : null}
     </div>
   )
 }

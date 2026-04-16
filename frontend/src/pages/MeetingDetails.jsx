@@ -5,12 +5,14 @@ import { btnPrimary, cardLight } from '../ui'
 const isTreasurer = true
 
 export default function MeetingDetails() {
-  const { id } = useParams()
+  const { meeting_id, id: legacyMeetingId, stokvel_id } = useParams()
+  const meetingKey = meeting_id ?? legacyMeetingId
+  const meetingsListPath = stokvel_id ? `/group/${stokvel_id}/meetings` : '/dashboard'
 
   return (
     <div className="max-w-2xl text-stone-800">
       <Link
-        to="/meetings"
+        to={meetingsListPath}
         className="mb-8 inline-flex items-center gap-2 text-sm text-stone-500 transition hover:text-emerald-800"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden />
@@ -41,12 +43,12 @@ export default function MeetingDetails() {
             Location / link
           </h2>
           <a
-            href={`https://meet.example.com/room/${id ?? 'unknown'}`}
+            href={`https://meet.example.com/room/${meetingKey ?? 'unknown'}`}
             className="break-all text-emerald-700 underline-offset-2 hover:text-emerald-800 hover:underline"
             target="_blank"
             rel="noreferrer"
           >
-            https://meet.example.com/room/{id ?? 'unknown'}
+            https://meet.example.com/room/{meetingKey ?? 'unknown'}
           </a>
         </section>
 
@@ -55,7 +57,8 @@ export default function MeetingDetails() {
             Agenda / notes
           </h2>
           <p className="text-stone-600">
-            Opening, review contributions, confirm payout order, AOB. (Meeting ID: {id})
+            Opening, review contributions, confirm payout order, AOB. (Meeting ID:{' '}
+            {meetingKey ?? '—'})
           </p>
         </section>
       </div>
