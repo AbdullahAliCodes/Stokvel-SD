@@ -6,6 +6,7 @@ import { apiUrl } from '../utils/api'
 import { btnPrimary, cardLight, errorBox, pageSubtitle } from '../ui'
 import { readViewCache, writeViewCache } from '../utils/viewCache'
 import QuickPayModal from '../components/QuickPayModal'
+import MarketRatesWidget from '../components/MarketRatesWidget'
 
 function formatZAR(n) {
   const num = Number(n)
@@ -259,7 +260,7 @@ export default function StokvelDashboard() {
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
         <section className={`${cardLight} border-t-4 border-emerald-700 p-5`}>
           <div className="mb-4 flex items-center gap-2">
             <Calendar className="h-5 w-5 text-emerald-700" aria-hidden />
@@ -320,6 +321,10 @@ export default function StokvelDashboard() {
           ) : null}
           {paymentDebug ? <p className="mt-2 text-xs text-stone-400">{paymentDebug}</p> : null}
         </section>
+
+        <div className="min-w-0 lg:col-span-2 xl:col-span-1">
+          <MarketRatesWidget memberMonthlyContribution={monthlyContribution} />
+        </div>
       </div>
 
       {quickPayOpen && session ? (
