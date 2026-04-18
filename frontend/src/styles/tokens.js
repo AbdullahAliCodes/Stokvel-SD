@@ -48,6 +48,13 @@ export const sectionContainer = 'mx-auto max-w-7xl px-3 sm:px-4 md:px-8'
 
 export const sectionNarrow = 'mx-auto max-w-2xl text-center'
 
+/**
+ * Fixed-height top chrome (8rem). Logo uses max-h-full inside a stretch slot so changing
+ * asset dimensions never grows or shrinks this bar.
+ */
+export const marketingNavInnerRow =
+  'flex h-32 min-h-32 max-h-32 shrink-0 items-center justify-between gap-2 py-2.5 sm:gap-4'
+
 // ——— PublicLayout shell (auth, home, invitations — not `/`, which uses Landing’s header) ———
 
 export const publicLayoutShell =
@@ -57,7 +64,7 @@ export const publicLayoutNavChrome =
   'z-10 shrink-0 border-b border-emerald-900/10 bg-[#faf8f5]/95 backdrop-blur-sm'
 
 export const publicLayoutNavRow =
-  'mx-auto flex w-full max-w-7xl items-center justify-between gap-2 px-3 py-2 sm:gap-3 sm:px-4 sm:py-2.5 md:px-8'
+  'mx-auto flex h-32 min-h-32 max-h-32 w-full max-w-7xl shrink-0 items-center justify-between gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 md:px-8'
 
 /** Guest CTA in layout chrome (outline on cream) */
 export const publicNavCtaGuest =

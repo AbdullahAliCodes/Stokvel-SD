@@ -22,7 +22,7 @@ export default function PublicFooter() {
       <div className={`${sectionContainer} py-12 md:py-16`}>
         <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 sm:gap-10 lg:grid-cols-3 lg:gap-12">
           <div className="min-w-0">
-            <BrandLogo to="/" variant="onDark" imgClassName="h-28 w-auto sm:h-32 md:h-40" />
+            <BrandLogo to="/" variant="onDark" imgClassName="h-12 w-auto sm:h-14 md:h-16" />
             <p className={footerBody}>
               Community-first savings circles with transparent tools for members and admins.
             </p>

@@ -28,6 +28,7 @@ import {
   iconButtonSubtle,
   landingPageShell,
   lead,
+  marketingNavInnerRow,
   navLink,
   roseBody,
   roseIconBubble,
@@ -62,14 +63,15 @@ function TopNav() {
 
   return (
     <header className={`${topNavBar} relative`}>
-      <div
-        className={`${sectionContainer} flex max-w-7xl items-center justify-between gap-2 py-2 sm:gap-4 sm:py-2.5`}
-      >
-        <BrandLogo
-          to="/"
-          imgClassName="h-24 w-auto sm:h-28 md:h-32 lg:h-36 xl:h-40 2xl:h-44"
-          onClick={closeMobile}
-        />
+      <div className={`${sectionContainer} ${marketingNavInnerRow}`}>
+        <div className="flex min-h-0 max-h-full min-w-0 shrink-0 self-stretch items-center">
+          <BrandLogo
+            to="/"
+            className="h-full min-h-0 max-h-full"
+            imgClassName="max-h-full w-auto max-w-[min(58vw,360px)] object-contain object-left sm:max-w-[min(50vw,400px)] md:max-w-[min(44vw,440px)]"
+            onClick={closeMobile}
+          />
+        </div>
 
         <nav className="hidden flex-1 justify-center gap-6 md:flex md:gap-8" aria-label="Primary">
           {links.map(({ label, href }) =>

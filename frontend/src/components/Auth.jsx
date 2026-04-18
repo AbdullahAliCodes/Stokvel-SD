@@ -119,7 +119,7 @@ export default function Auth() {
               to="/"
               variant="onDark"
               className="mx-auto"
-              imgClassName="h-28 w-auto sm:h-32 md:h-40"
+              imgClassName="h-16 w-auto sm:h-20 md:h-24"
             />
             <p className="mt-6 text-xl font-semibold leading-snug text-white lg:text-2xl">
               Your circle, your savings — organised fairly.

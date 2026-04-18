@@ -216,7 +216,7 @@ export default function DashboardLayout() {
             Member
           </div>
           <div className="mt-3 flex justify-center">
-            <BrandLogo to="/dashboard" imgClassName="h-24 w-auto md:h-28" />
+            <BrandLogo to="/dashboard" imgClassName="h-10 w-auto md:h-12" />
           </div>
         </div>
         <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-2">

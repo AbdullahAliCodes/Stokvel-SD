@@ -23,10 +23,13 @@ export default function PublicLayout() {
       {!landingHasOwnNav && (
         <header className={publicLayoutNavChrome}>
           <div className={publicLayoutNavRow}>
-            <BrandLogo
-              to={!session ? '/' : isAdmin ? '/admin/groups' : '/home'}
-              imgClassName="h-24 w-auto sm:h-28 md:h-32 lg:h-36 xl:h-40"
-            />
+            <div className="flex min-h-0 max-h-full min-w-0 shrink-0 self-stretch items-center">
+              <BrandLogo
+                to={!session ? '/' : isAdmin ? '/admin/groups' : '/home'}
+                className="h-full min-h-0 max-h-full"
+                imgClassName="max-h-full w-auto max-w-[min(58vw,360px)] object-contain object-left sm:max-w-[min(50vw,400px)] md:max-w-[min(44vw,440px)]"
+              />
+            </div>
             {!session ? (
               <Link to="/auth" className={publicNavCtaGuest}>
                 Log In / Sign Up
