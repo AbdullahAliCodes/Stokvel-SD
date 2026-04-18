@@ -47,11 +47,19 @@ function normalizeManualUsername(raw) {
 }
 
 function parseApiError(text) {
+  const raw = String(text || "").trim();
+  if (
+    raw.startsWith("<!DOCTYPE") ||
+    raw.includes("<html") ||
+    raw.includes("Cannot GET /api/")
+  ) {
+    return "Could not reach the API (got an HTML error page). In production set VITE_API_BASE_URL to your backend URL. Locally run the API and ensure the Vite dev proxy targets the same PORT as the server.";
+  }
   try {
-    const j = JSON.parse(text);
-    return j.error || text;
+    const j = JSON.parse(raw);
+    return j.error || raw;
   } catch {
-    return text || "Request failed";
+    return raw || "Request failed";
   }
 }
 
@@ -249,7 +257,7 @@ export function CreateStokvelWizard({ variant = "admin" }) {
       setSearchLoading(true);
       setSearchError("");
       try {
-        const usersPath = isAdmin ? "/api/admin/users" : "/api/users";
+        const usersPath = isAdmin ? "/api/admin/users" : "/api/stokvels/members/search";
         const res = await fetch(
           apiUrl(`${usersPath}?q=${encodeURIComponent(q)}`),
           {

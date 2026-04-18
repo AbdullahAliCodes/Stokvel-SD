@@ -7,6 +7,7 @@ import {
   sendMeetingScheduledEmail,
 } from '../utils/invitations.js'
 import { getServiceSupabase } from '../utils/supabaseAdmin.js'
+import { searchProfilesForMemberInvite } from '../utils/profileUserSearch.js'
 
 const router = Router()
 
@@ -250,9 +251,15 @@ router.post('/', requireAuth, async (req, res) => {
   }
 })
 
+/** Profile search for member invites (two path segments so this never collides with `/:id`). */
+router.get('/members/search', requireAuth, searchProfilesForMemberInvite)
+
 router.get('/:id', requireAuth, async (req, res) => {
   try {
     const stokvelId = req.params.id
+    if (!UUID_RE_MEMBER.test(String(stokvelId))) {
+      return res.status(404).json({ error: 'Not found' })
+    }
     const userSupabase = userScopedSupabase(req)
     const access = await requireStokvelAccess({ req, userSupabase, stokvelId })
     if (access.error) {

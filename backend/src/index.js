@@ -14,6 +14,7 @@ import { createInvitation, normalizeInviteEmail } from './utils/invitations.js'
 import cron from 'node-cron'
 import { fetchRepoRateFromFred } from './jobs/fetchRates.js'
 import marketRatesRouter from './routes/marketRates.js'
+import { searchProfilesForMemberInvite } from './utils/profileUserSearch.js'
 
 const app = express()
 const PORT = Number(process.env.PORT) || 5000
@@ -108,13 +109,6 @@ function normalizeTreasurerUserIdMember(raw) {
   if (typeof raw !== 'string') return ''
   const v = raw.trim()
   return UUID_RE_MEMBER_DETAILS.test(v) ? v : ''
-}
-
-function escapeIlikePattern(s) {
-  return String(s || '')
-    .replace(/\\/g, '\\\\')
-    .replace(/%/g, '\\%')
-    .replace(/_/g, '\\_')
 }
 
 const allowedOrigins = [
@@ -328,68 +322,7 @@ app.get('/api/my-meetings', requireAuth, async (req, res) => {
   }
 })
 
-app.get('/api/users', requireAuth, async (req, res) => {
-  try {
-    const rawQ = typeof req.query.q === 'string' ? req.query.q.trim() : ''
-    const q = rawQ.replace(/,/g, '')
-    if (q.length < 2) {
-      return res.json({ users: [] })
-    }
-
-    const client = getServiceSupabase() ?? createUserSupabaseFromReq(req)
-    const pattern = `%${escapeIlikePattern(q)}%`
-    const sel = 'id, first_name, last_name, username, email'
-
-    const run = (col) =>
-      client.from('profiles').select(sel).ilike(col, pattern).limit(15)
-
-    const [byFirst, byLast, byUsername, byEmail] = await Promise.all([
-      run('first_name'),
-      run('last_name'),
-      run('username'),
-      run('email'),
-    ])
-
-    const firstErr = byFirst.error || byLast.error || byUsername.error || byEmail.error
-    if (firstErr) {
-      console.error('GET /api/users:', firstErr)
-      return res.status(500).json({
-        error:
-          firstErr.message ||
-          'Profile search failed. Ensure profiles.username exists and use SUPABASE_SERVICE_ROLE_KEY if RLS blocks reads.',
-      })
-    }
-
-    const byId = new Map()
-    for (const chunk of [byFirst.data, byLast.data, byUsername.data, byEmail.data]) {
-      for (const row of chunk ?? []) {
-        byId.set(row.id, row)
-      }
-    }
-    const rows = [...byId.values()].slice(0, 25)
-
-    const users = rows.map((r) => {
-      const name = [r.first_name, r.last_name].filter(Boolean).join(' ').trim()
-      const uname = r.username ? String(r.username) : ''
-      const handle = uname ? `@${uname}` : ''
-      const labelParts = [handle, name || null].filter(Boolean)
-      const label = labelParts.length ? labelParts.join(' · ') : r.id
-      return {
-        id: r.id,
-        username: uname,
-        firstName: r.first_name ?? '',
-        lastName: r.last_name ?? '',
-        email: typeof r.email === 'string' ? r.email.trim() : '',
-        label,
-      }
-    })
-
-    return res.json({ users })
-  } catch (err) {
-    console.error('GET /api/users:', err)
-    return res.status(500).json({ error: 'Internal Server Error' })
-  }
-})
+app.get('/api/users', requireAuth, searchProfilesForMemberInvite)
 
 app.post('/api/stokvels', requireAuth, async (req, res) => {
   const started = hrNow()
