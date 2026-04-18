@@ -6,7 +6,7 @@ export default function RequireAdmin() {
 
   if (userRole === null || userRole === undefined) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0f172a] text-slate-400">
+      <div className="flex h-dvh items-center justify-center overflow-hidden bg-[#0f172a] text-slate-400">
         <p className="text-sm">Loading authorization…</p>
       </div>
     )

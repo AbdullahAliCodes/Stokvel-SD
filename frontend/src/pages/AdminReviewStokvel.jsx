@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useSession } from '../context/SessionContext'
 import { apiUrl } from '../utils/api'
-import { errorBox, pageSubtitle } from '../ui'
+import { cardLight, errorBox, pageSubtitle } from '../ui'
 
 function parseApiError(text) {
   try {
@@ -101,11 +101,11 @@ export default function AdminReviewStokvel() {
     <div>
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-wide text-cyan-400 sm:text-3xl">
+          <h1 className="text-2xl font-bold tracking-wide text-emerald-800 sm:text-3xl">
             Review Stokvel Application
           </h1>
           <p className={`mt-2 ${pageSubtitle}`}>
-            <Link to="/admin/groups" className="text-cyan-400/90 hover:underline">
+            <Link to="/admin/groups" className="text-emerald-800 hover:underline">
               ← Back to group config
             </Link>
           </p>
@@ -115,7 +115,7 @@ export default function AdminReviewStokvel() {
             type="button"
             disabled={actionLoading || loading || !stokvel}
             onClick={handleReject}
-            className="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-red-900/30 transition hover:bg-red-500 disabled:opacity-50"
+            className="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-red-700 disabled:opacity-50"
           >
             Reject
           </button>
@@ -123,7 +123,7 @@ export default function AdminReviewStokvel() {
             type="button"
             disabled={actionLoading || loading || !stokvel}
             onClick={handleApprove}
-            className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-900/30 transition hover:bg-emerald-500 disabled:opacity-50"
+            className="rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 disabled:opacity-50"
           >
             Approve
           </button>
@@ -137,60 +137,60 @@ export default function AdminReviewStokvel() {
       ) : null}
 
       {loading ? (
-        <p className="text-sm text-slate-500">Loading…</p>
+        <p className="text-sm text-stone-500">Loading…</p>
       ) : !stokvel ? (
-        <p className="text-sm text-slate-500">Application not found.</p>
+        <p className="text-sm text-stone-500">Application not found.</p>
       ) : (
-        <div className="glass max-w-2xl space-y-4 p-6">
+        <div className={`${cardLight} max-w-2xl space-y-4 p-6`}>
           <dl className="grid gap-4 sm:grid-cols-2">
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Name</dt>
-              <dd className="mt-1 text-white">{fmt(stokvel.name)}</dd>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">Name</dt>
+              <dd className="mt-1 text-stone-800">{fmt(stokvel.name)}</dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</dt>
-              <dd className="mt-1 capitalize text-slate-300">{fmt(stokvel.status)}</dd>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">Status</dt>
+              <dd className="mt-1 capitalize text-stone-800">{fmt(stokvel.status)}</dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">
                 Contribution amount
               </dt>
-              <dd className="mt-1 text-white">
+              <dd className="mt-1 text-stone-800">
                 {stokvel.contribution_amount != null
                   ? `R ${stokvel.contribution_amount}`
                   : '—'}
               </dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Type</dt>
-              <dd className="mt-1 text-slate-300">{fmt(stokvel.type)}</dd>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">Type</dt>
+              <dd className="mt-1 text-stone-800">{fmt(stokvel.type)}</dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">
                 Payout strategy
               </dt>
-              <dd className="mt-1 text-slate-300">{fmt(stokvel.payout_strategy)}</dd>
+              <dd className="mt-1 text-stone-800">{fmt(stokvel.payout_strategy)}</dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">
                 Cycle length
               </dt>
-              <dd className="mt-1 text-slate-300">{fmt(stokvel.cycle_length)}</dd>
+              <dd className="mt-1 text-stone-800">{fmt(stokvel.cycle_length)}</dd>
             </div>
             {stokvel.meeting_frequency != null && stokvel.meeting_frequency !== '' ? (
               <div className="sm:col-span-2">
-                <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">
                   Meeting frequency
                 </dt>
-                <dd className="mt-1 text-slate-300">{fmt(stokvel.meeting_frequency)}</dd>
+                <dd className="mt-1 text-stone-800">{fmt(stokvel.meeting_frequency)}</dd>
               </div>
             ) : null}
             {stokvel.payout_order != null && stokvel.payout_order !== '' ? (
               <div className="sm:col-span-2">
-                <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">
                   Payout order
                 </dt>
-                <dd className="mt-1 text-slate-300">{fmt(stokvel.payout_order)}</dd>
+                <dd className="mt-1 text-stone-800">{fmt(stokvel.payout_order)}</dd>
               </div>
             ) : null}
           </dl>

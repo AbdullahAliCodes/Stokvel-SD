@@ -4,8 +4,19 @@
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
 }
 
+/* Lock document scroll: only in-app scroll regions move (avoids rubber-band / gutter). */
+html {
+  height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background-color: #0f172a;
+}
+
 body {
   margin: 0;
+  height: 100dvh;
+  overflow: hidden;
+  overscroll-behavior: none;
   font-family: var(--font-sans);
   background-color: #0f172a;
   color: #fff;
@@ -13,7 +24,9 @@ body {
 }
 
 #root {
-  min-height: 100vh;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 /* Wireframe-aligned glass + accent cards */

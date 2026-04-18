@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../utils/supabase'
 import { apiUrl } from '../utils/api'
-import { btnPrimary, inputDark, labelDark } from '../ui'
+import { btnPrimary, inputLight, labelLight } from '../ui'
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true)
@@ -141,7 +141,7 @@ export default function Auth() {
 
         {isLogin ? (
           <form onSubmit={handleLogin} className="flex flex-col gap-4">
-            <label className={labelDark}>
+            <label className={labelLight}>
               Email
               <input
                 type="email"
@@ -149,10 +149,10 @@ export default function Auth() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className={inputDark}
+                className={inputLight}
               />
             </label>
-            <label className={labelDark}>
+            <label className={labelLight}>
               Password
               <input
                 type="password"
@@ -160,7 +160,7 @@ export default function Auth() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className={inputDark}
+                className={inputLight}
               />
             </label>
             <button type="submit" disabled={loading} className={`${btnPrimary} w-full`}>
@@ -169,7 +169,7 @@ export default function Auth() {
           </form>
         ) : (
           <form onSubmit={handleSignUp} className="flex flex-col gap-4">
-            <label className={labelDark}>
+            <label className={labelLight}>
               First Name
               <input
                 type="text"
@@ -177,10 +177,10 @@ export default function Auth() {
                 required
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                className={inputDark}
+                className={inputLight}
               />
             </label>
-            <label className={labelDark}>
+            <label className={labelLight}>
               Last Name
               <input
                 type="text"
@@ -188,10 +188,10 @@ export default function Auth() {
                 required
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                className={inputDark}
+                className={inputLight}
               />
             </label>
-            <label className={labelDark}>
+            <label className={labelLight}>
               Phone Number
               <input
                 type="tel"
@@ -199,10 +199,10 @@ export default function Auth() {
                 required
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
-                className={inputDark}
+                className={inputLight}
               />
             </label>
-            <label className={labelDark}>
+            <label className={labelLight}>
               Username
               <input
                 type="text"
@@ -210,7 +210,7 @@ export default function Auth() {
                 required
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className={inputDark}
+                className={inputLight}
                 placeholder="e.g. sipho_k"
               />
               <span className="mt-1 block text-xs text-slate-500">
@@ -218,7 +218,7 @@ export default function Auth() {
                 signup.
               </span>
             </label>
-            <label className={labelDark}>
+            <label className={labelLight}>
               Email
               <input
                 type="email"
@@ -226,10 +226,10 @@ export default function Auth() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className={inputDark}
+                className={inputLight}
               />
             </label>
-            <label className={labelDark}>
+            <label className={labelLight}>
               Password
               <input
                 type="password"
@@ -237,7 +237,7 @@ export default function Auth() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className={inputDark}
+                className={inputLight}
               />
             </label>
             <button type="submit" disabled={loading} className={`${btnPrimary} w-full`}>
