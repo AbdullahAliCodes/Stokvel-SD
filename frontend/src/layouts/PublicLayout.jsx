@@ -8,9 +8,9 @@ export default function PublicLayout() {
   const landingHasOwnNav = pathname === '/'
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-white">
+    <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-[#0f172a] text-white">
       {!landingHasOwnNav && (
-        <nav className="glass sticky top-0 z-10 mx-4 mt-4 flex items-center justify-between rounded-2xl px-4 py-3 md:mx-8">
+        <nav className="glass z-10 mx-4 mt-4 flex shrink-0 items-center justify-between rounded-2xl px-4 py-3 md:mx-8">
           <Link
             to={!session ? '/' : isAdmin ? '/admin/groups' : '/home'}
             className="text-lg font-bold tracking-tight text-cyan-400 transition hover:text-cyan-300"
@@ -34,7 +34,9 @@ export default function PublicLayout() {
           )}
         </nav>
       )}
-      <Outlet />
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
+        <Outlet />
+      </div>
     </div>
   )
 }
