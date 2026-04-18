@@ -6,6 +6,7 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
+import BrandLogo from "../components/BrandLogo";
 import {
   LayoutDashboard,
   Wallet,
@@ -214,9 +215,9 @@ export default function DashboardLayout() {
           <div className="rounded-lg bg-emerald-800 py-2 text-center text-xs font-bold uppercase tracking-wide text-white">
             Member
           </div>
-          <p className="mt-3 text-xs font-semibold text-stone-500">
-            Sawubona Stokvel
-          </p>
+          <div className="mt-3 flex justify-center">
+            <BrandLogo to="/dashboard" imgClassName="h-20 w-auto md:h-24" />
+          </div>
         </div>
         <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-2">
           <NavLink

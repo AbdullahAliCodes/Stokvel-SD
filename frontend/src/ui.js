@@ -1,4 +1,4 @@
-/** Shared Tailwind class fragments (light, earthy pastel forms + tables). */
+/** Shared Tailwind class fragments (forms + tables). Landing/auth palette: `styles/tokens.js`. */
 
 export const pageTitle =
   'text-2xl font-bold tracking-wide text-emerald-800 uppercase sm:text-3xl'
