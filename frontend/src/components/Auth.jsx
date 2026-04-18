@@ -114,8 +114,13 @@ export default function Auth() {
             aria-hidden
           />
 
-          <div className="relative">
-            <BrandLogo to="/" variant="onDark" imgClassName="h-24 w-auto sm:h-28 md:h-36" />
+          <div className="relative flex w-full max-w-md flex-col items-center">
+            <BrandLogo
+              to="/"
+              variant="onDark"
+              className="mx-auto"
+              imgClassName="h-28 w-auto sm:h-32 md:h-40"
+            />
             <p className="mt-6 text-xl font-semibold leading-snug text-white lg:text-2xl">
               Your circle, your savings — organised fairly.
             </p>

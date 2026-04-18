@@ -28,7 +28,7 @@ export default function AdminLayout() {
             Admin
           </div>
           <div className="mt-3 flex justify-center">
-            <BrandLogo to="/admin/groups" imgClassName="h-20 w-auto md:h-24" />
+            <BrandLogo to="/admin/groups" imgClassName="h-24 w-auto md:h-28" />
           </div>
           <p className="mt-2 text-center text-xs font-semibold text-stone-500">Control panel</p>
         </div>

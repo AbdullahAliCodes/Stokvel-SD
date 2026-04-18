@@ -1,18 +1,12 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import BrandLogo from '../components/BrandLogo'
+import PublicFooter from '../components/PublicFooter'
 import OpportunityCard from '../components/OpportunityCard'
 import { heroDashboardIllustration, testimonialPortrait } from '../assets/landing'
 import { PUBLIC_STOKVEL_OPPORTUNITIES } from '../data/publicStokvelOpportunities'
 import { LANDING_TESTIMONIAL } from '../data/landingTestimonial'
-import {
-  ExternalLink,
-  Globe,
-  Menu,
-  Search,
-  ShieldCheck,
-  X,
-} from 'lucide-react'
+import { Globe, Menu, Search, ShieldCheck, X } from 'lucide-react'
 import { useSession } from '../context/SessionContext'
 import {
   bodyMuted,
@@ -23,15 +17,6 @@ import {
   cardCaptionBar,
   cardCaptionTitle,
   cardMediaPlaceholder,
-  dividerFooter,
-  footerBody,
-  footerColTitle,
-  footerLegal,
-  footerLegalLink,
-  footerLink,
-  footerLinkList,
-  footerSocialButton,
-  footerSocialRow,
   headingHero,
   headingHeroAccent,
   headingSection,
@@ -51,7 +36,6 @@ import {
   sectionNarrow,
   statLabel,
   statValue,
-  surfaceFooter,
   surfaceHero,
   testimonialGrid,
   testimonialKicker,
@@ -79,11 +63,11 @@ function TopNav() {
   return (
     <header className={`${topNavBar} relative`}>
       <div
-        className={`${sectionContainer} flex max-w-7xl items-center justify-between gap-2 py-4 sm:gap-4 sm:py-5`}
+        className={`${sectionContainer} flex max-w-7xl items-center justify-between gap-2 py-2 sm:gap-4 sm:py-2.5`}
       >
         <BrandLogo
           to="/"
-          imgClassName="h-24 w-auto sm:h-28 md:h-32 lg:h-40 xl:h-44 2xl:h-52"
+          imgClassName="h-24 w-auto sm:h-28 md:h-32 lg:h-36 xl:h-40 2xl:h-44"
           onClick={closeMobile}
         />
 
@@ -350,99 +334,6 @@ function Testimonial() {
   )
 }
 
-function Footer() {
-  return (
-    <footer className={`${surfaceFooter} mt-auto`}>
-        <div className={`${sectionContainer} py-12 md:py-16`}>
-        <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 sm:gap-10 lg:grid-cols-3 lg:gap-12">
-          <div className="min-w-0">
-            <BrandLogo to="/" variant="onDark" imgClassName="h-24 w-auto sm:h-28 md:h-36" />
-            <p className={footerBody}>
-              Community-first savings circles with transparent tools for members and admins.
-            </p>
-          </div>
-          <nav aria-label="Company" className="min-w-0">
-            <p className={footerColTitle}>Company</p>
-            <ul className={footerLinkList}>
-              <li>
-                <a href="#how" className={footerLink}>
-                  How it works
-                </a>
-              </li>
-              <li>
-                <Link to="/auth" className={footerLink}>
-                  Create account
-                </Link>
-              </li>
-              <li>
-                <a href="#footer-support" className={footerLink}>
-                  Contact
-                </a>
-              </li>
-            </ul>
-          </nav>
-          <nav id="footer-support" aria-label="Support" className="min-w-0 scroll-mt-24">
-            <p className={footerColTitle}>Support</p>
-            <ul className={footerLinkList}>
-              <li>
-                <Link to="/auth" className={footerLink}>
-                  Help centre (sign in)
-                </Link>
-              </li>
-                           <li>
-                <Link to="/stokvels" className={footerLink}>
-                  Browse groups
-                </Link>
-              </li>
-            </ul>
-          </nav>
-        </div>
-
-        <div
-          className={`mt-12 flex flex-col gap-6 ${dividerFooter} pt-8 md:flex-row md:items-center md:justify-between md:gap-8`}
-        >
-          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6">
-            <p className={`${footerLegal} shrink-0`}>
-              © {new Date().getFullYear()} StokGeld. All rights reserved.
-            </p>
-            <nav className="flex flex-wrap gap-x-4 gap-y-1" aria-label="Legal">
-              <a href="#privacy" className={footerLegalLink}>
-                Privacy
-              </a>
-              <a href="#terms" className={footerLegalLink}>
-                Terms
-              </a>
-            </nav>
-          </div>
-          <div className={footerSocialRow}>
-            <a
-              href="https://facebook.com"
-              className={footerSocialButton}
-              aria-label="Facebook"
-            >
-              <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4" strokeWidth={1.75} />
-            </a>
-            <a
-              href="https://instagram.com"
-              className={footerSocialButton}
-              aria-label="Instagram"
-            >
-              <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4" strokeWidth={1.75} />
-            </a>
-            <a
-              href="https://linkedin.com"
-              className={footerSocialButton}
-              aria-label="LinkedIn"
-            >
-              <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4" strokeWidth={1.75} />
-            </a>
-          </div>
-        </div>
-      </div>
-    </footer>
-  )
-}
-
 export default function Landing() {
   return (
     <div className={landingPageShell}>
@@ -459,11 +350,7 @@ export default function Landing() {
               Browse public stokvels
             </h2>
             <p className={`mt-3 ${bodyMutedLg}`}>
-              Discover open circles looking for reliable members. The cards read from demo data in{' '}
-              <span className="whitespace-nowrap font-medium text-emerald-900">
-                src/data/publicStokvelOpportunities.js
-              </span>
-              —swap that for your API when you wire the backend.
+              Discover open circles looking for reliable members and find a group that fits your goals.
             </p>
             <p className="mt-4">
               <Link
@@ -484,7 +371,7 @@ export default function Landing() {
         </section>
         <Testimonial />
       </main>
-      <Footer />
+      <PublicFooter />
     </div>
   )
 }

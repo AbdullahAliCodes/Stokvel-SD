@@ -25,11 +25,7 @@ export default function PublicStokvels() {
         <header className="mx-auto mt-6 max-w-2xl text-center md:mt-8">
           <h1 className={headingSection}>Public stokvel directory</h1>
           <p className={`mt-3 ${bodyMutedLg}`}>
-            Demo listings only — replace with live data from your API (for example{' '}
-            <code className="rounded bg-emerald-900/5 px-1.5 py-0.5 text-xs text-emerald-900">
-              GET /api/public/stokvels
-            </code>
-            ).
+            Open groups currently accepting interest from new members.
           </p>
         </header>
 

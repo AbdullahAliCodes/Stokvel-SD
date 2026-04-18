@@ -57,7 +57,7 @@ export const publicLayoutNavChrome =
   'z-10 shrink-0 border-b border-emerald-900/10 bg-[#faf8f5]/95 backdrop-blur-sm'
 
 export const publicLayoutNavRow =
-  'mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-3 py-4 sm:gap-4 sm:px-4 sm:py-5 md:px-8'
+  'mx-auto flex w-full max-w-7xl items-center justify-between gap-2 px-3 py-2 sm:gap-3 sm:px-4 sm:py-2.5 md:px-8'
 
 /** Guest CTA in layout chrome (outline on cream) */
 export const publicNavCtaGuest =
@@ -125,7 +125,7 @@ export const roseTitle = 'text-sm font-semibold text-rose-950'
 export const roseBody = 'mt-1 text-xs leading-snug text-rose-900/70'
 
 export const opportunityCard =
-  'flex h-full flex-col rounded-2xl border border-emerald-900/10 bg-white p-5 shadow-sm shadow-emerald-900/5 transition hover:border-emerald-800/25 hover:shadow-md sm:p-6'
+  'flex h-full flex-col rounded-2xl border border-emerald-900/10 bg-white p-5 shadow-sm shadow-emerald-900/5 outline-none transition duration-200 hover:-translate-y-1 hover:border-emerald-800/30 hover:shadow-lg focus-within:ring-2 focus-within:ring-emerald-600/30 focus-within:ring-offset-2 focus-within:ring-offset-[#faf8f5] sm:p-6'
 
 export const opportunityIconBubble =
   'flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-800'
@@ -214,7 +214,7 @@ export const authSplitCard =
   'flex w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-emerald-900/10 bg-white shadow-xl shadow-emerald-900/[0.12] sm:max-w-xl lg:max-w-5xl lg:min-h-[520px] lg:flex-row'
 
 export const authBrandAside =
-  'relative flex flex-col justify-between gap-6 overflow-hidden bg-gradient-to-br from-emerald-800 via-emerald-900 to-emerald-950 px-6 py-8 text-emerald-50 sm:gap-8 sm:px-8 sm:py-10 lg:w-[42%] lg:px-10 lg:py-12'
+  'relative flex flex-col items-center justify-between gap-6 overflow-hidden bg-gradient-to-br from-emerald-800 via-emerald-900 to-emerald-950 px-6 py-8 text-center text-emerald-50 sm:gap-8 sm:px-8 sm:py-10 lg:w-[42%] lg:px-10 lg:py-12'
 
 export const authFormSection =
   'flex flex-1 flex-col justify-center px-6 py-8 sm:px-8 sm:py-10 lg:px-11 lg:py-12'

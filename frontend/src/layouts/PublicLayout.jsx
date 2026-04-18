@@ -1,5 +1,6 @@
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import BrandLogo from '../components/BrandLogo'
+import PublicFooter from '../components/PublicFooter'
 import { useSession } from '../context/SessionContext'
 import {
   btnPrimary,
@@ -15,6 +16,7 @@ export default function PublicLayout() {
   const isAdmin = String(userRole || '').toLowerCase() === 'admin'
   const { pathname } = useLocation()
   const landingHasOwnNav = pathname === '/'
+  const showPublicFooter = !landingHasOwnNav && pathname !== '/auth'
 
   return (
     <div className={publicLayoutShell}>
@@ -23,7 +25,7 @@ export default function PublicLayout() {
           <div className={publicLayoutNavRow}>
             <BrandLogo
               to={!session ? '/' : isAdmin ? '/admin/groups' : '/home'}
-              imgClassName="h-24 w-auto sm:h-28 md:h-32 lg:h-40 xl:h-44"
+              imgClassName="h-24 w-auto sm:h-28 md:h-32 lg:h-36 xl:h-40"
             />
             {!session ? (
               <Link to="/auth" className={publicNavCtaGuest}>
@@ -41,7 +43,12 @@ export default function PublicLayout() {
         </header>
       )}
       <div className={publicLayoutScrollMain}>
-        <Outlet />
+        <div className="flex min-h-full flex-col">
+          <div className="flex-1">
+            <Outlet />
+          </div>
+          {showPublicFooter ? <PublicFooter /> : null}
+        </div>
       </div>
     </div>
   )

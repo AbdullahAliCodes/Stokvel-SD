@@ -8,7 +8,7 @@ import logoSrc from '../assets/stokgeld-logo.png'
 export default function BrandLogo({
   to = '/',
   className = '',
-  imgClassName = 'h-28 w-auto md:h-36',
+  imgClassName = 'h-32 w-auto md:h-40',
   variant = 'default',
   ...linkProps
 }) {
