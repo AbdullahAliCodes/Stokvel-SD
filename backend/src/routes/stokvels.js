@@ -20,6 +20,10 @@ function normalizeMembersCount(raw) {
 const UUID_RE_MEMBER =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
+/** Stokvel id from URL `:id`. Matches Postgres uuid text form without enforcing RFC variant/version bits (seed / hand-inserted ids). */
+const UUID_RE_STOKVEL_PARAM =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 function normalizeMemberDetails(raw, limit = 500) {
   if (!Array.isArray(raw)) return []
   return raw
@@ -257,7 +261,7 @@ router.get('/members/search', requireAuth, searchProfilesForMemberInvite)
 router.get('/:id', requireAuth, async (req, res) => {
   try {
     const stokvelId = req.params.id
-    if (!UUID_RE_MEMBER.test(String(stokvelId))) {
+    if (!UUID_RE_STOKVEL_PARAM.test(String(stokvelId))) {
       return res.status(404).json({ error: 'Not found' })
     }
     const userSupabase = userScopedSupabase(req)
