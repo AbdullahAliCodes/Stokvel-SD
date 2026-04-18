@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useSession } from '../context/SessionContext'
 import { apiUrl } from '../utils/api'
-import { btnPrimary, errorBox, pageSubtitle } from '../ui'
+import { sectionContainer } from '../styles/tokens'
+import { btnPrimary, cardLight, errorBox, pageSubtitle } from '../ui'
 
 function parseApiError(text) {
   try {
@@ -73,8 +74,8 @@ export default function AcceptInvitation() {
   }
 
   return (
-    <div>
-      <h1 className="mb-2 text-2xl font-bold tracking-wide text-cyan-400">Accept Invitation</h1>
+    <div className={`${sectionContainer} py-8 text-emerald-950`}>
+      <h1 className="mb-2 text-2xl font-bold tracking-wide text-emerald-900">Accept Invitation</h1>
       <p className={`mb-6 ${pageSubtitle}`}>Join a stokvel from your invitation email.</p>
 
       {error ? (
@@ -83,21 +84,24 @@ export default function AcceptInvitation() {
         </p>
       ) : null}
       {ok ? (
-        <p className="mb-4 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+        <p className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
           {ok}
         </p>
       ) : null}
 
       {loading ? (
-        <p className="text-sm text-slate-400">Checking invitation…</p>
+        <p className="text-sm text-stone-500">Checking invitation…</p>
       ) : invitation ? (
-        <div className="glass max-w-xl space-y-4 p-6">
-          <p className="text-sm text-slate-300">
-            Invite for <strong>{invitation.email}</strong> to join{' '}
-            <strong>{invitation.stokvel?.name ?? 'this stokvel'}</strong>.
+        <div className={`${cardLight} max-w-xl space-y-4 p-6`}>
+          <p className="text-sm text-stone-700">
+            Invite for <strong className="text-emerald-950">{invitation.email}</strong> to join{' '}
+            <strong className="text-emerald-950">
+              {invitation.stokvel?.name ?? 'this stokvel'}
+            </strong>
+            .
           </p>
           {!session ? (
-            <p className="text-sm text-slate-300">Please sign in first, then return to this link.</p>
+            <p className="text-sm text-stone-600">Please sign in first, then return to this link.</p>
           ) : (
             <button type="button" onClick={acceptInvite} className={btnPrimary} disabled={accepting}>
               {accepting ? 'Accepting…' : 'Accept invitation'}
@@ -107,7 +111,7 @@ export default function AcceptInvitation() {
       ) : null}
 
       <div className="mt-6">
-        <Link to="/dashboard" className="text-sm text-cyan-400 hover:underline">
+        <Link to="/dashboard" className="text-sm font-medium text-emerald-800 hover:underline">
           Back to dashboard
         </Link>
       </div>

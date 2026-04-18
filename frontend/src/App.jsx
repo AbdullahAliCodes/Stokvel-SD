@@ -34,6 +34,7 @@ import MyPayout from "./pages/MyPayout";
 import Support from "./pages/Support";
 import Home from "./pages/Home";
 import Landing from "./pages/Landing";
+import PublicStokvels from "./pages/PublicStokvels";
 import AcceptInvitation from "./pages/AcceptInvitation";
 
 export default function App() {
@@ -99,6 +100,7 @@ export default function App() {
           <Routes>
             <Route element={<PublicLayout />}>
               <Route path="/" element={<Landing />} />
+              <Route path="/stokvels" element={<PublicStokvels />} />
               <Route
                 path="/auth"
                 element={session ? <AuthRedirect /> : <Auth />}
