@@ -14,6 +14,7 @@ import { createInvitation, normalizeInviteEmail } from './utils/invitations.js'
 import cron from 'node-cron'
 import { fetchRepoRateFromFred } from './jobs/fetchRates.js'
 import marketRatesRouter from './routes/marketRates.js'
+import { searchProfilesForMemberInvite } from './utils/profileUserSearch.js'
 
 const app = express()
 const PORT = Number(process.env.PORT) || 5000
@@ -102,6 +103,12 @@ function normalizeDocuments(raw, limit = 50) {
     .map((d) => (typeof d === 'string' ? d.trim() : ''))
     .filter(Boolean)
     .slice(0, limit)
+}
+
+function normalizeTreasurerUserIdMember(raw) {
+  if (typeof raw !== 'string') return ''
+  const v = raw.trim()
+  return UUID_RE_MEMBER_DETAILS.test(v) ? v : ''
 }
 
 const allowedOrigins = [
@@ -315,6 +322,8 @@ app.get('/api/my-meetings', requireAuth, async (req, res) => {
   }
 })
 
+app.get('/api/users', requireAuth, searchProfilesForMemberInvite)
+
 app.post('/api/stokvels', requireAuth, async (req, res) => {
   const started = hrNow()
   try {
@@ -322,24 +331,28 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
 
     const {
       name,
+      type,
       contributionAmount,
       meetingFrequency,
       payoutOrder,
+      payoutStrategy,
+      cycleLength,
       treasurerEmail,
+      treasurerUserId,
       membersCount,
       memberDetails,
       documents,
     } = req.body
 
-    void contributionAmount
-    void meetingFrequency
-    void payoutOrder
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ error: 'Group name is required.' })
+    }
 
     const parsedMembersCount = normalizeMembersCount(membersCount)
     const parsedDetails = normalizeMemberDetails(memberDetails, parsedMembersCount ?? 500)
     const parsedDocuments = normalizeDocuments(documents)
     const insertRow = {
-      name,
+      name: name.trim(),
       status: 'pending',
       contribution_amount: Number(contributionAmount) || 0,
       payout_order: typeof payoutOrder === 'string' ? payoutOrder : 'randomize',
@@ -347,6 +360,19 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
       members_count: parsedMembersCount,
       member_details: parsedDetails,
       documents: parsedDocuments,
+    }
+    if (typeof type === 'string' && (type === 'Rotating' || type === 'Fixed')) {
+      insertRow.type = type
+    }
+    if (
+      typeof payoutStrategy === 'string' &&
+      (payoutStrategy === 'Manual' || payoutStrategy === 'Auto-Rotate')
+    ) {
+      insertRow.payout_strategy = payoutStrategy
+    }
+    const cyc = Number(cycleLength)
+    if (Number.isInteger(cyc) && cyc >= 1 && cyc <= 240) {
+      insertRow.cycle_length = cyc
     }
 
     const { data: newStokvel, error: stokvelError } = await userSupabase
@@ -362,35 +388,66 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
       })
     }
 
+    const treasurerFromBody = normalizeTreasurerUserIdMember(treasurerUserId)
+    const treasurerId = treasurerFromBody || req.user.id
+    const creatorRole = treasurerId === req.user.id ? 'treasurer' : 'admin'
+
     const { error: memberError } = await userSupabase.from('stokvel_members').insert([
       {
         stokvel_id: newStokvel.id,
         user_id: req.user.id,
-        group_role: 'treasurer',
+        group_role: creatorRole,
       },
     ])
 
     if (memberError) {
       console.error('stokvel_members insert:', memberError)
       return res.status(500).json({
-        error: memberError.message || 'Failed to assign treasurer',
+        error: memberError.message || 'Failed to assign creator role',
       })
     }
 
-    const normalizedTreasurerEmail = normalizeInviteEmail(treasurerEmail)
+    const writer = getServiceSupabase() ?? userSupabase
     const creatorEmail = normalizeInviteEmail(req.user.email)
-    if (normalizedTreasurerEmail && normalizedTreasurerEmail !== creatorEmail) {
-      const writer = getServiceSupabase() ?? userSupabase
-      const { error: treasurerInviteError } = await createInvitation(writer, {
-        stokvelId: newStokvel.id,
-        email: normalizedTreasurerEmail,
-        invitedBy: req.user.id,
-        status: 'pending_group_request',
-        groupRole: 'treasurer',
-      })
-      if (treasurerInviteError) {
-        console.error('treasurer invitation:', treasurerInviteError)
-        return res.status(500).json({ error: treasurerInviteError.message })
+
+    if (treasurerId && treasurerId !== req.user.id) {
+      const { data: tp, error: tpErr } = await writer
+        .from('profiles')
+        .select('email')
+        .eq('id', treasurerId)
+        .maybeSingle()
+      if (tpErr) {
+        console.error('treasurer profile lookup:', tpErr)
+      } else {
+        const inviteEm = normalizeInviteEmail(tp?.email)
+        if (inviteEm && inviteEm !== creatorEmail) {
+          const { error: treasurerInviteError } = await createInvitation(writer, {
+            stokvelId: newStokvel.id,
+            email: inviteEm,
+            invitedBy: req.user.id,
+            status: 'pending_group_request',
+            groupRole: 'treasurer',
+          })
+          if (treasurerInviteError) {
+            console.error('treasurer invitation:', treasurerInviteError)
+            return res.status(500).json({ error: treasurerInviteError.message })
+          }
+        }
+      }
+    } else {
+      const normalizedTreasurerEmail = normalizeInviteEmail(treasurerEmail)
+      if (normalizedTreasurerEmail && normalizedTreasurerEmail !== creatorEmail) {
+        const { error: treasurerInviteError } = await createInvitation(writer, {
+          stokvelId: newStokvel.id,
+          email: normalizedTreasurerEmail,
+          invitedBy: req.user.id,
+          status: 'pending_group_request',
+          groupRole: 'treasurer',
+        })
+        if (treasurerInviteError) {
+          console.error('treasurer invitation:', treasurerInviteError)
+          return res.status(500).json({ error: treasurerInviteError.message })
+        }
       }
     }
 
