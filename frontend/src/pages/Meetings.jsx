@@ -12,6 +12,8 @@ import {
   pageSubtitle,
 } from "../ui";
 import { readViewCache, writeViewCache } from "../utils/viewCache";
+import MeetingCalendar from "../components/meetings/MeetingCalendar";
+import MeetingDetailsPanel from "../components/meetings/MeetingDetailsPanel";
 
 function parseApiError(text) {
   try {
@@ -73,6 +75,11 @@ export default function Meetings() {
   const [editingMeetingId, setEditingMeetingId] = useState("");
   const [editDraft, setEditDraft] = useState({});
   const [minutesDraft, setMinutesDraft] = useState({});
+  const [meetingsTab, setMeetingsTab] = useState(
+    /** @type {'list' | 'calendar'} */ ("list"),
+  );
+  /** `{ dateKey, meetings }` when a calendar day is selected */
+  const [dayPanel, setDayPanel] = useState(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduleForm, setScheduleForm] = useState({
     title: "",
@@ -587,6 +594,38 @@ export default function Meetings() {
         ) : null}
       </header>
 
+      <div className={`${cardLight} overflow-hidden border border-stone-200`}>
+        <nav
+          className="flex border-b border-stone-200 bg-stone-50/90"
+          aria-label="Meetings view"
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setMeetingsTab("list");
+              setDayPanel(null);
+            }}
+            className={`relative flex-1 px-3 py-3 text-sm font-medium transition-colors duration-200 sm:px-4 sm:text-base ${
+              meetingsTab === "list"
+                ? "border-b-2 border-emerald-700 bg-emerald-50/70 text-emerald-800"
+                : "border-b-2 border-transparent text-stone-500 hover:bg-stone-100 hover:text-stone-800"
+            }`}
+          >
+            List
+          </button>
+          <button
+            type="button"
+            onClick={() => setMeetingsTab("calendar")}
+            className={`relative flex-1 px-3 py-3 text-sm font-medium transition-colors duration-200 sm:px-4 sm:text-base ${
+              meetingsTab === "calendar"
+                ? "border-b-2 border-emerald-700 bg-emerald-50/70 text-emerald-800"
+                : "border-b-2 border-transparent text-stone-500 hover:bg-stone-100 hover:text-stone-800"
+            }`}
+          >
+            Calendar
+          </button>
+        </nav>
+      </div>
       {scheduleOpen ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
@@ -684,43 +723,69 @@ export default function Meetings() {
         </p>
       ) : null}
 
-      <section>
-        <h2 className="mb-4 text-lg font-bold text-emerald-800">
-          Upcoming meetings
-        </h2>
-        {loading && meetings.length === 0 ? (
-          <p className="text-sm text-stone-500">Loading…</p>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {upcomingMeetings.map((m) =>
-              renderMeetingCard(m, { isPast: false }),
-            )}
-            {upcomingMeetings.length === 0 ? (
-              <div
-                className={`${cardLight} border border-dashed border-stone-200 bg-stone-50/80 p-8 text-center text-sm text-stone-600`}
-              >
-                No upcoming meetings scheduled for this group.
+      {meetingsTab === "list" ? (
+        <>
+          <section>
+            <h2 className="mb-4 text-lg font-bold text-emerald-800">
+              Upcoming meetings
+            </h2>
+            {loading && meetings.length === 0 ? (
+              <p className="text-sm text-stone-500">Loading…</p>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {upcomingMeetings.map((m) =>
+                  renderMeetingCard(m, { isPast: false }),
+                )}
+                {upcomingMeetings.length === 0 ? (
+                  <div
+                    className={`${cardLight} border border-dashed border-stone-200 bg-stone-50/80 p-8 text-center text-sm text-stone-600`}
+                  >
+                    No upcoming meetings scheduled for this group.
+                  </div>
+                ) : null}
               </div>
-            ) : null}
-          </div>
-        )}
-      </section>
+            )}
+          </section>
 
-      <section>
-        <h2 className="mb-4 text-lg font-bold text-emerald-800">
-          Past meetings
-        </h2>
-        <div className="grid gap-4 md:grid-cols-2">
-          {pastMeetings.map((m) => renderMeetingCard(m, { isPast: true }))}
-          {pastMeetings.length === 0 ? (
-            <div
-              className={`${cardLight} border border-dashed border-stone-200 bg-stone-50/80 p-8 text-center text-sm text-stone-600`}
-            >
-              No past meetings yet.
+          <section>
+            <h2 className="mb-4 text-lg font-bold text-emerald-800">
+              Past meetings
+            </h2>
+            <div className="grid gap-4 md:grid-cols-2">
+              {pastMeetings.map((m) => renderMeetingCard(m, { isPast: true }))}
+              {pastMeetings.length === 0 ? (
+                <div
+                  className={`${cardLight} border border-dashed border-stone-200 bg-stone-50/80 p-8 text-center text-sm text-stone-600`}
+                >
+                  No past meetings yet.
+                </div>
+              ) : null}
             </div>
-          ) : null}
-        </div>
-      </section>
+          </section>
+        </>
+      ) : (
+        <section aria-label="Meetings calendar">
+          {loading && meetings.length === 0 ? (
+            <p className="text-sm text-stone-500">Loading calendar…</p>
+          ) : (
+            <MeetingCalendar
+              meetings={meetings}
+              selectedDateKey={dayPanel?.dateKey ?? null}
+              onSelectDay={(dateKey, dayMeetings) =>
+                setDayPanel({ dateKey, meetings: dayMeetings })
+              }
+            />
+          )}
+        </section>
+      )}
+
+      <MeetingDetailsPanel
+        open={Boolean(dayPanel)}
+        dateKey={dayPanel?.dateKey ?? ""}
+        meetings={dayPanel?.meetings ?? []}
+        meetingBase={meetingBase}
+        onClose={() => setDayPanel(null)}
+      />
     </div>
   );
 }
