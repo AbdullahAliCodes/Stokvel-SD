@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import BrandLogo from '../components/BrandLogo'
 import PublicFooter from '../components/PublicFooter'
+import ThemeToggle from '../components/ThemeToggle'
 import { useSession } from '../context/SessionContext'
 import { supabase } from '../utils/supabase'
 import {
@@ -42,11 +43,15 @@ export default function PublicLayout() {
               />
             </div>
             {!session ? (
-              <Link to="/auth" className={publicNavCtaGuest}>
-                Log In / Sign up
-              </Link>
+              <div className="flex shrink-0 items-center gap-2">
+                <ThemeToggle />
+                <Link to="/auth" className={publicNavCtaGuest}>
+                  Log In / Sign up
+                </Link>
+              </div>
             ) : (
               <div className="flex shrink-0 items-center gap-2">
+                <ThemeToggle />
                 <button
                   type="button"
                   className={`${btnSecondary} border-emerald-800/20 px-4 py-2.5 text-sm font-semibold text-emerald-900`}

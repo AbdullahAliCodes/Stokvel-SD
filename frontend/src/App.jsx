@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { supabase } from "./utils/supabase";
+import { ThemeProvider } from "./context/ThemeContext";
 import { SessionProvider } from "./context/SessionContext";
 import RequireAuth from "./components/RequireAuth";
 import RequireAdmin from "./components/RequireAdmin";
@@ -63,9 +64,10 @@ export default function App() {
   }
 
   return (
-    <SessionProvider session={session}>
-      <div className="h-full min-h-0 overflow-hidden">
-        <BrowserRouter>
+    <ThemeProvider>
+      <SessionProvider session={session}>
+        <div className="h-full min-h-0 overflow-hidden">
+          <BrowserRouter>
           <Routes>
             <Route path="/home" element={<Navigate to="/" replace />} />
             <Route element={<PublicLayout />}>
@@ -141,8 +143,9 @@ export default function App() {
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-        </BrowserRouter>
-      </div>
-    </SessionProvider>
+          </BrowserRouter>
+        </div>
+      </SessionProvider>
+    </ThemeProvider>
   );
 }

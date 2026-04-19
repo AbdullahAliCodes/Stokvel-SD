@@ -137,10 +137,10 @@ export default function Auth() {
 
         <div className={authFormSection}>
           <div className="mx-auto w-full max-w-md">
-            <h1 className="text-lg font-semibold text-emerald-950 md:text-xl">
+            <h1 className="text-lg font-semibold text-emerald-950 md:text-xl dark:text-stone-100">
               {isLogin ? 'Sign in' : 'Create your account'}
             </h1>
-            <p className="mt-1 text-sm text-stone-600">
+            <p className="mt-1 text-sm text-stone-600 dark:text-stone-400">
               {isLogin
                 ? 'Use your email and password to continue.'
                 : 'Fill in your details — username is saved after signup via the server.'}

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import BrandLogo from '../components/BrandLogo'
+import ThemeToggle from '../components/ThemeToggle'
 import PublicFooter from '../components/PublicFooter'
 import OpportunityCard from '../components/OpportunityCard'
 import { heroDashboardIllustration, testimonialPortrait } from '../assets/landing'
@@ -94,6 +95,7 @@ function TopNav() {
         </nav>
 
         <div className="flex shrink-0 items-center gap-1 sm:gap-2 md:gap-3">
+          <ThemeToggle />
           <button
             type="button"
             className={`${iconButton} md:hidden`}
@@ -133,7 +135,7 @@ function TopNav() {
       </div>
 
       {mobileOpen ? (
-        <div className="border-t border-emerald-900/10 bg-[#faf8f5]/98 shadow-lg backdrop-blur-md md:hidden">
+        <div className="border-t border-emerald-900/10 bg-[#faf8f5]/98 shadow-lg backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/98 md:hidden">
           <nav
             className={`${sectionContainer} flex max-w-7xl flex-col gap-1 py-3`}
             aria-label="Mobile primary"
@@ -143,7 +145,7 @@ function TopNav() {
                 <a
                   key={label}
                   href={href}
-                  className="rounded-lg px-3 py-2.5 text-sm font-medium text-emerald-900 hover:bg-emerald-900/5"
+                  className="rounded-lg px-3 py-2.5 text-sm font-medium text-emerald-900 hover:bg-emerald-900/5 dark:text-emerald-100 dark:hover:bg-emerald-500/10"
                   onClick={closeMobile}
                 >
                   {label}
@@ -152,7 +154,7 @@ function TopNav() {
                 <Link
                   key={label}
                   to={href}
-                  className="rounded-lg px-3 py-2.5 text-sm font-medium text-emerald-900 hover:bg-emerald-900/5"
+                  className="rounded-lg px-3 py-2.5 text-sm font-medium text-emerald-900 hover:bg-emerald-900/5 dark:text-emerald-100 dark:hover:bg-emerald-500/10"
                   onClick={closeMobile}
                 >
                   {label}

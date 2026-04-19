@@ -7,6 +7,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 import BrandLogo from "../components/BrandLogo";
+import ThemeToggle from "../components/ThemeToggle";
 import {
   LayoutDashboard,
   Wallet,
@@ -32,8 +33,8 @@ const CACHE_TTL_MS = 180000;
 const linkClass = ({ isActive }) =>
   `flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition ${
     isActive
-      ? "bg-emerald-50 font-semibold text-emerald-800"
-      : "text-stone-600 hover:bg-stone-100 hover:text-stone-900"
+      ? "bg-emerald-50 font-semibold text-emerald-800 dark:bg-emerald-900/35 dark:text-emerald-100"
+      : "text-stone-600 hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-slate-800 dark:hover:text-stone-100"
   }`;
 
 function membershipStokvelId(m) {
@@ -157,7 +158,7 @@ export default function DashboardLayout() {
 
   if (memberships === null && isScopedPath) {
     return (
-      <div className="flex h-dvh items-center justify-center overflow-hidden bg-[#F4F5F0] text-stone-600">
+      <div className="flex h-dvh items-center justify-center overflow-hidden bg-[#F4F5F0] text-stone-600 dark:bg-slate-950 dark:text-stone-400">
         <p className="text-sm tracking-wide">Loading your groups…</p>
       </div>
     );
@@ -165,11 +166,11 @@ export default function DashboardLayout() {
 
   if (fetchError && memberships !== null && memberships.length === 0) {
     return (
-      <div className="flex h-dvh flex-col items-center justify-center gap-3 overflow-hidden bg-[#F4F5F0] p-6 text-center text-stone-600">
+      <div className="flex h-dvh flex-col items-center justify-center gap-3 overflow-hidden bg-[#F4F5F0] p-6 text-center text-stone-600 dark:bg-slate-950 dark:text-stone-400">
         <p className="text-sm">Could not load your stokvels.</p>
         <button
           type="button"
-          className="rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-50"
+          className="rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-50 dark:border-slate-600 dark:bg-slate-800 dark:text-stone-200 dark:hover:bg-slate-700"
           onClick={() => navigate("/dashboard", { replace: true })}
         >
           Try again
@@ -179,19 +180,19 @@ export default function DashboardLayout() {
   }
 
   return (
-    <div className="box-border flex h-dvh min-h-0 w-full flex-col gap-3 overflow-hidden bg-[#F4F5F0] p-3 text-stone-800 md:flex-row md:gap-4 md:p-4">
-      <aside className="flex w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm md:h-full md:w-[220px] md:min-w-[220px] md:max-w-[220px]">
-        <div className="shrink-0 border-b border-stone-200 p-3">
+    <div className="box-border flex h-dvh min-h-0 w-full flex-col gap-3 overflow-hidden bg-[#F4F5F0] p-3 text-stone-800 dark:bg-slate-950 dark:text-stone-100 md:flex-row md:gap-4 md:p-4">
+      <aside className="flex w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900 md:h-full md:w-[220px] md:min-w-[220px] md:max-w-[220px]">
+        <div className="shrink-0 border-b border-stone-200 p-3 dark:border-slate-700">
           <label
             htmlFor="stokvel-selector"
-            className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-stone-500"
+            className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400"
           >
             Stokvel
           </label>
           <select
             id="stokvel-selector"
             disabled={memberships === null}
-            className="w-full rounded-lg border border-stone-200 bg-stone-50 px-2 py-2 text-sm text-stone-800 shadow-sm outline-none transition focus:border-emerald-400 focus:ring-1 focus:ring-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-lg border border-stone-200 bg-stone-50 px-2 py-2 text-sm text-stone-800 shadow-sm outline-none transition focus:border-emerald-400 focus:ring-1 focus:ring-emerald-300 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-stone-100 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/40"
             value={memberships === null ? "" : selectValue}
             onChange={handleStokvelSelect}
           >
@@ -211,7 +212,7 @@ export default function DashboardLayout() {
             })}
           </select>
         </div>
-        <div className="shrink-0 border-b border-stone-200 p-4">
+        <div className="shrink-0 border-b border-stone-200 p-4 dark:border-slate-700">
           <div className="rounded-lg bg-emerald-800 py-2 text-center text-xs font-bold uppercase tracking-wide text-white">
             Member
           </div>
@@ -263,7 +264,7 @@ export default function DashboardLayout() {
         <div className="mx-2 mb-2 flex shrink-0 flex-col gap-1">
           <Link
             to="/apply"
-            className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-stone-600 transition hover:bg-stone-100 hover:text-stone-900"
+            className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-stone-600 transition hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-slate-800 dark:hover:text-stone-100"
           >
             <UserPlus
               className="h-4 w-4 shrink-0 text-emerald-700"
@@ -282,16 +283,17 @@ export default function DashboardLayout() {
           ) : null}
           <Link
             to="/"
-            className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-stone-600 transition hover:bg-stone-100 hover:text-stone-900"
+            className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-stone-600 transition hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-slate-800 dark:hover:text-stone-100"
           >
             <Home className="h-4 w-4" aria-hidden />
             Back to Home
           </Link>
         </div>
-        <div className="shrink-0 border-t border-stone-200 p-3">
+        <div className="shrink-0 space-y-2 border-t border-stone-200 p-3 dark:border-slate-700">
+          <ThemeToggle layout="sidebar" />
           <button
             type="button"
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-stone-200 bg-stone-50 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-100"
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-stone-200 bg-stone-50 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-100 dark:border-slate-600 dark:bg-slate-800 dark:text-stone-200 dark:hover:bg-slate-700"
             onClick={async () => {
               await supabase.auth.signOut();
               navigate("/", { replace: true });
@@ -302,7 +304,7 @@ export default function DashboardLayout() {
           </button>
         </div>
       </aside>
-      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain rounded-2xl border border-stone-200 bg-white p-6 shadow-sm md:p-8">
+      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain rounded-2xl border border-stone-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-stone-100 md:p-8">
         {blockOutlet ? null : <Outlet />}
       </main>
     </div>
