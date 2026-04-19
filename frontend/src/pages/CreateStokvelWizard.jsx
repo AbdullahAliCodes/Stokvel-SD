@@ -111,45 +111,37 @@ function buildMemberDetailsFromSelected(selectedMembers, isAdminWizard = true) {
   });
 }
 
-/** @returns {{ treasurerUserId?: string, treasurerEmail?: string } | { error: string }} */
+/** Treasurer must be another registered user (real UUID id). */
 function resolveMemberTreasurerPayload(selectedMembers, treasurerMemberId, myUserId) {
   const t = selectedMembers.find((m) => m.id === treasurerMemberId);
   if (!t || t.isCreator || t.id === myUserId) {
     return { error: "Choose a treasurer who is not yourself." };
   }
-  if (UUID_RE.test(t.id)) {
-    return { treasurerUserId: t.id };
-  }
-  if (t.pendingEmail && isValidManualEmail(t.pendingEmail)) {
-    return { treasurerEmail: t.pendingEmail.trim().toLowerCase() };
-  }
-  if (
-    t.pendingUsername &&
-    isValidManualEmail(typeof t.email === "string" ? t.email : "")
-  ) {
+  if (!UUID_RE.test(t.id)) {
     return {
-      treasurerEmail: String(t.email).trim().toLowerCase(),
+      error:
+        "A registered user must be selected as the Treasurer (email-only invites cannot be treasurer).",
     };
   }
-  return {
-    error:
-      "Treasurer must be a registered user or have a valid email on file.",
-  };
+  return { treasurerUserId: t.id.trim().toLowerCase() };
 }
 
-function formatTreasurerOptionLabel(m) {
-  if (m.pendingEmail) return `${m.pendingEmail} (invite by email)`;
-  if (m.pendingUsername) {
-    const em =
-      typeof m.email === "string" && m.email.trim()
-        ? ` · ${m.email.trim()}`
-        : "";
-    return `@${m.pendingUsername}${em}`;
-  }
+function formatRegisteredMemberOptionLabel(m) {
   const name = [m.firstName, m.lastName].filter(Boolean).join(" ").trim();
   const handle = m.username ? `@${m.username}` : "";
   if (name && handle) return `${name} (${handle})`;
   return name || handle || "Member";
+}
+
+/** Non-creator members with platform accounts (UUID ids). */
+function registeredNonCreatorMembers(selectedMembers, myUserId) {
+  return selectedMembers.filter(
+    (m) =>
+      !m.isCreator &&
+      myUserId &&
+      m.id !== myUserId &&
+      UUID_RE.test(String(m.id || "")),
+  );
 }
 
 function displayEmailReadOnly(m, creatorEmail) {
@@ -258,6 +250,16 @@ export function CreateStokvelWizard({ variant = "admin" }) {
         );
         return;
       }
+      const regOthers = registeredNonCreatorMembers(
+        selectedMembers,
+        myUserId,
+      );
+      if (regOthers.length < 1) {
+        setFormError(
+          "You must add at least one registered user to act as the Treasurer.",
+        );
+        return;
+      }
       if (!treasurerMemberId.trim()) {
         setFormError(
           "Select a designated treasurer. You cannot assign yourself.",
@@ -265,18 +267,9 @@ export function CreateStokvelWizard({ variant = "admin" }) {
         return;
       }
       const t = selectedMembers.find((m) => m.id === treasurerMemberId);
-      if (!t || t.isCreator) {
-        setFormError("Choose a valid treasurer who is not yourself.");
-        return;
-      }
-      const okTreasurer =
-        UUID_RE.test(t.id) ||
-        (t.pendingEmail && isValidManualEmail(t.pendingEmail)) ||
-        (t.pendingUsername &&
-          isValidManualEmail(typeof t.email === "string" ? t.email : ""));
-      if (!okTreasurer) {
+      if (!t || t.isCreator || !UUID_RE.test(t.id)) {
         setFormError(
-          "Treasurer must be a registered user or have a valid email (use Add email for username-only invites).",
+          "Choose a registered user as treasurer (not an email-only invite).",
         );
         return;
       }
@@ -287,12 +280,13 @@ export function CreateStokvelWizard({ variant = "admin" }) {
     isAdmin,
     selectedMembers,
     treasurerMemberId,
+    myUserId,
   ]);
 
   useEffect(() => {
     if (!createdStokvel?.id) return undefined;
     const target = isAdmin
-      ? `/stokvels/${createdStokvel.id}`
+      ? `/group/${createdStokvel.id}/dashboard`
       : "/dashboard";
     const id = setTimeout(() => navigate(target), 5000);
     return () => clearTimeout(id);
@@ -340,21 +334,23 @@ export function CreateStokvelWizard({ variant = "admin" }) {
 
   useEffect(() => {
     if (isAdmin) return;
-    const others = selectedMembers.filter(
-      (m) => !m.isCreator && m.id !== myUserId,
-    );
-    if (others.length === 1) {
-      setTreasurerMemberId((prev) => prev || others[0].id);
+    const reg = registeredNonCreatorMembers(selectedMembers, myUserId);
+    if (reg.length === 1) {
+      setTreasurerMemberId((prev) => prev || reg[0].id);
     }
   }, [selectedMembers, isAdmin, myUserId]);
 
   useEffect(() => {
     if (isAdmin) return;
-    const ids = new Set(selectedMembers.map((m) => m.id));
-    if (treasurerMemberId && !ids.has(treasurerMemberId)) {
+    const allowed = new Set(
+      registeredNonCreatorMembers(selectedMembers, myUserId || "").map(
+        (m) => m.id,
+      ),
+    );
+    if (treasurerMemberId && !allowed.has(treasurerMemberId)) {
       setTreasurerMemberId("");
     }
-  }, [selectedMembers, treasurerMemberId, isAdmin]);
+  }, [selectedMembers, treasurerMemberId, isAdmin, myUserId]);
 
   useEffect(() => {
     const n = Math.max(1, selectedMembers.length);
@@ -641,6 +637,14 @@ export function CreateStokvelWizard({ variant = "admin" }) {
     return t?.id || myUserId || "";
   }, [selectedMembers, myUserId, isAdmin]);
 
+  const regTreasurerOptions = useMemo(
+    () => registeredNonCreatorMembers(selectedMembers, myUserId || ""),
+    [selectedMembers, myUserId],
+  );
+
+  const memberTabNextDisabled =
+    !isAdmin && activeTab === "members" && regTreasurerOptions.length === 0;
+
   const atMemberCap = selectedMembers.length >= MAX_GROUP_MEMBERS;
 
   const qTrim = memberQuery.trim();
@@ -729,16 +733,18 @@ export function CreateStokvelWizard({ variant = "admin" }) {
           "Add at least one other member (minimum two people including you).",
         );
       }
+      if (registeredNonCreatorMembers(selectedMembers, myUserId).length < 1) {
+        return setFormError(
+          "You must add at least one registered user to act as the Treasurer.",
+        );
+      }
       const tr = resolveMemberTreasurerPayload(
         selectedMembers,
         treasurerMemberId,
         myUserId,
       );
       if ("error" in tr && tr.error) return setFormError(tr.error);
-      memberTreasurerPayload =
-        "treasurerUserId" in tr && tr.treasurerUserId
-          ? { treasurerUserId: tr.treasurerUserId }
-          : { treasurerEmail: tr.treasurerEmail };
+      memberTreasurerPayload = { treasurerUserId: tr.treasurerUserId };
     }
 
     const treasurerIdForAdmin = treasurerUserIdFromSelection || myUserId;
@@ -937,7 +943,7 @@ export function CreateStokvelWizard({ variant = "admin" }) {
         </section>
         ) : null}
         <Link
-          to={isAdmin ? `/stokvels/${createdStokvel.id}` : "/dashboard"}
+          to={isAdmin ? `/group/${createdStokvel.id}/dashboard` : "/dashboard"}
           className={`${btnPrimary} inline-flex`}
         >
           {isAdmin ? "Open group dashboard" : "Back to dashboard"}
@@ -1414,33 +1420,41 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                   ))}
                 </ul>
 
-                {!isAdmin &&
-                selectedMembers.some((m) => !m.isCreator) ? (
+                {!isAdmin ? (
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
                     <label className={`${labelLight}`}>
                       Designated treasurer{" "}
                       <span className="text-red-700">*</span>
                       <p className="mb-2 mt-1 text-xs font-normal text-stone-600">
-                        Required — cannot be yourself. Pick a registered member or
-                        someone added by email (invite pending).
+                        Required — must be another{" "}
+                        <span className="font-medium text-stone-800">
+                          registered
+                        </span>{" "}
+                        user (not an email-only invite). Email invites can still
+                        join as regular members.
                       </p>
-                      <select
-                        className={inputLight}
-                        value={treasurerMemberId}
-                        onChange={(e) =>
-                          setTreasurerMemberId(e.target.value)
-                        }
-                        required
-                      >
-                        <option value="">Select treasurer…</option>
-                        {selectedMembers
-                          .filter((m) => !m.isCreator)
-                          .map((m) => (
+                      {regTreasurerOptions.length === 0 ? (
+                        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                          You must add at least one registered user to act as the
+                          Treasurer.
+                        </p>
+                      ) : (
+                        <select
+                          className={inputLight}
+                          value={treasurerMemberId}
+                          onChange={(e) =>
+                            setTreasurerMemberId(e.target.value)
+                          }
+                          required
+                        >
+                          <option value="">Select treasurer…</option>
+                          {regTreasurerOptions.map((m) => (
                             <option key={m.id} value={m.id}>
-                              {formatTreasurerOptionLabel(m)}
+                              {formatRegisteredMemberOptionLabel(m)}
                             </option>
                           ))}
-                      </select>
+                        </select>
+                      )}
                     </label>
                   </div>
                 ) : null}
@@ -1574,7 +1588,13 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                 <button
                   type="button"
                   onClick={handleGoTabNext}
-                  className={`${btnSecondary} inline-flex items-center gap-2`}
+                  disabled={memberTabNextDisabled}
+                  title={
+                    memberTabNextDisabled
+                      ? "Add a registered member to assign as treasurer before continuing."
+                      : undefined
+                  }
+                  className={`${btnSecondary} inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50`}
                 >
                   Next
                   <ChevronRight className="h-4 w-4" />

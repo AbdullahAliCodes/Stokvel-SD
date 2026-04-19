@@ -18,6 +18,7 @@ import {
   LegacyStokvelToGroup,
   LegacyMeetingsListRedirect,
   LegacyMeetingDetailRedirect,
+  LegacyMyPayoutRedirect,
 } from "./components/LegacyMemberRedirects";
 import Apply from "./pages/Apply";
 import AdminPlaceholder from "./pages/AdminPlaceholder";
@@ -27,10 +28,9 @@ import AdminEditStokvel from "./pages/AdminEditStokvel";
 import AdminReviewStokvel from "./pages/AdminReviewStokvel";
 import Account from "./pages/Account";
 import StokvelDashboard from "./pages/StokvelDashboard";
-import SingleStokvel from "./pages/SingleStokvel";
 import Meetings from "./pages/Meetings";
 import MeetingDetails from "./pages/MeetingDetails";
-import MyPayout from "./pages/MyPayout";
+import Payments from "./pages/Payments";
 import Support from "./pages/Support";
 import Landing from "./pages/Landing";
 import PublicStokvels from "./pages/PublicStokvels";
@@ -102,11 +102,11 @@ export default function App() {
                   <Route path="/apply" element={<Apply />} />
                   <Route path="/account" element={<Account />} />
                   <Route path="/support" element={<Support />} />
-                  <Route path="/my-payout" element={<MyPayout />} />
+                  <Route path="/my-payout" element={<LegacyMyPayoutRedirect />} />
                   <Route path="/group/:stokvel_id">
                     <Route index element={<GroupScopeIndexRedirect />} />
                     <Route path="dashboard" element={<StokvelDashboard />} />
-                    <Route path="stokvels" element={<SingleStokvel />} />
+                    <Route path="payments" element={<Payments />} />
                     <Route path="meetings" element={<Meetings />} />
                     <Route
                       path="meetings/:meeting_id"

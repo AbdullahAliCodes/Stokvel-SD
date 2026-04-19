@@ -62,7 +62,7 @@ function GroupsTable({ title, groups, action, embedded }) {
                 <tr key={s.id} className={tableRow}>
                   <td className="p-3 font-medium text-stone-900">
                     <Link
-                      to={`/stokvels/${s.id}`}
+                      to={`/group/${s.id}/dashboard`}
                       className="text-emerald-800 underline-offset-2 hover:text-emerald-900 hover:underline"
                     >
                       {s.name}

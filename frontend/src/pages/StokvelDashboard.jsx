@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Calendar, CreditCard, LayoutDashboard, Users } from 'lucide-react'
+import { Calendar, CreditCard, LayoutDashboard, Users, Wallet } from 'lucide-react'
 import { useSession } from '../context/SessionContext'
 import { apiUrl } from '../utils/api'
 import { btnPrimary, cardLight, errorBox, pageSubtitle } from '../ui'
 import { readViewCache, writeViewCache } from '../utils/viewCache'
 import QuickPayModal from '../components/QuickPayModal'
-import MarketRatesWidget from '../components/MarketRatesWidget'
 
 function formatZAR(n) {
   const num = Number(n)
@@ -37,6 +36,15 @@ function toDisplayDate(value) {
 
 function memberProfilesForUser(members, userId) {
   return members.find((m) => m.user_id === userId)?.profiles ?? null
+}
+
+function memberDisplay(p) {
+  const first = p?.first_name?.trim()
+  const last = p?.last_name?.trim()
+  if (first || last) return [first, last].filter(Boolean).join(' ')
+  if (p?.full_name) return p.full_name
+  if (p?.email) return p.email.split('@')[0]
+  return 'Member'
 }
 
 export default function StokvelDashboard() {
@@ -159,7 +167,10 @@ export default function StokvelDashboard() {
     return upcoming[0] ?? null
   }, [meetings])
 
-  const detailPath = `/group/${stokvel_id}/stokvels`
+  const paymentsPath = `/group/${stokvel_id}/payments`
+  const adminMember = members.find((m) => String(m.group_role).toLowerCase() === 'admin')
+  const treasurerMember = members.find((m) => String(m.group_role).toLowerCase() === 'treasurer')
+  const firstRosterMember = members[0] ?? null
 
   if (!stokvel_id) {
     return null
@@ -207,15 +218,15 @@ export default function StokvelDashboard() {
             ) : null}
           </div>
           <p className={pageSubtitle}>
-            Summary for this group. Open the full stokvel page for meetings, members, and admin
-            tools.
+            Summary for this group. Meetings live on the Meetings tab; contributions, rates, and
+            payout roster are on Payments.
           </p>
         </div>
         <Link
-          to={detailPath}
-          className="shrink-0 rounded-lg border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-100"
+          to={paymentsPath}
+          className="shrink-0 rounded-lg border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-100 dark:border-slate-600 dark:bg-slate-800 dark:text-stone-200 dark:hover:bg-slate-700"
         >
-          View full details
+          Payments &amp; finances
         </Link>
       </header>
 
@@ -260,7 +271,7 @@ export default function StokvelDashboard() {
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-2">
         <section className={`${cardLight} border-t-4 border-emerald-700 p-5`}>
           <div className="mb-4 flex items-center gap-2">
             <Calendar className="h-5 w-5 text-emerald-700" aria-hidden />
@@ -297,6 +308,65 @@ export default function StokvelDashboard() {
           )}
         </section>
 
+        <section className={`${cardLight} border-t-4 border-emerald-600/80 p-5`}>
+          <div className="mb-4 flex items-center gap-2">
+            <Users className="h-5 w-5 text-emerald-700" aria-hidden />
+            <h2 className="text-sm font-bold uppercase tracking-wide text-emerald-800">
+              Leadership
+            </h2>
+          </div>
+          <dl className="space-y-3 text-sm text-stone-700 dark:text-stone-300">
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
+                Admin
+              </dt>
+              <dd className="font-medium text-stone-800 dark:text-stone-100">
+                {adminMember ? memberDisplay(adminMember.profiles) : '—'}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
+                Treasurer
+              </dt>
+              <dd className="font-medium text-stone-800 dark:text-stone-100">
+                {treasurerMember ? memberDisplay(treasurerMember.profiles) : 'Not assigned'}
+              </dd>
+            </div>
+          </dl>
+        </section>
+
+        <section className={`${cardLight} border-t-4 border-stone-300 p-5`}>
+          <div className="mb-4 flex items-center gap-2">
+            <Wallet className="h-5 w-5 text-emerald-700" aria-hidden />
+            <h2 className="text-sm font-bold uppercase tracking-wide text-emerald-800">
+              Next payout
+            </h2>
+          </div>
+          <p className="text-sm text-stone-600 dark:text-stone-400">
+            {firstRosterMember && monthlyContribution > 0 ? (
+              <>
+                Next in line on the roster (informational):{' '}
+                <span className="font-medium text-stone-800 dark:text-stone-100">
+                  {memberDisplay(firstRosterMember.profiles)}
+                </span>{' '}
+                — expected amount {formatZAR(monthlyContribution)} per turn. The app does not store
+                confirmed payout dates yet; check with your treasurer.
+              </>
+            ) : (
+              <>
+                Payout order follows your group&apos;s roster on the Payments page. Dates are not
+                stored in the app yet—confirm timing with your treasurer.
+              </>
+            )}
+          </p>
+          <Link
+            to={paymentsPath}
+            className="mt-4 inline-block text-sm font-medium text-emerald-800 underline-offset-2 hover:underline dark:text-emerald-300"
+          >
+            Open payout queue
+          </Link>
+        </section>
+
         <section className={`${cardLight} border-t-4 border-stone-300 p-5`}>
           <div className="mb-4 flex items-center gap-2">
             <CreditCard className="h-5 w-5 text-emerald-700" aria-hidden />
@@ -321,10 +391,6 @@ export default function StokvelDashboard() {
           ) : null}
           {paymentDebug ? <p className="mt-2 text-xs text-stone-400">{paymentDebug}</p> : null}
         </section>
-
-        <div className="min-w-0 lg:col-span-2 xl:col-span-1">
-          <MarketRatesWidget memberMonthlyContribution={monthlyContribution} />
-        </div>
       </div>
 
       {quickPayOpen && session ? (

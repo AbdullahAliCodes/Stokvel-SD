@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
 import { useSession } from "../context/SessionContext";
 import { apiUrl } from "../utils/api";
 import {
@@ -40,6 +41,21 @@ function toDisplayDate(value) {
   return d.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
 }
 
+const markdownBody =
+  "text-sm leading-relaxed text-stone-700 dark:text-stone-300 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_strong]:font-semibold [&_a]:text-emerald-800 [&_a]:underline dark:[&_a]:text-emerald-300 [&_code]:rounded [&_code]:bg-stone-100 [&_code]:px-1 [&_code]:text-xs dark:[&_code]:bg-slate-800";
+
+function MarkdownBlock({ text, emptyLabel }) {
+  const src = (text || "").trim();
+  if (!src) {
+    return <p className="text-sm leading-relaxed text-stone-600 dark:text-stone-400">{emptyLabel}</p>;
+  }
+  return (
+    <div className={markdownBody}>
+      <ReactMarkdown>{src}</ReactMarkdown>
+    </div>
+  );
+}
+
 export default function Meetings() {
   const { stokvel_id } = useParams();
   const navigate = useNavigate();
@@ -57,6 +73,15 @@ export default function Meetings() {
   const [editingMeetingId, setEditingMeetingId] = useState("");
   const [editDraft, setEditDraft] = useState({});
   const [minutesDraft, setMinutesDraft] = useState({});
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleForm, setScheduleForm] = useState({
+    title: "",
+    meetingDate: "",
+    meetingLink: "",
+    agenda: "",
+  });
+  const [scheduleSaving, setScheduleSaving] = useState(false);
+  const [scheduleError, setScheduleError] = useState("");
 
   useEffect(() => {
     if (!stokvel_id) {
@@ -268,6 +293,56 @@ export default function Meetings() {
     }
   }
 
+  async function handleCreateMeeting(e) {
+    e.preventDefault();
+    if (!session?.access_token || !stokvel_id) return;
+    setScheduleSaving(true);
+    setScheduleError("");
+    setMeetingActionError("");
+    setMeetingActionOk("");
+    try {
+      const res = await fetch(apiUrl(`/api/stokvels/${stokvel_id}/meetings`), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          title: scheduleForm.title.trim(),
+          meetingDate: scheduleForm.meetingDate,
+          meetingLink: scheduleForm.meetingLink.trim(),
+          agenda: scheduleForm.agenda.trim(),
+        }),
+      });
+      const text = await res.text();
+      if (!res.ok) throw new Error(parseApiError(text));
+      const data = JSON.parse(text);
+      const created = data.meeting;
+      if (created) {
+        const cacheKey = `stokvel_detail:${session.user.id}:${stokvel_id}`;
+        setMeetings((prev) => {
+          const next = [...prev, created].sort(
+            (a, b) =>
+              new Date(a.meeting_date).getTime() - new Date(b.meeting_date).getTime(),
+          );
+          const prevCache = readViewCache(cacheKey, 120000);
+          writeViewCache(cacheKey, {
+            ...(typeof prevCache === "object" && prevCache ? prevCache : {}),
+            meetings: next,
+          });
+          return next;
+        });
+      }
+      setScheduleOpen(false);
+      setScheduleForm({ title: "", meetingDate: "", meetingLink: "", agenda: "" });
+      setMeetingActionOk("Meeting scheduled.");
+    } catch (err) {
+      setScheduleError(err.message ?? String(err));
+    } finally {
+      setScheduleSaving(false);
+    }
+  }
+
   async function handleDeleteMeeting(meetingId) {
     if (!session?.access_token || !stokvel_id) return;
     if (!confirmAction("Delete this meeting? This cannot be undone.")) return;
@@ -380,8 +455,9 @@ export default function Meetings() {
                 setEditDraft((prev) => ({ ...prev, agenda: e.target.value }))
               }
               className={inputLight}
-              placeholder="Agenda"
+              placeholder="Agenda (Markdown supported)"
             />
+            <p className="text-[11px] text-stone-500">Markdown is supported for agenda and minutes.</p>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
@@ -409,17 +485,16 @@ export default function Meetings() {
               <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-stone-500">
                 Agenda
               </p>
-              <p className="text-sm leading-relaxed text-stone-700">
-                {meeting.agenda || meeting.notes || "No agenda yet."}
-              </p>
+              <MarkdownBlock
+                text={meeting.agenda || meeting.notes}
+                emptyLabel="No agenda yet."
+              />
             </div>
             <div>
               <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-stone-500">
                 Minutes
               </p>
-              <p className="text-sm leading-relaxed text-stone-700">
-                {meeting.minutes || "No minutes recorded yet."}
-              </p>
+              <MarkdownBlock text={meeting.minutes} emptyLabel="No minutes recorded yet." />
             </div>
             {meeting.meeting_link ? (
               <a
@@ -461,7 +536,7 @@ export default function Meetings() {
                         [meeting.id]: e.target.value,
                       }))
                     }
-                    placeholder="Record minutes…"
+                    placeholder="Record minutes… (Markdown supported)"
                     className={`${inputLight} mt-1`}
                   />
                 </label>
@@ -483,19 +558,119 @@ export default function Meetings() {
 
   return (
     <div className="space-y-8">
-      <header className="border-b border-stone-200 pb-4">
-        <h1 className="mb-2 flex flex-wrap items-center gap-2 text-2xl font-bold tracking-tight text-emerald-800 sm:text-3xl">
-          <i
-            className="fa-solid fa-calendar-days text-emerald-700"
-            aria-hidden
-          />
-          Meetings
-        </h1>
-        <p className={`${pageSubtitle} text-stone-600`}>
-          <span className="font-medium text-stone-800">{groupName}</span> —
-          upcoming and past sessions. Agenda and minutes are shown on each card.
-        </p>
+      <header className="flex flex-col gap-3 border-b border-stone-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="mb-2 flex flex-wrap items-center gap-2 text-2xl font-bold tracking-tight text-emerald-800 sm:text-3xl">
+            <i
+              className="fa-solid fa-calendar-days text-emerald-700"
+              aria-hidden
+            />
+            Meetings
+          </h1>
+          <p className={`${pageSubtitle} text-stone-600`}>
+            <span className="font-medium text-stone-800">{groupName}</span> —
+            upcoming and past sessions. Agenda and minutes render as Markdown on each card.
+          </p>
+        </div>
+        {canManageMeetings ? (
+          <button
+            type="button"
+            onClick={() => {
+              setScheduleError("");
+              setScheduleForm({ title: "", meetingDate: "", meetingLink: "", agenda: "" });
+              setScheduleOpen(true);
+            }}
+            className={`${btnPrimary} shrink-0`}
+          >
+            Schedule new meeting
+          </button>
+        ) : null}
       </header>
+
+      {scheduleOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="schedule-meeting-title"
+        >
+          <div
+            className={`${cardLight} max-h-[90vh] w-full max-w-lg overflow-y-auto p-6 shadow-lg`}
+          >
+            <h2
+              id="schedule-meeting-title"
+              className="mb-4 text-lg font-bold text-emerald-800"
+            >
+              Schedule meeting
+            </h2>
+            <form className="space-y-3" onSubmit={handleCreateMeeting}>
+              <label className="block text-xs font-semibold uppercase text-stone-500">
+                Title *
+                <input
+                  type="text"
+                  required
+                  value={scheduleForm.title}
+                  onChange={(e) =>
+                    setScheduleForm((p) => ({ ...p, title: e.target.value }))
+                  }
+                  className={`${inputLight} mt-1`}
+                  placeholder="e.g. April check-in"
+                />
+              </label>
+              <label className="block text-xs font-semibold uppercase text-stone-500">
+                Date &amp; time *
+                <input
+                  type="datetime-local"
+                  required
+                  value={scheduleForm.meetingDate}
+                  onChange={(e) =>
+                    setScheduleForm((p) => ({ ...p, meetingDate: e.target.value }))
+                  }
+                  className={`${inputLight} mt-1`}
+                />
+              </label>
+              <label className="block text-xs font-semibold uppercase text-stone-500">
+                Meeting link
+                <input
+                  type="url"
+                  value={scheduleForm.meetingLink}
+                  onChange={(e) =>
+                    setScheduleForm((p) => ({ ...p, meetingLink: e.target.value }))
+                  }
+                  className={`${inputLight} mt-1`}
+                  placeholder="https://…"
+                />
+              </label>
+              <label className="block text-xs font-semibold uppercase text-stone-500">
+                Agenda (optional, Markdown)
+                <textarea
+                  rows={4}
+                  value={scheduleForm.agenda}
+                  onChange={(e) =>
+                    setScheduleForm((p) => ({ ...p, agenda: e.target.value }))
+                  }
+                  className={`${inputLight} mt-1`}
+                  placeholder={"- Welcome\n- Contributions review"}
+                />
+              </label>
+              {scheduleError ? <p className={`text-sm ${errorBox}`}>{scheduleError}</p> : null}
+              <div className="flex flex-wrap gap-2 pt-2">
+                <button type="submit" className={btnPrimary} disabled={scheduleSaving}>
+                  {scheduleSaving ? "Saving…" : "Create meeting"}
+                </button>
+                <button
+                  type="button"
+                  className={btnSecondary}
+                  disabled={scheduleSaving}
+                  onClick={() => setScheduleOpen(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
 
       {meetingsError && meetings.length === 0 ? (
         <p className={`text-sm ${errorBox}`}>{meetingsError}</p>

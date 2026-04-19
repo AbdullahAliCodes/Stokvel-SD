@@ -7,11 +7,19 @@ export function GroupScopeIndexRedirect() {
   return <Navigate to={`/group/${stokvel_id}/dashboard`} replace />
 }
 
-/** Old `/stokvels/:id` → scoped detail (keeps StokvelDashboard card links working). */
+/** Old `/stokvels/:id` → scoped member area (payments & finances). */
 export function LegacyStokvelToGroup() {
   const { id } = useParams()
   if (!id) return <Navigate to="/dashboard" replace />
-  return <Navigate to={`/group/${id}/stokvels`} replace />
+  return <Navigate to={`/group/${id}/payments`} replace />
+}
+
+/** Legacy flat payout page → scoped payments when a last group is known. */
+export function LegacyMyPayoutRedirect() {
+  const last =
+    typeof localStorage !== 'undefined' ? localStorage.getItem('last_stokvel_id') : null
+  if (last) return <Navigate to={`/group/${last}/payments`} replace />
+  return <Navigate to="/dashboard" replace />
 }
 
 /** Old flat meetings list → gateway picks a group. */

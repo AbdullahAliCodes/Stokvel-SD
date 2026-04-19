@@ -277,20 +277,29 @@ export default function DashboardLayout() {
             />
             Meetings
           </NavLink>
+          <NavLink
+            to={
+              scopedPrefix
+                ? `${scopedPrefix}/payments`
+                : firstActiveId
+                  ? `/group/${firstActiveId}/payments`
+                  : "/dashboard"
+            }
+            className={linkClass}
+          >
+            <Wallet className="h-4 w-4 shrink-0 text-emerald-700" aria-hidden />
+            Payments
+          </NavLink>
+        </nav>
+        <div className="mx-2 mb-2 flex shrink-0 flex-col gap-1">
           <NavLink to="/account" className={linkClass}>
             <User className="h-4 w-4 shrink-0 text-emerald-700" aria-hidden />
             Account
-          </NavLink>
-          <NavLink to="/my-payout" className={linkClass}>
-            <Wallet className="h-4 w-4 shrink-0 text-emerald-700" aria-hidden />
-            My Payouts
           </NavLink>
           <NavLink to="/support" className={linkClass}>
             <LifeBuoy className="h-4 w-4 shrink-0 text-stone-500" aria-hidden />
             Support
           </NavLink>
-        </nav>
-        <div className="mx-2 mb-2 flex shrink-0 flex-col gap-1">
           <Link
             to="/apply"
             className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-stone-600 transition hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-slate-800 dark:hover:text-stone-100"

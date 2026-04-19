@@ -385,7 +385,6 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
       payoutOrder,
       payoutStrategy,
       cycleLength,
-      treasurerEmail: treasurerEmailRaw,
       treasurerUserId: treasurerUserIdRaw,
       initialMemberIds: initialMemberIdsRaw,
       membersCount,
@@ -412,17 +411,19 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
     }
 
     const treasurerUuidRaw = normalizeTreasurerUserIdMember(treasurerUserIdRaw)
-    const treasurerEmailNorm = normalizeInviteEmail(treasurerEmailRaw)
-    if (!treasurerUuidRaw && !treasurerEmailNorm) {
+    if (!treasurerUuidRaw) {
       return res.status(400).json({
-        error: 'A designated treasurer is required (choose a registered member or provide an email).',
+        error: 'A registered user must be selected as the Treasurer.',
       })
     }
-    if (treasurerUuidRaw && treasurerUuidRaw === creatorId) {
-      return res.status(400).json({ error: 'You cannot designate yourself as treasurer.' })
+    const treasurerUuid = normalizeUuid(treasurerUuidRaw)
+    if (!treasurerUuid) {
+      return res.status(400).json({
+        error: 'A registered user must be selected as the Treasurer.',
+      })
     }
-    if (treasurerEmailNorm && treasurerEmailNorm === creatorEmailNorm) {
-      return res.status(400).json({ error: 'Treasurer email cannot be your own email.' })
+    if (treasurerUuid === creatorId) {
+      return res.status(400).json({ error: 'You cannot designate yourself as treasurer.' })
     }
 
     const parsedDetails = normalizeMemberDetails(memberDetails, parsedMembersCount ?? 500)
@@ -503,47 +504,23 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
     if (creatorEmailNorm) handledEmails.add(creatorEmailNorm)
 
     try {
-      const treasurerUuid = treasurerUuidRaw ? normalizeUuid(treasurerUuidRaw) : null
+      handledUserIds.add(treasurerUuid)
+      const { error: te } = await svc.from('stokvel_members').insert([
+        {
+          stokvel_id: stokvelId,
+          user_id: treasurerUuid,
+          group_role: 'treasurer',
+        },
+      ])
+      if (te) throw te
 
-      if (treasurerUuid) {
-        if (treasurerUuid === creatorId) {
-          throw new Error('Treasurer cannot be the same user as the creator.')
-        }
-        handledUserIds.add(treasurerUuid)
-        const { error: te } = await svc.from('stokvel_members').insert([
-          {
-            stokvel_id: stokvelId,
-            user_id: treasurerUuid,
-            group_role: 'treasurer',
-          },
-        ])
-        if (te) throw te
-
-        const { data: tp } = await svc
-          .from('profiles')
-          .select('email')
-          .eq('id', treasurerUuid)
-          .maybeSingle()
-        const pem = normalizeInviteEmail(tp?.email)
-        if (pem) handledEmails.add(pem)
-      } else if (treasurerEmailNorm) {
-        handledEmails.add(treasurerEmailNorm)
-        const { data: invTreasurer, error: teInv } = await createInvitation(svc, {
-          stokvelId,
-          email: treasurerEmailNorm,
-          invitedBy: req.user.id,
-          status: 'pending',
-          groupRole: 'treasurer',
-        })
-        if (teInv) throw teInv
-        if (invTreasurer?.token) {
-          await sendInvitationEmail({
-            to: treasurerEmailNorm,
-            groupName: newStokvel.name,
-            token: invTreasurer.token,
-          })
-        }
-      }
+      const { data: tp } = await svc
+        .from('profiles')
+        .select('email')
+        .eq('id', treasurerUuid)
+        .maybeSingle()
+      const pem = normalizeInviteEmail(tp?.email)
+      if (pem) handledEmails.add(pem)
 
       for (const rawUid of mergedMemberUuids) {
         const uid = normalizeUuid(rawUid)
@@ -575,7 +552,6 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
         if (handledEmails.has(em)) continue
         if (row.userId && UUID_RE_MEMBER_DETAILS.test(String(row.userId).trim())) continue
 
-        if (em === treasurerEmailNorm && !treasurerUuid) continue
         if (em === creatorEmailNorm) continue
 
         const { data: invRow, error: invErr } = await createInvitation(svc, {
