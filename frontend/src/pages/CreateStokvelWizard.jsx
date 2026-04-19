@@ -69,16 +69,26 @@ function formatFileSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function buildMemberDetailsFromSelected(selectedMembers) {
+function buildMemberDetailsFromSelected(selectedMembers, isAdminWizard = true) {
   return selectedMembers.map((m) => {
     const userId = UUID_RE.test(m.id) ? m.id : "";
     if (m.isPending && m.pendingEmail) {
-      return { userId: "", name: "", email: m.pendingEmail, role: m.role };
+      return {
+        userId: "",
+        name: "",
+        email: m.pendingEmail,
+        role: !isAdminWizard ? "Member" : m.role,
+      };
     }
     if (m.isPending && m.pendingUsername) {
       const email =
         typeof m.email === "string" ? m.email.trim().toLowerCase() : "";
-      return { userId: "", name: m.pendingUsername, email, role: m.role };
+      return {
+        userId: "",
+        name: m.pendingUsername,
+        email,
+        role: !isAdminWizard ? "Member" : m.role,
+      };
     }
     const name =
       [m.firstName, m.lastName].filter(Boolean).join(" ").trim() ||
@@ -86,13 +96,52 @@ function buildMemberDetailsFromSelected(selectedMembers) {
       "";
     const email =
       typeof m.email === "string" ? m.email.trim().toLowerCase() : "";
+    const roleOut =
+      !isAdminWizard && m.isCreator
+        ? "Admin (Chairperson)"
+        : !isAdminWizard
+          ? "Member"
+          : m.role;
     return {
       userId,
       name,
       email,
-      role: m.role,
+      role: roleOut,
     };
   });
+}
+
+/** Treasurer must be another registered user (real UUID id). */
+function resolveMemberTreasurerPayload(selectedMembers, treasurerMemberId, myUserId) {
+  const t = selectedMembers.find((m) => m.id === treasurerMemberId);
+  if (!t || t.isCreator || t.id === myUserId) {
+    return { error: "Choose a treasurer who is not yourself." };
+  }
+  if (!UUID_RE.test(t.id)) {
+    return {
+      error:
+        "A registered user must be selected as the Treasurer (email-only invites cannot be treasurer).",
+    };
+  }
+  return { treasurerUserId: t.id.trim().toLowerCase() };
+}
+
+function formatRegisteredMemberOptionLabel(m) {
+  const name = [m.firstName, m.lastName].filter(Boolean).join(" ").trim();
+  const handle = m.username ? `@${m.username}` : "";
+  if (name && handle) return `${name} (${handle})`;
+  return name || handle || "Member";
+}
+
+/** Non-creator members with platform accounts (UUID ids). */
+function registeredNonCreatorMembers(selectedMembers, myUserId) {
+  return selectedMembers.filter(
+    (m) =>
+      !m.isCreator &&
+      myUserId &&
+      m.id !== myUserId &&
+      UUID_RE.test(String(m.id || "")),
+  );
 }
 
 function displayEmailReadOnly(m, creatorEmail) {
@@ -167,6 +216,8 @@ export function CreateStokvelWizard({ variant = "admin" }) {
   const [lastSearch, setLastSearch] = useState({ query: "", count: -1 });
 
   const [selectedMembers, setSelectedMembers] = useState([]);
+  /** Non-creator member id chosen as treasurer (member apply flow only). */
+  const [treasurerMemberId, setTreasurerMemberId] = useState("");
 
   const [emailPopoverId, setEmailPopoverId] = useState(/** @type {string | null} */ (null));
   const [emailPopoverDraft, setEmailPopoverDraft] = useState("");
@@ -189,15 +240,53 @@ export function CreateStokvelWizard({ variant = "admin" }) {
     if (i > 0) setActiveTab(TAB_ORDER[i - 1]);
   }, [activeTab]);
 
-  const goTabNext = useCallback(() => {
+  const handleGoTabNext = useCallback(() => {
     const i = TAB_ORDER.indexOf(activeTab);
+    if (!isAdmin && activeTab === "members") {
+      setFormError("");
+      if (selectedMembers.length < 2) {
+        setFormError(
+          "Add at least one other member (minimum two people including you).",
+        );
+        return;
+      }
+      const regOthers = registeredNonCreatorMembers(
+        selectedMembers,
+        myUserId,
+      );
+      if (regOthers.length < 1) {
+        setFormError(
+          "You must add at least one registered user to act as the Treasurer.",
+        );
+        return;
+      }
+      if (!treasurerMemberId.trim()) {
+        setFormError(
+          "Select a designated treasurer. You cannot assign yourself.",
+        );
+        return;
+      }
+      const t = selectedMembers.find((m) => m.id === treasurerMemberId);
+      if (!t || t.isCreator || !UUID_RE.test(t.id)) {
+        setFormError(
+          "Choose a registered user as treasurer (not an email-only invite).",
+        );
+        return;
+      }
+    }
     if (i < TAB_ORDER.length - 1) setActiveTab(TAB_ORDER[i + 1]);
-  }, [activeTab]);
+  }, [
+    activeTab,
+    isAdmin,
+    selectedMembers,
+    treasurerMemberId,
+    myUserId,
+  ]);
 
   useEffect(() => {
     if (!createdStokvel?.id) return undefined;
     const target = isAdmin
-      ? `/stokvels/${createdStokvel.id}`
+      ? `/group/${createdStokvel.id}/dashboard`
       : "/dashboard";
     const id = setTimeout(() => navigate(target), 5000);
     return () => clearTimeout(id);
@@ -208,9 +297,14 @@ export function CreateStokvelWizard({ variant = "admin" }) {
     setSelectedMembers((prev) => {
       const withoutCreator = prev.filter((m) => m.id !== myUserId);
       const existing = prev.find((m) => m.id === myUserId);
-      const label = creatorEmail
-        ? `You (creator) · ${creatorEmail}`
-        : "You (creator)";
+      const label =
+        !isAdmin && creatorEmail
+          ? `Admin (Chairperson) · ${creatorEmail}`
+          : !isAdmin
+            ? "Admin (Chairperson)"
+            : creatorEmail
+              ? `You (creator) · ${creatorEmail}`
+              : "You (creator)";
       const profileHasEmail = Boolean(String(creatorEmail || "").trim());
       const creatorRow = existing
         ? {
@@ -228,7 +322,7 @@ export function CreateStokvelWizard({ variant = "admin" }) {
             username: "",
             firstName: "",
             lastName: "",
-            role: "Admin",
+            role: !isAdmin ? "Admin (Chairperson)" : "Admin",
             isCreator: true,
           };
       return [
@@ -236,7 +330,27 @@ export function CreateStokvelWizard({ variant = "admin" }) {
         ...withoutCreator.map((m) => ({ ...m, isCreator: false })),
       ];
     });
-  }, [myUserId, creatorEmail]);
+  }, [myUserId, creatorEmail, isAdmin]);
+
+  useEffect(() => {
+    if (isAdmin) return;
+    const reg = registeredNonCreatorMembers(selectedMembers, myUserId);
+    if (reg.length === 1) {
+      setTreasurerMemberId((prev) => prev || reg[0].id);
+    }
+  }, [selectedMembers, isAdmin, myUserId]);
+
+  useEffect(() => {
+    if (isAdmin) return;
+    const allowed = new Set(
+      registeredNonCreatorMembers(selectedMembers, myUserId || "").map(
+        (m) => m.id,
+      ),
+    );
+    if (treasurerMemberId && !allowed.has(treasurerMemberId)) {
+      setTreasurerMemberId("");
+    }
+  }, [selectedMembers, treasurerMemberId, isAdmin, myUserId]);
 
   useEffect(() => {
     const n = Math.max(1, selectedMembers.length);
@@ -516,11 +630,20 @@ export function CreateStokvelWizard({ variant = "admin" }) {
   }, []);
 
   const treasurerUserIdFromSelection = useMemo(() => {
+    if (!isAdmin) return "";
     const t = selectedMembers.find(
       (m) => m.role === "Treasurer" && UUID_RE.test(m.id),
     );
     return t?.id || myUserId || "";
-  }, [selectedMembers, myUserId]);
+  }, [selectedMembers, myUserId, isAdmin]);
+
+  const regTreasurerOptions = useMemo(
+    () => registeredNonCreatorMembers(selectedMembers, myUserId || ""),
+    [selectedMembers, myUserId],
+  );
+
+  const memberTabNextDisabled =
+    !isAdmin && activeTab === "members" && regTreasurerOptions.length === 0;
 
   const atMemberCap = selectedMembers.length >= MAX_GROUP_MEMBERS;
 
@@ -602,7 +725,29 @@ export function CreateStokvelWizard({ variant = "admin" }) {
         );
       }
     }
-    const treasurerId = treasurerUserIdFromSelection || myUserId;
+
+    let memberTreasurerPayload = {};
+    if (!isAdmin) {
+      if (selectedMembers.length < 2) {
+        return setFormError(
+          "Add at least one other member (minimum two people including you).",
+        );
+      }
+      if (registeredNonCreatorMembers(selectedMembers, myUserId).length < 1) {
+        return setFormError(
+          "You must add at least one registered user to act as the Treasurer.",
+        );
+      }
+      const tr = resolveMemberTreasurerPayload(
+        selectedMembers,
+        treasurerMemberId,
+        myUserId,
+      );
+      if ("error" in tr && tr.error) return setFormError(tr.error);
+      memberTreasurerPayload = { treasurerUserId: tr.treasurerUserId };
+    }
+
+    const treasurerIdForAdmin = treasurerUserIdFromSelection || myUserId;
     if (
       !window.confirm(
         "Create this group with the selected settings and members?",
@@ -613,8 +758,10 @@ export function CreateStokvelWizard({ variant = "admin" }) {
     const initialMemberIds = selectedMembers
       .filter((m) => m.id !== myUserId && UUID_RE.test(m.id))
       .map((m) => m.id);
-    const memberDetailsPayload =
-      buildMemberDetailsFromSelected(selectedMembers);
+    const memberDetailsPayload = buildMemberDetailsFromSelected(
+      selectedMembers,
+      isAdmin,
+    );
     const membersCount = selectedMembers.length;
 
     setSubmitting(true);
@@ -640,7 +787,9 @@ export function CreateStokvelWizard({ variant = "admin" }) {
           memberDetails: memberDetailsPayload,
           documents: documentUrls,
           initialMemberIds,
-          treasurerUserId: treasurerId,
+          ...(isAdmin
+            ? { treasurerUserId: treasurerIdForAdmin }
+            : memberTreasurerPayload),
         }),
       });
       const text = await res.text();
@@ -794,7 +943,7 @@ export function CreateStokvelWizard({ variant = "admin" }) {
         </section>
         ) : null}
         <Link
-          to={isAdmin ? `/stokvels/${createdStokvel.id}` : "/dashboard"}
+          to={isAdmin ? `/group/${createdStokvel.id}/dashboard` : "/dashboard"}
           className={`${btnPrimary} inline-flex`}
         >
           {isAdmin ? "Open group dashboard" : "Back to dashboard"}
@@ -1084,9 +1233,15 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                           <td className="px-4 py-3 text-stone-800">
                             <span
                               className="block max-w-40 truncate"
-                              title={displayName(m)}
+                              title={
+                                m.isCreator && !isAdmin
+                                  ? "Admin (Chairperson)"
+                                  : displayName(m)
+                              }
                             >
-                              {displayName(m)}
+                              {m.isCreator && !isAdmin
+                                ? "Admin (Chairperson)"
+                                : displayName(m)}
                             </span>
                           </td>
                           <td className="min-w-40 px-4 py-3 text-stone-800">
@@ -1109,7 +1264,17 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            {m.isPending ? (
+                            {!isAdmin ? (
+                              m.isCreator ? (
+                                <span className="text-sm font-medium text-emerald-900">
+                                  Admin (Chairperson)
+                                </span>
+                              ) : (
+                                <span className="text-sm text-stone-700">
+                                  Member
+                                </span>
+                              )
+                            ) : m.isPending ? (
                               <select
                                 className={inputLight}
                                 value="Member"
@@ -1173,7 +1338,9 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                           <div className="flex items-start justify-between gap-2">
                             <div>
                               <p className="font-medium text-stone-900">
-                                {displayName(m)}
+                                {m.isCreator && !isAdmin
+                                  ? "Admin (Chairperson)"
+                                  : displayName(m)}
                               </p>
                               <p className="text-sm text-stone-600">
                                 {displayUsername(m)}
@@ -1214,7 +1381,15 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                           <div className="mt-3">
                             <label className={`${labelLight} text-xs`}>
                               Role
-                              {m.isPending ? (
+                              {!isAdmin ? (
+                                <div
+                                  className={`${inputLight} mt-1 cursor-default border-stone-200 bg-stone-100 text-stone-800`}
+                                >
+                                  {m.isCreator
+                                    ? "Admin (Chairperson)"
+                                    : "Member"}
+                                </div>
+                              ) : m.isPending ? (
                                 <select
                                   className={`${inputLight} mt-1`}
                                   value="Member"
@@ -1244,6 +1419,45 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                     </li>
                   ))}
                 </ul>
+
+                {!isAdmin ? (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
+                    <label className={`${labelLight}`}>
+                      Designated treasurer{" "}
+                      <span className="text-red-700">*</span>
+                      <p className="mb-2 mt-1 text-xs font-normal text-stone-600">
+                        Required — must be another{" "}
+                        <span className="font-medium text-stone-800">
+                          registered
+                        </span>{" "}
+                        user (not an email-only invite). Email invites can still
+                        join as regular members.
+                      </p>
+                      {regTreasurerOptions.length === 0 ? (
+                        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                          You must add at least one registered user to act as the
+                          Treasurer.
+                        </p>
+                      ) : (
+                        <select
+                          className={inputLight}
+                          value={treasurerMemberId}
+                          onChange={(e) =>
+                            setTreasurerMemberId(e.target.value)
+                          }
+                          required
+                        >
+                          <option value="">Select treasurer…</option>
+                          {regTreasurerOptions.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {formatRegisteredMemberOptionLabel(m)}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </label>
+                  </div>
+                ) : null}
 
                 {selectedMembers.length === 0 ? (
                   <p className="text-xs text-stone-500">Loading your row…</p>
@@ -1373,8 +1587,14 @@ export function CreateStokvelWizard({ variant = "admin" }) {
               ) : (
                 <button
                   type="button"
-                  onClick={goTabNext}
-                  className={`${btnSecondary} inline-flex items-center gap-2`}
+                  onClick={handleGoTabNext}
+                  disabled={memberTabNextDisabled}
+                  title={
+                    memberTabNextDisabled
+                      ? "Add a registered member to assign as treasurer before continuing."
+                      : undefined
+                  }
+                  className={`${btnSecondary} inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50`}
                 >
                   Next
                   <ChevronRight className="h-4 w-4" />

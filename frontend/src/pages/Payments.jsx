@@ -49,9 +49,8 @@ function confirmAction(message) {
   return window.confirm(message)
 }
 
-export default function SingleStokvel() {
-  const { id: legacyStokvelRouteId, stokvel_id } = useParams()
-  const id = stokvel_id ?? legacyStokvelRouteId
+export default function Payments() {
+  const { stokvel_id } = useParams()
   const { session } = useSession()
   const [stokvel, setStokvel] = useState(null)
   const [membership, setMembership] = useState(null)
@@ -68,12 +67,13 @@ export default function SingleStokvel() {
   const [paymentDebug, setPaymentDebug] = useState('')
 
   useEffect(() => {
-    if (!session || !id) {
+    if (!session || !stokvel_id) {
       setLoading(false)
       return
     }
 
     let cancelled = false
+    const id = stokvel_id
 
     async function load() {
       setLoading(true)
@@ -119,7 +119,7 @@ export default function SingleStokvel() {
               meetingsFromApi = true
             }
           } catch {
-            /* keep nextMeetings [] unless cache fallback below */
+            /* keep cache fallback */
           }
           if (!meetingsFromApi && Array.isArray(cached?.meetings)) {
             nextMeetings = cached.meetings
@@ -151,9 +151,8 @@ export default function SingleStokvel() {
     return () => {
       cancelled = true
     }
-  }, [session, id])
+  }, [session, stokvel_id])
 
-  // Support both `{ stokvel }` (router) and legacy `{ membership.stokvels }` shapes
   const effectiveStokvel = stokvel ?? membership?.stokvels ?? null
   const groupName = effectiveStokvel?.name
   const stokvelStatus = String(effectiveStokvel?.status ?? '').toLowerCase()
@@ -161,18 +160,21 @@ export default function SingleStokvel() {
   const memberCount = members.length
   const monthlyContribution = Number(effectiveStokvel?.contribution_amount) || 0
   const expectedPayout = monthlyContribution * memberCount
-  const canManageTreasurer = ['treasurer', 'admin'].includes(membership?.group_role)
+  const myRole = String(
+    members.find((m) => m.user_id === session?.user?.id)?.group_role ?? membership?.group_role ?? '',
+  ).toLowerCase()
+  const canManageTreasurer = ['treasurer', 'admin'].includes(myRole)
   const currentTreasurer = members.find((m) => m.group_role === 'treasurer') ?? null
   const currentTreasurerName = currentTreasurer ? memberDisplay(currentTreasurer.profiles) : 'Not assigned'
 
   async function handleTreasurerSave() {
-    if (!session?.access_token || !id || !treasurerUserId) return
+    if (!session?.access_token || !stokvel_id || !treasurerUserId) return
     if (!confirmAction('Save this treasurer change for the group?')) return
     setTreasurerSaving(true)
     setTreasurerError('')
     setTreasurerOk('')
     try {
-      const res = await fetch(apiUrl(`/api/stokvels/${id}/treasurer`), {
+      const res = await fetch(apiUrl(`/api/stokvels/${stokvel_id}/treasurer`), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -188,14 +190,24 @@ export default function SingleStokvel() {
       setMembers((prev) =>
         prev.map((m) => ({
           ...m,
-          group_role: m.user_id === treasurerUserId ? 'treasurer' : m.group_role === 'treasurer' ? 'member' : m.group_role,
+          group_role:
+            m.user_id === treasurerUserId
+              ? 'treasurer'
+              : m.group_role === 'treasurer'
+                ? 'member'
+                : m.group_role,
         })),
       )
 
       if (session.user?.id) {
         setMembership((prev) => {
           if (!prev) return prev
-          const nextRole = session.user.id === treasurerUserId ? 'treasurer' : prev.group_role === 'treasurer' ? 'member' : prev.group_role
+          const nextRole =
+            session.user.id === treasurerUserId
+              ? 'treasurer'
+              : prev.group_role === 'treasurer'
+                ? 'member'
+                : prev.group_role
           return { ...prev, group_role: nextRole }
         })
       }
@@ -215,26 +227,29 @@ export default function SingleStokvel() {
     { label: 'Members', value: String(memberCount) },
   ]
 
+  if (!stokvel_id) {
+    return null
+  }
+
   return (
     <div>
       {membership && stokvelStatus === 'rejected' ? (
         <div
-          className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200"
           role="status"
         >
-          <strong className="font-semibold text-red-900">Application rejected.</strong> This stokvel
-          is not active (status: <span className="font-mono">rejected</span>). Meeting and treasury
-          actions are disabled for this group.
+          <strong className="font-semibold text-red-900 dark:text-red-100">Application rejected.</strong> This stokvel
+          is not active (status: <span className="font-mono">rejected</span>). Meeting and treasury actions are
+          disabled for this group.
         </div>
       ) : null}
       {membership && stokvelStatus === 'pending' ? (
         <div
-          className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-100"
           role="status"
         >
-          <strong className="font-semibold text-amber-950">Awaiting approval.</strong> A platform
-          admin has not activated this stokvel yet. You will see an active status here once it is
-          approved.
+          <strong className="font-semibold text-amber-950 dark:text-amber-50">Awaiting approval.</strong> A platform
+          admin has not activated this stokvel yet. You will see an active status here once it is approved.
         </div>
       ) : null}
 
@@ -248,49 +263,45 @@ export default function SingleStokvel() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-emerald-800 sm:text-3xl">
             <span className="flex items-center gap-2">
-              <i className="fa-solid fa-users text-emerald-700" aria-hidden />
-              Group Details &amp; Finances
+              <i className="fa-solid fa-wallet text-emerald-700" aria-hidden />
+              Payments &amp; finances
             </span>
           </h1>
           {groupName || membership?.group_role ? (
             <p className={`mt-1 ${pageSubtitle}`}>
-              {groupName ? <span className="font-medium text-stone-800">{groupName}</span> : null}
+              {groupName ? <span className="font-medium text-stone-800 dark:text-stone-100">{groupName}</span> : null}
               {stokvelStatus ? (
-                <span className="ml-2 capitalize text-stone-500">· {stokvelStatus}</span>
+                <span className="ml-2 capitalize text-stone-500 dark:text-stone-400">· {stokvelStatus}</span>
               ) : null}
               {membership?.group_role ? (
-                <span className="ml-2 text-stone-500">
+                <span className="ml-2 text-stone-500 dark:text-stone-400">
                   · {formatGroupRole(membership.group_role)}
                 </span>
               ) : null}
             </p>
           ) : null}
-          <div className="mt-2 inline-flex items-center gap-2 rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-800">
+          <div className="mt-2 inline-flex items-center gap-2 rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-100">
             <span className="font-semibold uppercase tracking-wide">Current treasurer</span>
-            <span className="text-emerald-900">{currentTreasurerName}</span>
+            <span className="text-emerald-900 dark:text-emerald-50">{currentTreasurerName}</span>
           </div>
         </div>
       </div>
 
-      {!session ? (
-        <p className="mb-6 text-sm text-stone-500">Sign in to view this stokvel.</p>
-      ) : null}
+      {!session ? <p className="mb-6 text-sm text-stone-500">Sign in to view this stokvel.</p> : null}
 
       {error ? <p className={`mb-6 ${errorBox}`}>{error}</p> : null}
 
-      {session && loading ? (
-        <p className="text-sm text-stone-500">Loading…</p>
-      ) : null}
+      {session && loading ? <p className="text-sm text-stone-500">Loading…</p> : null}
 
       {session && !loading && membership ? (
         <>
           <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {statCards.map((card) => (
               <div key={card.label} className={`${cardLight} p-4`}>
-                <p className="mb-1 text-xs font-semibold uppercase text-stone-500">
+                <p className="mb-1 text-xs font-semibold uppercase text-stone-500 dark:text-stone-400">
                   {card.label}
                 </p>
-                <p className="text-xl font-semibold text-stone-800">{card.value}</p>
+                <p className="text-xl font-semibold text-stone-800 dark:text-stone-100">{card.value}</p>
               </div>
             ))}
           </div>
@@ -298,9 +309,9 @@ export default function SingleStokvel() {
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <MarketRatesWidget memberMonthlyContribution={monthlyContribution} />
             <div className={`${cardLight} p-6`}>
-              <span className="text-sm font-bold text-stone-800">Quick Pay</span>
+              <span className="text-sm font-bold text-stone-800 dark:text-stone-100">Quick Pay</span>
               {paymentDebug ? (
-                <p className="mt-2 text-xs text-amber-800" role="status">
+                <p className="mt-2 text-xs text-amber-800 dark:text-amber-200" role="status">
                   Payment debug: {paymentDebug}
                 </p>
               ) : null}
@@ -314,11 +325,11 @@ export default function SingleStokvel() {
                   ? `Pay monthly contribution (${formatZAR(monthlyContribution)})`
                   : 'Pay monthly contribution'}
               </button>
-              <p className="mt-4 text-xs text-stone-600">
+              <p className="mt-4 text-xs text-stone-600 dark:text-stone-400">
                 Schedules and minutes are on the{' '}
                 <Link
-                  to={`/group/${id}/meetings`}
-                  className="font-medium text-emerald-800 underline-offset-2 hover:underline"
+                  to={`/group/${stokvel_id}/meetings`}
+                  className="font-medium text-emerald-800 underline-offset-2 hover:underline dark:text-emerald-300"
                 >
                   Meetings
                 </Link>{' '}
@@ -330,11 +341,11 @@ export default function SingleStokvel() {
           <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-3">
             <div className="space-y-8 lg:col-span-2">
               <section>
-                <h3 className="mb-4 border-b border-stone-200 pb-2 text-lg font-bold text-emerald-800">
+                <h3 className="mb-4 border-b border-stone-200 pb-2 text-lg font-bold text-emerald-800 dark:border-slate-700 dark:text-emerald-300">
                   Recent contributions
                 </h3>
                 <div className={tableWrap}>
-                  <table className="w-full min-w-[320px] text-left text-sm text-stone-800">
+                  <table className="w-full min-w-[320px] text-left text-sm text-stone-800 dark:text-stone-100">
                     <thead>
                       <tr className={tableHead}>
                         <th className="p-3">Member</th>
@@ -355,9 +366,7 @@ export default function SingleStokvel() {
                             <td className="p-3">{memberDisplay(c.profiles)}</td>
                             <td className="p-3">{formatZAR(c.amount)}</td>
                             <td className="p-3">
-                              {c.paid_at
-                                ? new Date(c.paid_at).toLocaleDateString('en-ZA')
-                                : '—'}
+                              {c.paid_at ? new Date(c.paid_at).toLocaleDateString('en-ZA') : '—'}
                             </td>
                           </tr>
                         ))
@@ -371,11 +380,11 @@ export default function SingleStokvel() {
             <div>
               {canManageTreasurer ? (
                 <section className="mb-8">
-                  <h3 className="mb-4 border-b border-stone-200 pb-2 text-lg font-bold text-emerald-800">
+                  <h3 className="mb-4 border-b border-stone-200 pb-2 text-lg font-bold text-emerald-800 dark:border-slate-700 dark:text-emerald-300">
                     Assign treasurer
                   </h3>
                   <div className={`${cardLight} space-y-3 p-4`}>
-                    <label className="block text-xs font-semibold uppercase text-stone-500">
+                    <label className="block text-xs font-semibold uppercase text-stone-500 dark:text-stone-400">
                       Treasurer member
                       <select
                         value={treasurerUserId}
@@ -398,17 +407,21 @@ export default function SingleStokvel() {
                     >
                       {treasurerSaving ? 'Saving…' : 'Save treasurer'}
                     </button>
-                    {treasurerError ? <p className="text-xs text-red-700">{treasurerError}</p> : null}
-                    {treasurerOk ? <p className="text-xs text-emerald-800">{treasurerOk}</p> : null}
+                    {treasurerError ? <p className="text-xs text-red-700 dark:text-red-300">{treasurerError}</p> : null}
+                    {treasurerOk ? <p className="text-xs text-emerald-800 dark:text-emerald-200">{treasurerOk}</p> : null}
                   </div>
                 </section>
               ) : null}
               <section>
-                <h3 className="mb-4 border-b border-stone-200 pb-2 text-lg font-bold text-emerald-800">
+                <h3 className="mb-4 border-b border-stone-200 pb-2 text-lg font-bold text-emerald-800 dark:border-slate-700 dark:text-emerald-300">
                   Payout queue
                 </h3>
+                <p className="mb-3 text-xs text-stone-500 dark:text-stone-400">
+                  Member order below mirrors the roster; payout dates are not tracked in the app yet—confirm the live
+                  schedule with your treasurer.
+                </p>
                 <div className={tableWrap}>
-                  <table className="w-full min-w-[280px] text-left text-sm text-stone-800">
+                  <table className="w-full min-w-[280px] text-left text-sm text-stone-800 dark:text-stone-100">
                     <thead>
                       <tr className={tableHead}>
                         <th className="p-3">Member</th>
@@ -438,11 +451,11 @@ export default function SingleStokvel() {
               </section>
             </div>
           </div>
-          
+
           {quickPayOpen ? (
             <QuickPayModal
               groupName={groupName}
-              stokvelId={id}
+              stokvelId={stokvel_id}
               session={session}
               monthlyContribution={monthlyContribution}
               onClose={() => setQuickPayOpen(false)}

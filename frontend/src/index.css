@@ -1,5 +1,8 @@
 @import 'tailwindcss';
 
+/* User-controlled dark mode: `class="dark"` on the root element */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
 }
@@ -9,7 +12,13 @@ html {
   height: 100dvh;
   overflow: hidden;
   overscroll-behavior: none;
-  background-color: #0f172a;
+  background-color: #faf8f5;
+  color-scheme: light;
+}
+
+html.dark {
+  background-color: #020617;
+  color-scheme: dark;
 }
 
 body {
@@ -18,9 +27,14 @@ body {
   overflow: hidden;
   overscroll-behavior: none;
   font-family: var(--font-sans);
-  background-color: #0f172a;
-  color: #fff;
+  background-color: #faf8f5;
+  color: #0c1914;
   -webkit-font-smoothing: antialiased;
+}
+
+html.dark body {
+  background-color: #020617;
+  color: #e7e5e4;
 }
 
 #root {
