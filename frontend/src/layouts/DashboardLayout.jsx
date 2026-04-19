@@ -6,6 +6,7 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
+import BrandLogo from "../components/BrandLogo";
 import {
   LayoutDashboard,
   Wallet,
@@ -214,9 +215,9 @@ export default function DashboardLayout() {
           <div className="rounded-lg bg-emerald-800 py-2 text-center text-xs font-bold uppercase tracking-wide text-white">
             Member
           </div>
-          <p className="mt-3 text-xs font-semibold text-stone-500">
-            Sawubona Stokvel
-          </p>
+          <div className="mt-3 flex justify-center">
+            <BrandLogo to="/dashboard" imgClassName="h-10 w-auto md:h-12" />
+          </div>
         </div>
         <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-2">
           <NavLink
@@ -291,7 +292,10 @@ export default function DashboardLayout() {
           <button
             type="button"
             className="flex w-full items-center justify-center gap-2 rounded-lg border border-stone-200 bg-stone-50 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-100"
-            onClick={() => supabase.auth.signOut()}
+            onClick={async () => {
+              await supabase.auth.signOut();
+              navigate("/", { replace: true });
+            }}
           >
             <LogOut className="h-4 w-4" aria-hidden />
             Log Out

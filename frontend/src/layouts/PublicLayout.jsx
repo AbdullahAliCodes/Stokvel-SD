@@ -1,37 +1,64 @@
-import { Link, Outlet } from 'react-router-dom'
+import { useLayoutEffect, useRef } from 'react'
+import { Link, Outlet, useLocation } from 'react-router-dom'
+import BrandLogo from '../components/BrandLogo'
+import PublicFooter from '../components/PublicFooter'
 import { useSession } from '../context/SessionContext'
+import {
+  btnPrimary,
+  publicLayoutNavChrome,
+  publicLayoutNavRow,
+  publicLayoutScrollMain,
+  publicLayoutShell,
+  publicNavCtaGuest,
+} from '../styles/tokens'
 
 export default function PublicLayout() {
   const { session, userRole } = useSession()
   const isAdmin = String(userRole || '').toLowerCase() === 'admin'
+  const { pathname } = useLocation()
+  const scrollMainRef = useRef(null)
+  const landingHasOwnNav = pathname === '/'
+  const showPublicFooter = !landingHasOwnNav && pathname !== '/auth'
+
+  useLayoutEffect(() => {
+    const el = scrollMainRef.current
+    if (el) el.scrollTop = 0
+  }, [pathname])
 
   return (
-    <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-[#0f172a] text-white">
-      <nav className="glass z-10 mx-4 mt-4 shrink-0 flex items-center justify-between rounded-2xl px-4 py-3 md:mx-8">
-        <Link
-          to={!session ? '/' : isAdmin ? '/admin/groups' : '/home'}
-          className="text-lg font-bold tracking-tight text-cyan-400 transition hover:text-cyan-300"
-        >
-          Sawubona Stokvel
-        </Link>
-        {!session ? (
-          <Link
-            to="/auth"
-            className="rounded-lg border border-cyan-400/40 bg-cyan-400/10 px-4 py-2 text-sm font-semibold text-cyan-300 transition hover:bg-cyan-400/20"
-          >
-            Log In / Sign Up
-          </Link>
-        ) : (
-          <Link
-            to={isAdmin ? '/admin/groups' : '/dashboard'}
-            className="rounded-lg border border-blue-400/40 bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-300 transition hover:bg-blue-500/20"
-          >
-            {isAdmin ? 'Admin Dashboard' : 'Dashboard'}
-          </Link>
-        )}
-      </nav>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
-        <Outlet />
+    <div className={publicLayoutShell}>
+      {!landingHasOwnNav && (
+        <header className={publicLayoutNavChrome}>
+          <div className={publicLayoutNavRow}>
+            <div className="flex min-h-0 max-h-full min-w-0 shrink-0 self-stretch items-center">
+              <BrandLogo
+                to={!session ? '/' : isAdmin ? '/admin/groups' : '/home'}
+                className="h-full min-h-0 max-h-full"
+                imgClassName="max-h-full w-auto max-w-[min(58vw,360px)] object-contain object-left sm:max-w-[min(50vw,400px)] md:max-w-[min(44vw,440px)]"
+              />
+            </div>
+            {!session ? (
+              <Link to="/auth" className={publicNavCtaGuest}>
+                Log In / Sign Up
+              </Link>
+            ) : (
+              <Link
+                to={isAdmin ? '/admin/groups' : '/dashboard'}
+                className={`${btnPrimary} px-4 py-2.5 text-sm font-semibold`}
+              >
+                {isAdmin ? 'Admin Dashboard' : 'Dashboard'}
+              </Link>
+            )}
+          </div>
+        </header>
+      )}
+      <div ref={scrollMainRef} className={publicLayoutScrollMain}>
+        <div className="flex min-h-full flex-col">
+          <div className="flex-1">
+            <Outlet />
+          </div>
+          {showPublicFooter ? <PublicFooter /> : null}
+        </div>
       </div>
     </div>
   )

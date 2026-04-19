@@ -10,13 +10,7 @@ import { apiUrl } from '../utils/api'
 
 export const SessionContext = createContext(null)
 
-export function SessionProvider({
-  children,
-  session,
-  backendData,
-  setBackendData,
-  testBackendConnection,
-}) {
+export function SessionProvider({ children, session }) {
   const [userRole, setUserRole] = useState(null)
 
   useEffect(() => {
@@ -65,11 +59,8 @@ export function SessionProvider({
     () => ({
       session,
       userRole,
-      backendData,
-      setBackendData,
-      testBackendConnection,
     }),
-    [session, userRole, backendData, setBackendData, testBackendConnection],
+    [session, userRole],
   )
 
   return (

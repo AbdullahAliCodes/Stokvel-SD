@@ -1,7 +1,19 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import BrandLogo from './BrandLogo'
 import { supabase } from '../utils/supabase'
 import { apiUrl } from '../utils/api'
-import { btnPrimary, inputLight, labelLight } from '../ui'
+import {
+  authBrandAside,
+  authFormSection,
+  authPageWrap,
+  authSplitCard,
+  authTabActive,
+  authTabGroup,
+  authTabInactive,
+  btnPrimary,
+} from '../styles/tokens'
+import { errorBox, inputLight, labelLight } from '../ui'
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true)
@@ -90,161 +102,193 @@ export default function Auth() {
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-6rem)] items-center justify-center px-4 py-12">
-      <div className="glass w-full max-w-md p-6 shadow-2xl shadow-black/40">
-        <h1 className="mb-2 text-center text-xl font-bold uppercase tracking-widest text-cyan-400">
-          Stokvel Portal
-        </h1>
-        <p className="mb-6 text-center text-xs text-slate-500">
-          Management system — sign in to continue
-        </p>
+    <div className={authPageWrap}>
+      <div className={authSplitCard}>
+        <aside className={authBrandAside}>
+          <div
+            className="pointer-events-none absolute -right-16 top-0 h-48 w-48 rounded-full bg-emerald-400/15 blur-2xl"
+            aria-hidden
+          />
+          <div
+            className="pointer-events-none absolute -bottom-12 -left-8 h-40 w-40 rounded-full bg-teal-300/10 blur-2xl"
+            aria-hidden
+          />
 
-        <div className="mb-6 flex gap-2">
-          <button
-            type="button"
-            className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
-              isLogin
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/30'
-                : 'border border-white/15 bg-white/5 text-slate-300 hover:bg-white/10'
-            }`}
-            onClick={() => {
-              setIsLogin(true)
-              setError(null)
-            }}
-          >
-            Login
-          </button>
-          <button
-            type="button"
-            className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold transition ${
-              !isLogin
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/30'
-                : 'border border-white/15 bg-white/5 text-slate-300 hover:bg-white/10'
-            }`}
-            onClick={() => {
-              setIsLogin(false)
-              setError(null)
-            }}
-          >
-            Sign Up
-          </button>
-        </div>
+          <div className="relative flex w-full max-w-md flex-col items-center">
+            <BrandLogo
+              to="/"
+              variant="onDark"
+              className="mx-auto"
+              imgClassName="h-16 w-auto sm:h-20 md:h-24"
+            />
+            <p className="mt-6 text-xl font-semibold leading-snug text-white lg:text-2xl">
+              Your circle, your savings — organised fairly.
+            </p>
+            <p className="mt-3 text-sm leading-relaxed text-emerald-100/85">
+              Track contributions, meetings, and payouts in one place. Built for treasurers and
+              members who want clarity without spreadsheet chaos.
+            </p>
+          </div>
 
-        {error ? (
-          <p
-            className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm font-medium text-red-200"
-            role="alert"
-          >
-            {error}
+          <p className="relative text-xs font-medium uppercase tracking-wider text-emerald-300/90">
+            StokGeld · Member portal
           </p>
-        ) : null}
+        </aside>
 
-        {isLogin ? (
-          <form onSubmit={handleLogin} className="flex flex-col gap-4">
-            <label className={labelLight}>
-              Email
-              <input
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={inputLight}
-              />
-            </label>
-            <label className={labelLight}>
-              Password
-              <input
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className={inputLight}
-              />
-            </label>
-            <button type="submit" disabled={loading} className={`${btnPrimary} w-full`}>
-              {loading ? 'Loading…' : 'Log in'}
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handleSignUp} className="flex flex-col gap-4">
-            <label className={labelLight}>
-              First Name
-              <input
-                type="text"
-                autoComplete="given-name"
-                required
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                className={inputLight}
-              />
-            </label>
-            <label className={labelLight}>
-              Last Name
-              <input
-                type="text"
-                autoComplete="family-name"
-                required
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                className={inputLight}
-              />
-            </label>
-            <label className={labelLight}>
-              Phone Number
-              <input
-                type="tel"
-                autoComplete="tel"
-                required
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                className={inputLight}
-              />
-            </label>
-            <label className={labelLight}>
-              Username
-              <input
-                type="text"
-                autoComplete="username"
-                required
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className={inputLight}
-                placeholder="e.g. sipho_k"
-              />
-              <span className="mt-1 block text-xs text-slate-500">
-                3–30 characters: lowercase letters, numbers, underscore. Saved via the server after
-                signup.
-              </span>
-            </label>
-            <label className={labelLight}>
-              Email
-              <input
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={inputLight}
-              />
-            </label>
-            <label className={labelLight}>
-              Password
-              <input
-                type="password"
-                autoComplete="new-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className={inputLight}
-              />
-            </label>
-            <button type="submit" disabled={loading} className={`${btnPrimary} w-full`}>
-              {loading ? 'Loading…' : 'Create account'}
-            </button>
-          </form>
-        )}
+        <div className={authFormSection}>
+          <div className="mx-auto w-full max-w-md">
+            <h1 className="text-lg font-semibold text-emerald-950 md:text-xl">
+              {isLogin ? 'Sign in' : 'Create your account'}
+            </h1>
+            <p className="mt-1 text-sm text-stone-600">
+              {isLogin
+                ? 'Use your email and password to continue.'
+                : 'Fill in your details — username is saved after signup via the server.'}
+            </p>
+
+            <div className={authTabGroup}>
+              <button
+                type="button"
+                className={isLogin ? authTabActive : authTabInactive}
+                onClick={() => {
+                  setIsLogin(true)
+                  setError(null)
+                }}
+              >
+                Log in
+              </button>
+              <button
+                type="button"
+                className={!isLogin ? authTabActive : authTabInactive}
+                onClick={() => {
+                  setIsLogin(false)
+                  setError(null)
+                }}
+              >
+                Sign up
+              </button>
+            </div>
+
+            {error ? (
+              <p className={`${errorBox} mb-4`} role="alert">
+                {error}
+              </p>
+            ) : null}
+
+            {isLogin ? (
+              <form onSubmit={handleLogin} className="flex flex-col gap-4">
+                <label className={labelLight}>
+                  Email
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className={inputLight}
+                  />
+                </label>
+                <label className={labelLight}>
+                  Password
+                  <input
+                    type="password"
+                    autoComplete="current-password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className={inputLight}
+                  />
+                </label>
+                <button type="submit" disabled={loading} className={`${btnPrimary} w-full py-3`}>
+                  {loading ? 'Loading…' : 'Log in'}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleSignUp} className="flex flex-col gap-4">
+                <label className={labelLight}>
+                  First Name
+                  <input
+                    type="text"
+                    autoComplete="given-name"
+                    required
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    className={inputLight}
+                  />
+                </label>
+                <label className={labelLight}>
+                  Last Name
+                  <input
+                    type="text"
+                    autoComplete="family-name"
+                    required
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    className={inputLight}
+                  />
+                </label>
+                <label className={labelLight}>
+                  Phone Number
+                  <input
+                    type="tel"
+                    autoComplete="tel"
+                    required
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    className={inputLight}
+                  />
+                </label>
+                <label className={labelLight}>
+                  Username
+                  <input
+                    type="text"
+                    autoComplete="username"
+                    required
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className={inputLight}
+                    placeholder="e.g. sipho_k"
+                  />
+                  <span className="mt-1 block text-xs text-stone-500">
+                    3–30 characters: lowercase letters, numbers, underscore. Saved via the server
+                    after signup.
+                  </span>
+                </label>
+                <label className={labelLight}>
+                  Email
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className={inputLight}
+                  />
+                </label>
+                <label className={labelLight}>
+                  Password
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className={inputLight}
+                  />
+                </label>
+                <button type="submit" disabled={loading} className={`${btnPrimary} w-full py-3`}>
+                  {loading ? 'Loading…' : 'Create account'}
+                </button>
+              </form>
+            )}
+
+            <p className="mt-6 text-center text-sm text-stone-500">
+              <Link to="/" className="font-medium text-emerald-800 hover:underline">
+                ← Back to home
+              </Link>
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   )
