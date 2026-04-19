@@ -42,7 +42,7 @@ export default function PublicStokvels() {
         </p>
         <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4">
           <Link to="/auth" className={publicNavCtaGuest}>
-            Log in / Sign up
+            Log In / Sign up
           </Link>
           <Link
             to="/"

@@ -126,7 +126,7 @@ function TopNav() {
             </>
           ) : (
             <Link to="/auth" className={`${btnPrimary} hidden px-4 py-2 sm:inline-flex`}>
-              Log in
+              Log In / Sign up
             </Link>
           )}
         </div>
@@ -186,7 +186,7 @@ function TopNav() {
                 className={`${btnPrimary} mt-2 px-4 py-3 text-center`}
                 onClick={closeMobile}
               >
-                Log in
+                Log In / Sign up
               </Link>
             )}
           </nav>

@@ -215,7 +215,7 @@ export const btnSecondaryOnHero = `${btnSecondary} border-emerald-900/15 text-em
 // ——— Auth page (split card) ———
 
 export const authPageWrap =
-  'flex min-h-full w-full flex-col items-center justify-center px-4 py-10 md:py-14'
+  'flex min-h-full w-full flex-1 flex-col items-center justify-center px-4 py-8 sm:py-10 md:py-12'
 
 export const authSplitCard =
   'flex w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-emerald-900/10 bg-white shadow-xl shadow-emerald-900/[0.12] sm:max-w-xl lg:max-w-5xl lg:min-h-[520px] lg:flex-row'

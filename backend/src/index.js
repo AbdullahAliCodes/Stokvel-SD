@@ -10,7 +10,11 @@ import profileRouter from './routes/profile.js'
 import invitationsRouter from './routes/invitations.js'
 import { getServiceSupabase } from './utils/supabaseAdmin.js'
 import { ensurePlatformAdminsInStokvel } from './utils/platformAdminStokvelMembers.js'
-import { createInvitation, normalizeInviteEmail } from './utils/invitations.js'
+import {
+  createInvitation,
+  normalizeInviteEmail,
+  sendInvitationEmail,
+} from './utils/invitations.js'
 import cron from 'node-cron'
 import { fetchRepoRateFromFred } from './jobs/fetchRates.js'
 import marketRatesRouter from './routes/marketRates.js'
@@ -109,6 +113,46 @@ function normalizeTreasurerUserIdMember(raw) {
   if (typeof raw !== 'string') return ''
   const v = raw.trim()
   return UUID_RE_MEMBER_DETAILS.test(v) ? v : ''
+}
+
+function normalizeInitialMemberIds(raw) {
+  if (!Array.isArray(raw)) return []
+  const out = []
+  const seen = new Set()
+  for (const id of raw) {
+    if (typeof id !== 'string') continue
+    const v = id.trim()
+    if (!UUID_RE_MEMBER_DETAILS.test(v)) continue
+    if (seen.has(v)) continue
+    seen.add(v)
+    out.push(v)
+    if (out.length >= 500) break
+  }
+  return out
+}
+
+function collectUuidsFromMemberDetails(details) {
+  const out = []
+  const seen = new Set()
+  for (const row of details ?? []) {
+    const uid = row?.userId
+    if (typeof uid !== 'string' || !UUID_RE_MEMBER_DETAILS.test(uid.trim())) continue
+    const v = uid.trim()
+    if (seen.has(v)) continue
+    seen.add(v)
+    out.push(v)
+  }
+  return out
+}
+
+/** Deletes invitations, memberships, then the stokvel (service role — bypasses RLS). */
+async function deleteStokvelCascade(svc, stokvelId) {
+  const { error: e1 } = await svc.from('invitations').delete().eq('stokvel_id', stokvelId)
+  if (e1) console.error('deleteStokvelCascade invitations:', e1)
+  const { error: e2 } = await svc.from('stokvel_members').delete().eq('stokvel_id', stokvelId)
+  if (e2) console.error('deleteStokvelCascade stokvel_members:', e2)
+  const { error: e3 } = await svc.from('stokvels').delete().eq('id', stokvelId)
+  if (e3) console.error('deleteStokvelCascade stokvels:', e3)
 }
 
 const allowedOrigins = [
@@ -337,18 +381,42 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
       payoutOrder,
       payoutStrategy,
       cycleLength,
-      treasurerEmail,
-      treasurerUserId,
+      treasurerEmail: treasurerEmailRaw,
+      treasurerUserId: treasurerUserIdRaw,
+      initialMemberIds: initialMemberIdsRaw,
       membersCount,
       memberDetails,
       documents,
-    } = req.body
+    } = req.body ?? {}
 
     if (!name || typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({ error: 'Group name is required.' })
     }
 
+    const creatorEmailNorm = normalizeInviteEmail(req.user.email)
+
     const parsedMembersCount = normalizeMembersCount(membersCount)
+    if (!parsedMembersCount || parsedMembersCount < 2) {
+      return res.status(400).json({
+        error:
+          'The group must include at least two people (you plus at least one other member).',
+      })
+    }
+
+    const treasurerUuidRaw = normalizeTreasurerUserIdMember(treasurerUserIdRaw)
+    const treasurerEmailNorm = normalizeInviteEmail(treasurerEmailRaw)
+    if (!treasurerUuidRaw && !treasurerEmailNorm) {
+      return res.status(400).json({
+        error: 'A designated treasurer is required (choose a registered member or provide an email).',
+      })
+    }
+    if (treasurerUuidRaw && treasurerUuidRaw === req.user.id) {
+      return res.status(400).json({ error: 'You cannot designate yourself as treasurer.' })
+    }
+    if (treasurerEmailNorm && treasurerEmailNorm === creatorEmailNorm) {
+      return res.status(400).json({ error: 'Treasurer email cannot be your own email.' })
+    }
+
     const parsedDetails = normalizeMemberDetails(memberDetails, parsedMembersCount ?? 500)
     const parsedDocuments = normalizeDocuments(documents)
     const insertRow = {
@@ -388,86 +456,143 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
       })
     }
 
-    const treasurerFromBody = normalizeTreasurerUserIdMember(treasurerUserId)
-    const treasurerId = treasurerFromBody || req.user.id
-    const creatorRole = treasurerId === req.user.id ? 'treasurer' : 'admin'
+    const stokvelId = newStokvel.id
 
-    const { error: memberError } = await userSupabase.from('stokvel_members').insert([
+    const { error: creatorMemberErr } = await userSupabase.from('stokvel_members').insert([
       {
-        stokvel_id: newStokvel.id,
+        stokvel_id: stokvelId,
         user_id: req.user.id,
-        group_role: creatorRole,
+        group_role: 'admin',
       },
     ])
 
-    if (memberError) {
-      console.error('stokvel_members insert:', memberError)
+    if (creatorMemberErr) {
+      console.error('stokvel_members creator insert:', creatorMemberErr)
+      await userSupabase.from('stokvels').delete().eq('id', stokvelId)
       return res.status(500).json({
-        error: memberError.message || 'Failed to assign creator role',
+        error: creatorMemberErr.message || 'Failed to assign creator as group admin.',
       })
     }
 
-    const writer = getServiceSupabase() ?? userSupabase
-    const creatorEmail = normalizeInviteEmail(req.user.email)
-
-    if (treasurerId && treasurerId !== req.user.id) {
-      const { data: tp, error: tpErr } = await writer
-        .from('profiles')
-        .select('email')
-        .eq('id', treasurerId)
-        .maybeSingle()
-      if (tpErr) {
-        console.error('treasurer profile lookup:', tpErr)
-      } else {
-        const inviteEm = normalizeInviteEmail(tp?.email)
-        if (inviteEm && inviteEm !== creatorEmail) {
-          const { error: treasurerInviteError } = await createInvitation(writer, {
-            stokvelId: newStokvel.id,
-            email: inviteEm,
-            invitedBy: req.user.id,
-            status: 'pending_group_request',
-            groupRole: 'treasurer',
-          })
-          if (treasurerInviteError) {
-            console.error('treasurer invitation:', treasurerInviteError)
-            return res.status(500).json({ error: treasurerInviteError.message })
-          }
-        }
-      }
-    } else {
-      const normalizedTreasurerEmail = normalizeInviteEmail(treasurerEmail)
-      if (normalizedTreasurerEmail && normalizedTreasurerEmail !== creatorEmail) {
-        const { error: treasurerInviteError } = await createInvitation(writer, {
-          stokvelId: newStokvel.id,
-          email: normalizedTreasurerEmail,
-          invitedBy: req.user.id,
-          status: 'pending_group_request',
-          groupRole: 'treasurer',
-        })
-        if (treasurerInviteError) {
-          console.error('treasurer invitation:', treasurerInviteError)
-          return res.status(500).json({ error: treasurerInviteError.message })
-        }
-      }
+    const svc = getServiceSupabase()
+    if (!svc) {
+      console.error('POST /api/stokvels: SUPABASE_SERVICE_ROLE_KEY required for SoD member setup.')
+      await userSupabase.from('stokvel_members').delete().eq('stokvel_id', stokvelId)
+      await userSupabase.from('stokvels').delete().eq('id', stokvelId)
+      return res.status(500).json({
+        error:
+          'Server configuration error: cannot complete group membership (missing service role key).',
+      })
     }
 
-    const svc = getServiceSupabase()
-    if (svc) {
-      const { error: syncErr } = await ensurePlatformAdminsInStokvel(svc, newStokvel.id)
-      if (syncErr) {
-        console.error('POST /api/stokvels platform admin sync:', syncErr)
-        await userSupabase.from('stokvel_members').delete().eq('stokvel_id', newStokvel.id)
-        await userSupabase.from('stokvels').delete().eq('id', newStokvel.id)
-        return res.status(500).json({
-          error:
-            syncErr.message ||
-            'Failed to add platform admins to the new group. Ensure stokvel_members allows group_role admin (see repo SQL migration).',
+    const initialIdsList = normalizeInitialMemberIds(initialMemberIdsRaw)
+    const detailUuids = collectUuidsFromMemberDetails(parsedDetails)
+    const mergedMemberUuids = [...new Set([...initialIdsList, ...detailUuids])]
+
+    const handledUserIds = new Set([req.user.id])
+    const handledEmails = new Set()
+    if (creatorEmailNorm) handledEmails.add(creatorEmailNorm)
+
+    try {
+      const treasurerUuid = treasurerUuidRaw || null
+
+      if (treasurerUuid) {
+        handledUserIds.add(treasurerUuid)
+        const { error: te } = await svc.from('stokvel_members').insert([
+          {
+            stokvel_id: stokvelId,
+            user_id: treasurerUuid,
+            group_role: 'treasurer',
+          },
+        ])
+        if (te) throw te
+
+        const { data: tp } = await svc
+          .from('profiles')
+          .select('email')
+          .eq('id', treasurerUuid)
+          .maybeSingle()
+        const pem = normalizeInviteEmail(tp?.email)
+        if (pem) handledEmails.add(pem)
+      } else if (treasurerEmailNorm) {
+        handledEmails.add(treasurerEmailNorm)
+        const { data: invTreasurer, error: teInv } = await createInvitation(svc, {
+          stokvelId,
+          email: treasurerEmailNorm,
+          invitedBy: req.user.id,
+          status: 'pending',
+          groupRole: 'treasurer',
         })
+        if (teInv) throw teInv
+        if (invTreasurer?.token) {
+          await sendInvitationEmail({
+            to: treasurerEmailNorm,
+            groupName: newStokvel.name,
+            token: invTreasurer.token,
+          })
+        }
       }
-    } else {
-      console.warn(
-        'POST /api/stokvels: SUPABASE_SERVICE_ROLE_KEY not set; skipping auto-join for profiles.role=admin on new stokvels.',
-      )
+
+      for (const uid of mergedMemberUuids) {
+        if (!UUID_RE_MEMBER_DETAILS.test(uid)) continue
+        if (handledUserIds.has(uid)) continue
+        const { error: me } = await svc.from('stokvel_members').insert([
+          {
+            stokvel_id: stokvelId,
+            user_id: uid,
+            group_role: 'member',
+          },
+        ])
+        if (me) throw me
+        handledUserIds.add(uid)
+
+        const { data: prof } = await svc
+          .from('profiles')
+          .select('email')
+          .eq('id', uid)
+          .maybeSingle()
+        const em = normalizeInviteEmail(prof?.email)
+        if (em) handledEmails.add(em)
+      }
+
+      for (const row of parsedDetails) {
+        const em = normalizeInviteEmail(row.email)
+        if (!em) continue
+        if (handledEmails.has(em)) continue
+        if (row.userId && UUID_RE_MEMBER_DETAILS.test(String(row.userId).trim())) continue
+
+        if (em === treasurerEmailNorm && !treasurerUuid) continue
+        if (em === creatorEmailNorm) continue
+
+        const { data: invRow, error: invErr } = await createInvitation(svc, {
+          stokvelId,
+          email: em,
+          invitedBy: req.user.id,
+          status: 'pending',
+          groupRole: 'member',
+        })
+        if (invErr) throw invErr
+        if (invRow?.token) {
+          await sendInvitationEmail({
+            to: em,
+            groupName: newStokvel.name,
+            token: invRow.token,
+          })
+        }
+        handledEmails.add(em)
+      }
+
+      const { error: syncErr } = await ensurePlatformAdminsInStokvel(svc, stokvelId)
+      if (syncErr) throw syncErr
+    } catch (pipelineErr) {
+      console.error('POST /api/stokvels membership pipeline:', pipelineErr)
+      await deleteStokvelCascade(svc, stokvelId)
+      return res.status(500).json({
+        error:
+          pipelineErr?.message ||
+          String(pipelineErr) ||
+          'Failed to complete group membership setup.',
+      })
     }
 
     clearDashboardCacheForUser(req.user.id)
