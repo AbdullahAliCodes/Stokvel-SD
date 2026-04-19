@@ -38,7 +38,20 @@ const linkClass = ({ isActive }) =>
   }`;
 
 function membershipStokvelId(m) {
+  if (m?.stokvel_id != null && String(m.stokvel_id).length)
+    return String(m.stokvel_id);
   return m?.stokvels?.id != null ? String(m.stokvels.id) : null;
+}
+
+function roleBadgeForGroupRole(groupRole) {
+  const r = String(groupRole ?? "")
+    .trim()
+    .toLowerCase();
+  if (r === "treasurer")
+    return { label: "Treasurer", className: "bg-slate-700 text-white" };
+  if (r === "admin")
+    return { label: "Admin", className: "bg-amber-700 text-white" };
+  return { label: "Member", className: "bg-emerald-800 text-white" };
 }
 
 export default function DashboardLayout() {
@@ -123,6 +136,20 @@ export default function DashboardLayout() {
     }
     return ids;
   }, [memberships]);
+
+  const selectedMembership = useMemo(() => {
+    if (!stokvel_id || memberships == null) return null;
+    const sid = String(stokvel_id);
+    const list = Array.isArray(memberships) ? memberships : [];
+    return list.find((m) => membershipStokvelId(m) === sid) ?? null;
+  }, [memberships, stokvel_id]);
+
+  const sidebarRoleBadge = useMemo(() => {
+    if (!selectedMembership) {
+      return { label: "Member", className: "bg-emerald-800 text-white" };
+    }
+    return roleBadgeForGroupRole(selectedMembership.group_role);
+  }, [selectedMembership]);
 
   useEffect(() => {
     if (memberships === null || !stokvel_id) return;
@@ -213,8 +240,10 @@ export default function DashboardLayout() {
           </select>
         </div>
         <div className="shrink-0 border-b border-stone-200 p-4 dark:border-slate-700">
-          <div className="rounded-lg bg-emerald-800 py-2 text-center text-xs font-bold uppercase tracking-wide text-white">
-            Member
+          <div
+            className={`rounded-lg py-2 text-center text-xs font-bold uppercase tracking-wide ${sidebarRoleBadge.className}`}
+          >
+            {sidebarRoleBadge.label}
           </div>
           <div className="mt-3 flex justify-center">
             <BrandLogo to="/dashboard" imgClassName="h-10 w-auto md:h-12" />

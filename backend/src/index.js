@@ -9,7 +9,10 @@ import adminStokvelsRouter from './routes/adminStokvels.js'
 import profileRouter from './routes/profile.js'
 import invitationsRouter from './routes/invitations.js'
 import { getServiceSupabase } from './utils/supabaseAdmin.js'
-import { ensurePlatformAdminsInStokvel } from './utils/platformAdminStokvelMembers.js'
+import {
+  ensurePlatformAdminsInStokvel,
+  normalizeUuid,
+} from './utils/platformAdminStokvelMembers.js'
 import {
   createInvitation,
   normalizeInviteEmail,
@@ -89,7 +92,8 @@ function normalizeMemberDetails(raw, limit = 500) {
   return raw
     .map((m) => {
       const maybeUid = typeof m?.userId === 'string' ? m.userId.trim() : ''
-      const userId = UUID_RE_MEMBER_DETAILS.test(maybeUid) ? maybeUid : ''
+      const userId =
+        UUID_RE_MEMBER_DETAILS.test(maybeUid) ? maybeUid.trim().toLowerCase() : ''
       return {
         userId,
         name: typeof m?.name === 'string' ? m.name.trim() : '',
@@ -111,7 +115,7 @@ function normalizeDocuments(raw, limit = 50) {
 
 function normalizeTreasurerUserIdMember(raw) {
   if (typeof raw !== 'string') return ''
-  const v = raw.trim()
+  const v = raw.trim().toLowerCase()
   return UUID_RE_MEMBER_DETAILS.test(v) ? v : ''
 }
 
@@ -121,7 +125,7 @@ function normalizeInitialMemberIds(raw) {
   const seen = new Set()
   for (const id of raw) {
     if (typeof id !== 'string') continue
-    const v = id.trim()
+    const v = id.trim().toLowerCase()
     if (!UUID_RE_MEMBER_DETAILS.test(v)) continue
     if (seen.has(v)) continue
     seen.add(v)
@@ -137,7 +141,7 @@ function collectUuidsFromMemberDetails(details) {
   for (const row of details ?? []) {
     const uid = row?.userId
     if (typeof uid !== 'string' || !UUID_RE_MEMBER_DETAILS.test(uid.trim())) continue
-    const v = uid.trim()
+    const v = uid.trim().toLowerCase()
     if (seen.has(v)) continue
     seen.add(v)
     out.push(v)
@@ -283,7 +287,7 @@ app.get('/api/my-stokvels', requireAuth, async (req, res) => {
     const { data, error } = await userSupabase
       .from('stokvel_members')
       .select(
-        'group_role, stokvels(id, name, status, contribution_amount, type, payout_strategy, cycle_length)',
+        'stokvel_id, group_role, stokvels(id, name, status, contribution_amount, type, payout_strategy, cycle_length)',
       )
       .eq('user_id', req.user.id)
 
@@ -394,6 +398,10 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
     }
 
     const creatorEmailNorm = normalizeInviteEmail(req.user.email)
+    const creatorId = normalizeUuid(req.user.id)
+    if (!creatorId) {
+      return res.status(400).json({ error: 'Invalid authenticated user id.' })
+    }
 
     const parsedMembersCount = normalizeMembersCount(membersCount)
     if (!parsedMembersCount || parsedMembersCount < 2) {
@@ -410,7 +418,7 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
         error: 'A designated treasurer is required (choose a registered member or provide an email).',
       })
     }
-    if (treasurerUuidRaw && treasurerUuidRaw === req.user.id) {
+    if (treasurerUuidRaw && treasurerUuidRaw === creatorId) {
       return res.status(400).json({ error: 'You cannot designate yourself as treasurer.' })
     }
     if (treasurerEmailNorm && treasurerEmailNorm === creatorEmailNorm) {
@@ -458,10 +466,11 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
 
     const stokvelId = newStokvel.id
 
+    /** Creator is always group admin (chairperson); UUID canonicalized so later dedupe matches. */
     const { error: creatorMemberErr } = await userSupabase.from('stokvel_members').insert([
       {
         stokvel_id: stokvelId,
-        user_id: req.user.id,
+        user_id: creatorId,
         group_role: 'admin',
       },
     ])
@@ -489,14 +498,17 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
     const detailUuids = collectUuidsFromMemberDetails(parsedDetails)
     const mergedMemberUuids = [...new Set([...initialIdsList, ...detailUuids])]
 
-    const handledUserIds = new Set([req.user.id])
+    const handledUserIds = new Set([creatorId])
     const handledEmails = new Set()
     if (creatorEmailNorm) handledEmails.add(creatorEmailNorm)
 
     try {
-      const treasurerUuid = treasurerUuidRaw || null
+      const treasurerUuid = treasurerUuidRaw ? normalizeUuid(treasurerUuidRaw) : null
 
       if (treasurerUuid) {
+        if (treasurerUuid === creatorId) {
+          throw new Error('Treasurer cannot be the same user as the creator.')
+        }
         handledUserIds.add(treasurerUuid)
         const { error: te } = await svc.from('stokvel_members').insert([
           {
@@ -533,7 +545,9 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
         }
       }
 
-      for (const uid of mergedMemberUuids) {
+      for (const rawUid of mergedMemberUuids) {
+        const uid = normalizeUuid(rawUid)
+        if (!uid || uid === creatorId) continue
         if (!UUID_RE_MEMBER_DETAILS.test(uid)) continue
         if (handledUserIds.has(uid)) continue
         const { error: me } = await svc.from('stokvel_members').insert([
