@@ -1,21 +1,12 @@
 import { Router } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth } from '../middleware/auth.js'
-import {
-  createInvitation,
-  normalizeInviteEmail,
-  sendMeetingScheduledEmail,
-} from '../utils/invitations.js'
+import { normalizeInviteEmail, sendMeetingScheduledEmail } from '../utils/invitations.js'
 import { getServiceSupabase } from '../utils/supabaseAdmin.js'
+import axios from 'axios'
 import { searchProfilesForMemberInvite } from '../utils/profileUserSearch.js'
 
 const router = Router()
-
-function normalizeMembersCount(raw) {
-  const n = Number(raw)
-  if (!Number.isInteger(n) || n < 1 || n > 500) return null
-  return n
-}
 
 const UUID_RE_MEMBER =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -23,31 +14,6 @@ const UUID_RE_MEMBER =
 /** Stokvel id from URL `:id`. Matches Postgres uuid text form without enforcing RFC variant/version bits (seed / hand-inserted ids). */
 const UUID_RE_STOKVEL_PARAM =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-function normalizeMemberDetails(raw, limit = 500) {
-  if (!Array.isArray(raw)) return []
-  return raw
-    .map((m) => {
-      const maybeUid = typeof m?.userId === 'string' ? m.userId.trim() : ''
-      const userId = UUID_RE_MEMBER.test(maybeUid) ? maybeUid : ''
-      return {
-        userId,
-        name: typeof m?.name === 'string' ? m.name.trim() : '',
-        email: typeof m?.email === 'string' ? m.email.trim().toLowerCase() : '',
-        role: typeof m?.role === 'string' ? m.role.trim() : '',
-      }
-    })
-    .filter((m) => m.name || m.email || m.role)
-    .slice(0, limit)
-}
-
-function normalizeDocuments(raw, limit = 50) {
-  if (!Array.isArray(raw)) return []
-  return raw
-    .map((d) => (typeof d === 'string' ? d.trim() : ''))
-    .filter(Boolean)
-    .slice(0, limit)
-}
 
 function userScopedSupabase(req) {
   const token = req.headers.authorization.split(' ')[1]
@@ -132,125 +98,6 @@ router.get('/', requireAuth, async (req, res) => {
     res.json({ success: true, memberships: data })
   } catch (err) {
     console.error('GET /api/stokvels:', err)
-    res.status(500).json({ error: 'Internal Server Error' })
-  }
-})
-
-router.post('/', requireAuth, async (req, res) => {
-  try {
-    const {
-      name,
-      contributionAmount,
-      memberEmails,
-      treasurerEmail,
-      payoutOrder,
-      meetingFrequency,
-      membersCount,
-      memberDetails,
-      documents,
-    } = req.body
-
-    if (!name || typeof name !== 'string' || !name.trim()) {
-      return res.status(400).json({ error: 'Stokvel name is required' })
-    }
-
-    const userSupabase = userScopedSupabase(req)
-
-    const parsedMembersCount = normalizeMembersCount(membersCount)
-    const parsedDetails = normalizeMemberDetails(memberDetails, parsedMembersCount ?? 500)
-    const parsedDocuments = normalizeDocuments(documents)
-    const baseRow = {
-      name: name.trim(),
-      payout_order: typeof payoutOrder === 'string' ? payoutOrder : 'randomize',
-      meeting_frequency: typeof meetingFrequency === 'string' ? meetingFrequency : 'monthly',
-      members_count: parsedMembersCount,
-      member_details: parsedDetails,
-      documents: parsedDocuments,
-    }
-    const contributionNum = Number(contributionAmount)
-    const includeContribution =
-      contributionAmount !== '' &&
-      contributionAmount != null &&
-      !Number.isNaN(contributionNum)
-
-    const row = includeContribution
-      ? { ...baseRow, contribution_amount: contributionNum }
-      : baseRow
-
-    let { data: newStokvel, error: stokvelError } = await userSupabase
-      .from('stokvels')
-      .insert([row])
-      .select()
-      .single()
-
-    if (
-      stokvelError &&
-      includeContribution &&
-      String(stokvelError.message).includes('contribution_amount')
-    ) {
-      const retry = await userSupabase
-        .from('stokvels')
-        .insert([baseRow])
-        .select()
-        .single()
-      newStokvel = retry.data
-      stokvelError = retry.error
-    }
-
-    if (stokvelError) {
-      console.error('POST /api/stokvels stokvels insert:', stokvelError)
-      return res.status(500).json({
-        error: stokvelError.message || 'Failed to create stokvel',
-      })
-    }
-
-    const { error: memberError } = await userSupabase.from('stokvel_members').insert([
-      {
-        stokvel_id: newStokvel.id,
-        user_id: req.user.id,
-        group_role: 'treasurer',
-      },
-    ])
-
-    if (memberError) {
-      console.error('POST /api/stokvels stokvel_members insert:', memberError)
-      return res.status(500).json({
-        error: memberError.message || 'Failed to link creator to stokvel',
-      })
-    }
-
-    const normalizedTreasurerEmail = normalizeInviteEmail(treasurerEmail)
-    if (normalizedTreasurerEmail && normalizedTreasurerEmail !== normalizeInviteEmail(req.user.email)) {
-      const writer = getServiceSupabase() ?? userSupabase
-      const { error: treasurerInviteError } = await createInvitation(writer, {
-        stokvelId: newStokvel.id,
-        email: normalizedTreasurerEmail,
-        invitedBy: req.user.id,
-        status: 'pending_group_request',
-        groupRole: 'treasurer',
-      })
-      if (treasurerInviteError) {
-        return res.status(500).json({ error: treasurerInviteError.message })
-      }
-    }
-
-    if (Array.isArray(memberEmails) && memberEmails.length > 0) {
-      const writer = getServiceSupabase() ?? userSupabase
-      const sanitized = [...new Set(memberEmails.map(normalizeInviteEmail).filter(Boolean))].slice(0, 50)
-      for (const email of sanitized) {
-        if (normalizedTreasurerEmail && email === normalizedTreasurerEmail) continue
-        await createInvitation(writer, {
-          stokvelId: newStokvel.id,
-          email,
-          invitedBy: req.user.id,
-          status: 'pending_group_request',
-        })
-      }
-    }
-
-    res.status(201).json({ success: true, stokvel: newStokvel })
-  } catch (err) {
-    console.error('POST /api/stokvels:', err)
     res.status(500).json({ error: 'Internal Server Error' })
   }
 })
@@ -669,6 +516,52 @@ router.post('/:id/contributions', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('POST contributions:', err)
     res.status(500).json({ error: 'Internal Server Error' })
+  }
+})
+
+// POST /api/stokvels/:id/payments/verify
+router.post('/:id/payments/verify', requireAuth, async (req, res) => {
+  try {
+    const { reference, amount } = req.body
+    const stokvel_id = req.params.id
+    const user_id = req.user.id
+    if (!reference || typeof reference !== 'string') {
+      return res.status(400).json({ error: 'Payment reference is required.' })
+    }
+
+    let paystackResponse
+    try {
+      paystackResponse = await axios.get(
+        `https://api.paystack.co/transaction/verify/${reference}`,
+        { headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` } },
+      )
+    } catch (verifyErr) {
+      const paystackMessage =
+        verifyErr?.response?.data?.message || verifyErr?.message || 'Paystack verification failed'
+      console.error('POST payments/verify paystack error:', paystackMessage)
+      return res.status(502).json({ error: `Paystack verify failed: ${paystackMessage}` })
+    }
+    const { data } = paystackResponse
+
+    if (data.data.status !== 'success') {
+      return res.status(400).json({ error: 'Payment not successful' })
+    }
+
+    const verified_amount = data.data.amount / 100
+
+    const userSupabase = userScopedSupabase(req)
+    const { data: contribution, error } = await userSupabase
+      .from('contributions')
+      .insert([{ stokvel_id, user_id, amount: verified_amount }])
+      .select('id, stokvel_id, user_id, amount, paid_at')
+      .single()
+
+    if (error) return res.status(500).json({ error: error.message })
+
+    res.json({ success: true, contribution })
+  } catch (err) {
+    console.error('POST payments/verify:', err)
+    res.status(500).json({ error: 'Verification failed' })
   }
 })
 

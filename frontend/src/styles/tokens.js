@@ -9,11 +9,11 @@ export const pageBg = 'bg-[#faf8f5]'
 
 export const textOnPage = 'text-emerald-950'
 
-export const landingPageShell = `min-h-screen ${pageBg} ${textOnPage}`
+export const landingPageShell = `min-h-screen ${pageBg} ${textOnPage} dark:bg-slate-950 dark:text-stone-100`
 
 /** Sticky header on cream */
 export const topNavBar =
-  'sticky top-0 z-20 border-b border-emerald-900/10 bg-[#faf8f5]/90 backdrop-blur-md'
+  'sticky top-0 z-20 border-b border-emerald-900/10 bg-[#faf8f5]/90 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/90'
 
 /** Full-width sage / teal wash behind hero */
 export const surfaceHero =
@@ -58,17 +58,17 @@ export const marketingNavInnerRow =
 // ——— PublicLayout shell (auth, home, invitations — not `/`, which uses Landing’s header) ———
 
 export const publicLayoutShell =
-  'flex h-dvh min-h-0 flex-col overflow-hidden bg-[#faf8f5] text-emerald-950'
+  'flex h-dvh min-h-0 flex-col overflow-hidden bg-[#faf8f5] text-emerald-950 dark:bg-slate-950 dark:text-stone-100'
 
 export const publicLayoutNavChrome =
-  'z-10 shrink-0 border-b border-emerald-900/10 bg-[#faf8f5]/95 backdrop-blur-sm'
+  'z-10 shrink-0 border-b border-emerald-900/10 bg-[#faf8f5]/95 backdrop-blur-sm dark:border-slate-800 dark:bg-slate-950/95'
 
 export const publicLayoutNavRow =
   'mx-auto flex h-32 min-h-32 max-h-32 w-full max-w-7xl shrink-0 items-center justify-between gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 md:px-8'
 
 /** Guest CTA in layout chrome (outline on cream) */
 export const publicNavCtaGuest =
-  'rounded-lg border border-emerald-800/25 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-900 shadow-sm transition hover:border-emerald-800/40 hover:bg-emerald-50/90'
+  'rounded-lg border border-emerald-800/25 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-900 shadow-sm transition hover:border-emerald-800/40 hover:bg-emerald-50/90 dark:border-emerald-500/30 dark:bg-slate-900 dark:text-emerald-100 dark:hover:border-emerald-400/40 dark:hover:bg-slate-800'
 
 export const publicLayoutScrollMain =
   'min-h-0 flex-1 overflow-y-auto overscroll-y-contain scroll-smooth'
@@ -166,10 +166,10 @@ export const testimonialQuote =
 // ——— Navigation & chrome ———
 
 export const navLink =
-  'text-sm font-medium text-emerald-900/70 transition hover:text-emerald-900'
+  'text-sm font-medium text-emerald-900/70 transition hover:text-emerald-900 dark:text-emerald-200/75 dark:hover:text-emerald-100'
 
 export const iconButton =
-  'rounded-full p-2 text-emerald-900/60 transition hover:bg-emerald-900/5 hover:text-emerald-900'
+  'rounded-full p-2 text-emerald-900/60 transition hover:bg-emerald-900/5 hover:text-emerald-900 dark:text-emerald-200/70 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-100'
 
 export const iconButtonSubtle =
   'rounded-full p-2 text-emerald-900/50 transition hover:bg-emerald-900/5 hover:text-emerald-900'
@@ -204,10 +204,10 @@ export const footerLegalLink =
 // ——— Buttons (public marketing — slightly deeper green than dashboard forms) ———
 
 export const btnPrimary =
-  'rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-900 disabled:opacity-50'
+  'rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-900 disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500'
 
 export const btnSecondary =
-  'rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-sm transition hover:bg-stone-100 disabled:opacity-50'
+  'rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-sm transition hover:bg-stone-100 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-stone-200 dark:hover:bg-slate-700'
 
 /** Outline that reads on sage/cream hero */
 export const btnSecondaryOnHero = `${btnSecondary} border-emerald-900/15 text-emerald-900`
@@ -215,21 +215,22 @@ export const btnSecondaryOnHero = `${btnSecondary} border-emerald-900/15 text-em
 // ——— Auth page (split card) ———
 
 export const authPageWrap =
-  'flex min-h-full w-full flex-col items-center justify-center px-4 py-10 md:py-14'
+  'flex min-h-full w-full flex-1 flex-col items-center justify-center px-4 py-8 sm:py-10 md:py-12'
 
 export const authSplitCard =
-  'flex w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-emerald-900/10 bg-white shadow-xl shadow-emerald-900/[0.12] sm:max-w-xl lg:max-w-5xl lg:min-h-[520px] lg:flex-row'
+  'flex w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-emerald-900/10 bg-white shadow-xl shadow-emerald-900/[0.12] sm:max-w-xl lg:max-w-5xl lg:min-h-[520px] lg:flex-row dark:border-slate-700 dark:bg-slate-900'
 
 export const authBrandAside =
   'relative flex flex-col items-center justify-between gap-6 overflow-hidden bg-gradient-to-br from-emerald-800 via-emerald-900 to-emerald-950 px-6 py-8 text-center text-emerald-50 sm:gap-8 sm:px-8 sm:py-10 lg:w-[42%] lg:px-10 lg:py-12'
 
 export const authFormSection =
-  'flex flex-1 flex-col justify-center px-6 py-8 sm:px-8 sm:py-10 lg:px-11 lg:py-12'
+  'flex flex-1 flex-col justify-center px-6 py-8 sm:px-8 sm:py-10 lg:px-11 lg:py-12 dark:bg-slate-900'
 
-export const authTabGroup = 'mb-6 flex rounded-xl bg-emerald-900/[0.06] p-1'
+export const authTabGroup =
+  'mb-6 flex rounded-xl bg-emerald-900/[0.06] p-1 dark:bg-emerald-500/10'
 
 export const authTabActive =
-  'flex-1 rounded-lg bg-white py-2.5 text-sm font-semibold text-emerald-900 shadow-sm'
+  'flex-1 rounded-lg bg-white py-2.5 text-sm font-semibold text-emerald-900 shadow-sm dark:bg-slate-800 dark:text-emerald-100'
 
 export const authTabInactive =
-  'flex-1 rounded-lg py-2.5 text-sm font-semibold text-emerald-800/65 transition hover:text-emerald-900'
+  'flex-1 rounded-lg py-2.5 text-sm font-semibold text-emerald-800/65 transition hover:text-emerald-900 dark:text-emerald-300/70 dark:hover:text-emerald-100'

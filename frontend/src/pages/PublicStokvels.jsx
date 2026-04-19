@@ -10,7 +10,7 @@ import {
 
 export default function PublicStokvels() {
   return (
-    <div className="min-h-full bg-[#faf8f5] pb-16 pt-8 text-emerald-950 md:pt-10">
+    <div className="min-h-full bg-[#faf8f5] pb-16 pt-8 text-emerald-950 dark:bg-slate-950 dark:text-stone-100 md:pt-10">
       <div className={sectionContainer}>
         <nav aria-label="Breadcrumb" className="text-sm text-stone-600">
           <Link to="/" className="font-medium text-emerald-800 hover:text-emerald-950 hover:underline">
@@ -42,7 +42,7 @@ export default function PublicStokvels() {
         </p>
         <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4">
           <Link to="/auth" className={publicNavCtaGuest}>
-            Log in / Sign up
+            Log In / Sign up
           </Link>
           <Link
             to="/"
