@@ -1,13 +1,14 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import BrandLogo from '../components/BrandLogo'
 import PublicFooter from '../components/PublicFooter'
 import OpportunityCard from '../components/OpportunityCard'
 import { heroDashboardIllustration, testimonialPortrait } from '../assets/landing'
 import { PUBLIC_STOKVEL_OPPORTUNITIES } from '../data/publicStokvelOpportunities'
 import { LANDING_TESTIMONIAL } from '../data/landingTestimonial'
-import { Menu, ShieldCheck, X } from 'lucide-react'
+import { LogOut, Menu, ShieldCheck, X } from 'lucide-react'
 import { useSession } from '../context/SessionContext'
+import { supabase } from '../utils/supabase'
 import {
   bodyMuted,
   bodyMutedLg,
@@ -46,10 +47,16 @@ import {
 } from '../styles/tokens'
 
 function TopNav() {
+  const navigate = useNavigate()
   const { session, userRole } = useSession()
   const isAdmin = String(userRole || '').toLowerCase() === 'admin'
   const appHome = isAdmin ? '/admin/groups' : '/dashboard'
   const [mobileOpen, setMobileOpen] = useState(false)
+
+  const signOutAndHome = async () => {
+    await supabase.auth.signOut()
+    navigate('/', { replace: true })
+  }
 
   const links = [
     { label: 'How it works', href: '#how' },
@@ -101,12 +108,22 @@ function TopNav() {
             )}
           </button>
           {session ? (
-            <Link
-              to={appHome}
-              className={`${btnPrimary} hidden px-4 py-2 sm:inline-flex`}
-            >
-              {isAdmin ? 'Admin' : 'Dashboard'}
-            </Link>
+            <>
+              <button
+                type="button"
+                className={`${btnSecondaryOnHero} hidden items-center gap-1.5 px-4 py-2 sm:inline-flex`}
+                onClick={signOutAndHome}
+              >
+                <LogOut className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
+                Log out
+              </button>
+              <Link
+                to={appHome}
+                className={`${btnPrimary} hidden px-4 py-2 sm:inline-flex`}
+              >
+                {isAdmin ? 'Admin' : 'Dashboard'}
+              </Link>
+            </>
           ) : (
             <Link to="/auth" className={`${btnPrimary} hidden px-4 py-2 sm:inline-flex`}>
               Log in
@@ -143,13 +160,26 @@ function TopNav() {
               ),
             )}
             {session ? (
-              <Link
-                to={appHome}
-                className={`${btnPrimary} mt-2 px-4 py-3 text-center`}
-                onClick={closeMobile}
-              >
-                {isAdmin ? 'Admin dashboard' : 'Dashboard'}
-              </Link>
+              <>
+                <button
+                  type="button"
+                  className={`${btnSecondaryOnHero} mt-2 flex w-full items-center justify-center gap-2 px-4 py-3 text-center font-semibold`}
+                  onClick={() => {
+                    closeMobile()
+                    void signOutAndHome()
+                  }}
+                >
+                  <LogOut className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
+                  Log out
+                </button>
+                <Link
+                  to={appHome}
+                  className={`${btnPrimary} mt-2 px-4 py-3 text-center`}
+                  onClick={closeMobile}
+                >
+                  {isAdmin ? 'Admin dashboard' : 'Dashboard'}
+                </Link>
+              </>
             ) : (
               <Link
                 to="/auth"
