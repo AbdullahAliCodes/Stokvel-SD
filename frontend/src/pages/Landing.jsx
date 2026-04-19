@@ -1,19 +1,14 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import BrandLogo from '../components/BrandLogo'
+import PublicFooter from '../components/PublicFooter'
 import OpportunityCard from '../components/OpportunityCard'
 import { heroDashboardIllustration, testimonialPortrait } from '../assets/landing'
 import { PUBLIC_STOKVEL_OPPORTUNITIES } from '../data/publicStokvelOpportunities'
 import { LANDING_TESTIMONIAL } from '../data/landingTestimonial'
-import {
-  ExternalLink,
-  Globe,
-  Menu,
-  Search,
-  ShieldCheck,
-  X,
-} from 'lucide-react'
+import { LogOut, Menu, ShieldCheck, X } from 'lucide-react'
 import { useSession } from '../context/SessionContext'
+import { supabase } from '../utils/supabase'
 import {
   bodyMuted,
   bodyMutedLg,
@@ -23,15 +18,6 @@ import {
   cardCaptionBar,
   cardCaptionTitle,
   cardMediaPlaceholder,
-  dividerFooter,
-  footerBody,
-  footerColTitle,
-  footerLegal,
-  footerLegalLink,
-  footerLink,
-  footerLinkList,
-  footerSocialButton,
-  footerSocialRow,
   headingHero,
   headingHeroAccent,
   headingSection,
@@ -40,9 +26,9 @@ import {
   heroRoseCard,
   heroStatCluster,
   iconButton,
-  iconButtonSubtle,
   landingPageShell,
   lead,
+  marketingNavInnerRow,
   navLink,
   roseBody,
   roseIconBubble,
@@ -51,7 +37,6 @@ import {
   sectionNarrow,
   statLabel,
   statValue,
-  surfaceFooter,
   surfaceHero,
   testimonialGrid,
   testimonialKicker,
@@ -62,14 +47,20 @@ import {
 } from '../styles/tokens'
 
 function TopNav() {
+  const navigate = useNavigate()
   const { session, userRole } = useSession()
   const isAdmin = String(userRole || '').toLowerCase() === 'admin'
   const appHome = isAdmin ? '/admin/groups' : '/dashboard'
   const [mobileOpen, setMobileOpen] = useState(false)
 
+  const signOutAndHome = async () => {
+    await supabase.auth.signOut()
+    navigate('/', { replace: true })
+  }
+
   const links = [
     { label: 'How it works', href: '#how' },
-    { label: 'Browse groups', href: '/stokvels' },
+    { label: 'Public stokvels', href: '/stokvels' },
     { label: 'Stories', href: '#stories' },
     { label: 'Support', href: '#footer-support' },
   ]
@@ -78,14 +69,15 @@ function TopNav() {
 
   return (
     <header className={`${topNavBar} relative`}>
-      <div
-        className={`${sectionContainer} flex max-w-7xl items-center justify-between gap-2 py-4 sm:gap-4 sm:py-5`}
-      >
-        <BrandLogo
-          to="/"
-          imgClassName="h-24 w-auto sm:h-28 md:h-32 lg:h-40 xl:h-44 2xl:h-52"
-          onClick={closeMobile}
-        />
+      <div className={`${sectionContainer} ${marketingNavInnerRow}`}>
+        <div className="flex min-h-0 max-h-full min-w-0 shrink-0 self-stretch items-center">
+          <BrandLogo
+            to="/"
+            className="h-full min-h-0 max-h-full"
+            imgClassName="max-h-full w-auto max-w-[min(58vw,360px)] object-contain object-left sm:max-w-[min(50vw,400px)] md:max-w-[min(44vw,440px)]"
+            onClick={closeMobile}
+          />
+        </div>
 
         <nav className="hidden flex-1 justify-center gap-6 md:flex md:gap-8" aria-label="Primary">
           {links.map(({ label, href }) =>
@@ -104,20 +96,6 @@ function TopNav() {
         <div className="flex shrink-0 items-center gap-1 sm:gap-2 md:gap-3">
           <button
             type="button"
-            className={`${iconButton} hidden sm:inline-flex`}
-            aria-label="Search"
-          >
-            <Search className="h-5 w-5" strokeWidth={1.75} />
-          </button>
-          <a
-            href="https://twitter.com"
-            className={`hidden sm:inline-flex ${iconButtonSubtle}`}
-            aria-label="Social (opens X)"
-          >
-            <Globe className="h-5 w-5" strokeWidth={1.75} />
-          </a>
-          <button
-            type="button"
             className={`${iconButton} md:hidden`}
             aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={mobileOpen}
@@ -130,12 +108,22 @@ function TopNav() {
             )}
           </button>
           {session ? (
-            <Link
-              to={appHome}
-              className={`${btnPrimary} hidden px-4 py-2 sm:inline-flex`}
-            >
-              {isAdmin ? 'Admin' : 'Dashboard'}
-            </Link>
+            <>
+              <button
+                type="button"
+                className={`${btnSecondaryOnHero} hidden items-center gap-1.5 px-4 py-2 sm:inline-flex`}
+                onClick={signOutAndHome}
+              >
+                <LogOut className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
+                Log out
+              </button>
+              <Link
+                to={appHome}
+                className={`${btnPrimary} hidden px-4 py-2 sm:inline-flex`}
+              >
+                {isAdmin ? 'Admin' : 'Dashboard'}
+              </Link>
+            </>
           ) : (
             <Link to="/auth" className={`${btnPrimary} hidden px-4 py-2 sm:inline-flex`}>
               Log in
@@ -172,13 +160,26 @@ function TopNav() {
               ),
             )}
             {session ? (
-              <Link
-                to={appHome}
-                className={`${btnPrimary} mt-2 px-4 py-3 text-center`}
-                onClick={closeMobile}
-              >
-                {isAdmin ? 'Admin dashboard' : 'Dashboard'}
-              </Link>
+              <>
+                <button
+                  type="button"
+                  className={`${btnSecondaryOnHero} mt-2 flex w-full items-center justify-center gap-2 px-4 py-3 text-center font-semibold`}
+                  onClick={() => {
+                    closeMobile()
+                    void signOutAndHome()
+                  }}
+                >
+                  <LogOut className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden />
+                  Log out
+                </button>
+                <Link
+                  to={appHome}
+                  className={`${btnPrimary} mt-2 px-4 py-3 text-center`}
+                  onClick={closeMobile}
+                >
+                  {isAdmin ? 'Admin dashboard' : 'Dashboard'}
+                </Link>
+              </>
             ) : (
               <Link
                 to="/auth"
@@ -350,99 +351,6 @@ function Testimonial() {
   )
 }
 
-function Footer() {
-  return (
-    <footer className={`${surfaceFooter} mt-auto`}>
-        <div className={`${sectionContainer} py-12 md:py-16`}>
-        <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 sm:gap-10 lg:grid-cols-3 lg:gap-12">
-          <div className="min-w-0">
-            <BrandLogo to="/" variant="onDark" imgClassName="h-24 w-auto sm:h-28 md:h-36" />
-            <p className={footerBody}>
-              Community-first savings circles with transparent tools for members and admins.
-            </p>
-          </div>
-          <nav aria-label="Company" className="min-w-0">
-            <p className={footerColTitle}>Company</p>
-            <ul className={footerLinkList}>
-              <li>
-                <a href="#how" className={footerLink}>
-                  How it works
-                </a>
-              </li>
-              <li>
-                <Link to="/auth" className={footerLink}>
-                  Create account
-                </Link>
-              </li>
-              <li>
-                <a href="#footer-support" className={footerLink}>
-                  Contact
-                </a>
-              </li>
-            </ul>
-          </nav>
-          <nav id="footer-support" aria-label="Support" className="min-w-0 scroll-mt-24">
-            <p className={footerColTitle}>Support</p>
-            <ul className={footerLinkList}>
-              <li>
-                <Link to="/auth" className={footerLink}>
-                  Help centre (sign in)
-                </Link>
-              </li>
-                           <li>
-                <Link to="/stokvels" className={footerLink}>
-                  Browse groups
-                </Link>
-              </li>
-            </ul>
-          </nav>
-        </div>
-
-        <div
-          className={`mt-12 flex flex-col gap-6 ${dividerFooter} pt-8 md:flex-row md:items-center md:justify-between md:gap-8`}
-        >
-          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6">
-            <p className={`${footerLegal} shrink-0`}>
-              © {new Date().getFullYear()} StokGeld. All rights reserved.
-            </p>
-            <nav className="flex flex-wrap gap-x-4 gap-y-1" aria-label="Legal">
-              <a href="#privacy" className={footerLegalLink}>
-                Privacy
-              </a>
-              <a href="#terms" className={footerLegalLink}>
-                Terms
-              </a>
-            </nav>
-          </div>
-          <div className={footerSocialRow}>
-            <a
-              href="https://facebook.com"
-              className={footerSocialButton}
-              aria-label="Facebook"
-            >
-              <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4" strokeWidth={1.75} />
-            </a>
-            <a
-              href="https://instagram.com"
-              className={footerSocialButton}
-              aria-label="Instagram"
-            >
-              <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4" strokeWidth={1.75} />
-            </a>
-            <a
-              href="https://linkedin.com"
-              className={footerSocialButton}
-              aria-label="LinkedIn"
-            >
-              <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4" strokeWidth={1.75} />
-            </a>
-          </div>
-        </div>
-      </div>
-    </footer>
-  )
-}
-
 export default function Landing() {
   return (
     <div className={landingPageShell}>
@@ -459,11 +367,7 @@ export default function Landing() {
               Browse public stokvels
             </h2>
             <p className={`mt-3 ${bodyMutedLg}`}>
-              Discover open circles looking for reliable members. The cards read from demo data in{' '}
-              <span className="whitespace-nowrap font-medium text-emerald-900">
-                src/data/publicStokvelOpportunities.js
-              </span>
-              —swap that for your API when you wire the backend.
+              Discover open circles looking for reliable members and find a group that fits your goals.
             </p>
             <p className="mt-4">
               <Link
@@ -484,7 +388,7 @@ export default function Landing() {
         </section>
         <Testimonial />
       </main>
-      <Footer />
+      <PublicFooter />
     </div>
   )
 }
