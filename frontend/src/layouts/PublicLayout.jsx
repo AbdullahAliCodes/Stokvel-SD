@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import BrandLogo from '../components/BrandLogo'
 import PublicFooter from '../components/PublicFooter'
+import ThemeToggle from '../components/ThemeToggle'
 import { useSession } from '../context/SessionContext'
 import { supabase } from '../utils/supabase'
 import {
@@ -21,7 +22,8 @@ export default function PublicLayout() {
   const { pathname } = useLocation()
   const scrollMainRef = useRef(null)
   const landingHasOwnNav = pathname === '/'
-  const showPublicFooter = !landingHasOwnNav && pathname !== '/auth'
+  const showPublicChrome =
+    !landingHasOwnNav && pathname !== '/auth'
 
   useLayoutEffect(() => {
     const el = scrollMainRef.current
@@ -30,7 +32,7 @@ export default function PublicLayout() {
 
   return (
     <div className={publicLayoutShell}>
-      {!landingHasOwnNav && (
+      {showPublicChrome ? (
         <header className={publicLayoutNavChrome}>
           <div className={publicLayoutNavRow}>
             <div className="flex min-h-0 max-h-full min-w-0 shrink-0 self-stretch items-center">
@@ -41,11 +43,15 @@ export default function PublicLayout() {
               />
             </div>
             {!session ? (
-              <Link to="/auth" className={publicNavCtaGuest}>
-                Log In / Sign Up
-              </Link>
+              <div className="flex shrink-0 items-center gap-2">
+                <ThemeToggle />
+                <Link to="/auth" className={publicNavCtaGuest}>
+                  Log In / Sign up
+                </Link>
+              </div>
             ) : (
               <div className="flex shrink-0 items-center gap-2">
+                <ThemeToggle />
                 <button
                   type="button"
                   className={`${btnSecondary} border-emerald-800/20 px-4 py-2.5 text-sm font-semibold text-emerald-900`}
@@ -66,13 +72,13 @@ export default function PublicLayout() {
             )}
           </div>
         </header>
-      )}
+      ) : null}
       <div ref={scrollMainRef} className={publicLayoutScrollMain}>
         <div className="flex min-h-full flex-col">
-          <div className="flex-1">
+          <div className="flex min-h-0 flex-1 flex-col">
             <Outlet />
           </div>
-          {showPublicFooter ? <PublicFooter /> : null}
+          {showPublicChrome ? <PublicFooter /> : null}
         </div>
       </div>
     </div>

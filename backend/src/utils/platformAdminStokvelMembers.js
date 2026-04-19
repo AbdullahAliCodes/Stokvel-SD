@@ -4,6 +4,16 @@
  * (requires DB CHECK to allow 'admin' — see supabase migrations).
  */
 
+const UUID_HEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+/** Canonical lowercase UUID string for stable Set lookups (avoids duplicate membership rows). */
+export function normalizeUuid(id) {
+  if (typeof id !== 'string') return ''
+  const t = id.trim().toLowerCase()
+  return UUID_HEX.test(t) ? t : ''
+}
+
 export async function fetchPlatformAdminUserIds(client) {
   const { data, error } = await client.from('profiles').select('id').eq('role', 'admin')
   if (error) {
@@ -46,14 +56,21 @@ export async function ensurePlatformAdminsInStokvel(client, stokvelId) {
     return { error: exErr }
   }
 
-  const existing = new Set((existingRows ?? []).map((r) => r.user_id))
-  const toInsert = adminIds
-    .filter((uid) => !existing.has(uid))
-    .map((user_id) => ({
+  const existing = new Set(
+    (existingRows ?? []).map((r) => normalizeUuid(r.user_id)).filter(Boolean),
+  )
+  const seenInsert = new Set()
+  const toInsert = []
+  for (const rawId of adminIds) {
+    const user_id = normalizeUuid(rawId)
+    if (!user_id || existing.has(user_id) || seenInsert.has(user_id)) continue
+    seenInsert.add(user_id)
+    toInsert.push({
       stokvel_id: stokvelId,
       user_id,
       group_role: 'admin',
-    }))
+    })
+  }
 
   if (toInsert.length === 0) {
     return { error: null }
