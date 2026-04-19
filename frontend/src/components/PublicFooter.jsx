@@ -12,7 +12,7 @@ import {
   surfaceFooter,
 } from '../styles/tokens'
 
-/** Marketing footer for cream public shell (Home, /stokvels, etc.). Deep links use landing anchors on `/`. */
+/** Marketing footer for cream public shell (landing, /stokvels, etc.). Deep links use landing anchors on `/`. */
 export default function PublicFooter() {
   return (
     <footer className={`${surfaceFooter} mt-auto`}>

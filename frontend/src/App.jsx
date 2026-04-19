@@ -31,7 +31,6 @@ import Meetings from "./pages/Meetings";
 import MeetingDetails from "./pages/MeetingDetails";
 import MyPayout from "./pages/MyPayout";
 import Support from "./pages/Support";
-import Home from "./pages/Home";
 import Landing from "./pages/Landing";
 import PublicStokvels from "./pages/PublicStokvels";
 import AcceptInvitation from "./pages/AcceptInvitation";
@@ -68,6 +67,7 @@ export default function App() {
       <div className="h-full min-h-0 overflow-hidden">
         <BrowserRouter>
           <Routes>
+            <Route path="/home" element={<Navigate to="/" replace />} />
             <Route element={<PublicLayout />}>
               <Route path="/" element={<Landing />} />
               <Route path="/stokvels" element={<PublicStokvels />} />
@@ -80,10 +80,6 @@ export default function App() {
 
             <Route element={<RequireAuth session={session} />}>
               <Route element={<RequireMember />}>
-                <Route path="/home" element={<PublicLayout />}>
-                  <Route index element={<Home />} />
-                </Route>
-
                 <Route path="/dashboard" element={<DashboardGateway />} />
                 <Route path="/onboarding" element={<Onboarding />} />
 
