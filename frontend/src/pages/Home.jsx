@@ -1,15 +1,12 @@
 import { Link } from 'react-router-dom'
 import OpportunityCard from '../components/OpportunityCard'
 import { PUBLIC_STOKVEL_OPPORTUNITIES } from '../data/publicStokvelOpportunities'
-import { useSession } from '../context/SessionContext'
 import { sectionContainer } from '../styles/tokens'
-import { btnPrimary, btnSecondary, cardLight, pageSubtitle, pageTitle } from '../ui'
+import { btnPrimary, pageTitle } from '../ui'
 
 const HOME_STOKVEL_SPOTLIGHT = PUBLIC_STOKVEL_OPPORTUNITIES.slice(0, 3)
 
 export default function Home() {
-  const { session, backendData, testBackendConnection } = useSession()
-
   return (
     <div className={`${sectionContainer} pb-16 pt-8 text-emerald-950`}>
       <section className="mx-auto max-w-4xl text-center">
@@ -64,34 +61,6 @@ export default function Home() {
             Apply to join
           </Link>
           <p className="text-sm text-stone-500">or explore groups above</p>
-        </div>
-      </section>
-
-      <section className="mx-auto mt-16 max-w-lg">
-        <div className={`${cardLight} p-6`}>
-          <h3 className="mb-1 flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-emerald-700">
-            <i className="fa-solid fa-code text-stone-400" aria-hidden />
-            Developer
-          </h3>
-          <p className={`mb-4 ${pageSubtitle}`}>
-            Test the secure Express API (sign in first for a valid session).
-          </p>
-          <button
-            type="button"
-            className={btnSecondary}
-            onClick={testBackendConnection}
-            disabled={!session}
-          >
-            Test Secure Backend
-          </button>
-          {!session ? (
-            <p className="mt-3 text-xs text-stone-500">Log in to send a Bearer token.</p>
-          ) : null}
-          {backendData != null ? (
-            <pre className="mt-4 max-h-64 overflow-auto rounded-lg border border-stone-200 bg-stone-50 p-4 text-left text-xs text-emerald-900">
-              {JSON.stringify(backendData, null, 2)}
-            </pre>
-          ) : null}
         </div>
       </section>
     </div>

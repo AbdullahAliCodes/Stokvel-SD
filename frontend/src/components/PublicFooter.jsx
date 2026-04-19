@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom'
-import { ExternalLink } from 'lucide-react'
 import BrandLogo from './BrandLogo'
 import {
   dividerFooter,
@@ -9,8 +8,6 @@ import {
   footerLegalLink,
   footerLink,
   footerLinkList,
-  footerSocialButton,
-  footerSocialRow,
   sectionContainer,
   surfaceFooter,
 } from '../styles/tokens'
@@ -64,9 +61,7 @@ export default function PublicFooter() {
           </nav>
         </div>
 
-        <div
-          className={`mt-12 flex flex-col gap-6 ${dividerFooter} pt-8 md:flex-row md:items-center md:justify-between md:gap-8`}
-        >
+        <div className={`mt-12 flex flex-col gap-6 ${dividerFooter} pt-8`}>
           <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6">
             <p className={`${footerLegal} shrink-0`}>
               © {new Date().getFullYear()} StokGeld. All rights reserved.
@@ -79,29 +74,6 @@ export default function PublicFooter() {
                 Terms
               </a>
             </nav>
-          </div>
-          <div className={footerSocialRow}>
-            <a
-              href="https://facebook.com"
-              className={footerSocialButton}
-              aria-label="Facebook"
-            >
-              <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4" strokeWidth={1.75} />
-            </a>
-            <a
-              href="https://instagram.com"
-              className={footerSocialButton}
-              aria-label="Instagram"
-            >
-              <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4" strokeWidth={1.75} />
-            </a>
-            <a
-              href="https://linkedin.com"
-              className={footerSocialButton}
-              aria-label="LinkedIn"
-            >
-              <ExternalLink className="h-3.5 w-3.5 sm:h-4 sm:w-4" strokeWidth={1.75} />
-            </a>
           </div>
         </div>
       </div>

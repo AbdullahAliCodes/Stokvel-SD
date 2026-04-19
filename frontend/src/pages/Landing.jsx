@@ -6,7 +6,7 @@ import OpportunityCard from '../components/OpportunityCard'
 import { heroDashboardIllustration, testimonialPortrait } from '../assets/landing'
 import { PUBLIC_STOKVEL_OPPORTUNITIES } from '../data/publicStokvelOpportunities'
 import { LANDING_TESTIMONIAL } from '../data/landingTestimonial'
-import { Globe, Menu, Search, ShieldCheck, X } from 'lucide-react'
+import { Menu, ShieldCheck, X } from 'lucide-react'
 import { useSession } from '../context/SessionContext'
 import {
   bodyMuted,
@@ -25,7 +25,6 @@ import {
   heroRoseCard,
   heroStatCluster,
   iconButton,
-  iconButtonSubtle,
   landingPageShell,
   lead,
   marketingNavInnerRow,
@@ -54,7 +53,7 @@ function TopNav() {
 
   const links = [
     { label: 'How it works', href: '#how' },
-    { label: 'Browse groups', href: '/stokvels' },
+    { label: 'Public stokvels', href: '/stokvels' },
     { label: 'Stories', href: '#stories' },
     { label: 'Support', href: '#footer-support' },
   ]
@@ -88,20 +87,6 @@ function TopNav() {
         </nav>
 
         <div className="flex shrink-0 items-center gap-1 sm:gap-2 md:gap-3">
-          <button
-            type="button"
-            className={`${iconButton} hidden sm:inline-flex`}
-            aria-label="Search"
-          >
-            <Search className="h-5 w-5" strokeWidth={1.75} />
-          </button>
-          <a
-            href="https://twitter.com"
-            className={`hidden sm:inline-flex ${iconButtonSubtle}`}
-            aria-label="Social (opens X)"
-          >
-            <Globe className="h-5 w-5" strokeWidth={1.75} />
-          </a>
           <button
             type="button"
             className={`${iconButton} md:hidden`}

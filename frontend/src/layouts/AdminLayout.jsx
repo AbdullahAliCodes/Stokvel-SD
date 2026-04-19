@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import BrandLogo from '../components/BrandLogo'
 import {
   Users,
@@ -18,6 +18,8 @@ const linkClass = ({ isActive }) =>
   }`
 
 export default function AdminLayout() {
+  const navigate = useNavigate()
+
   return (
     <div className="box-border flex h-dvh min-h-0 w-full flex-col gap-3 overflow-hidden bg-[#F4F5F0] p-3 text-stone-800 md:flex-row md:gap-4 md:p-4">
       <aside
@@ -57,7 +59,10 @@ export default function AdminLayout() {
           <button
             type="button"
             className="flex w-full items-center justify-center gap-2 rounded-lg border border-stone-300 bg-white py-2 text-sm font-medium text-stone-700 shadow-sm transition hover:bg-stone-100"
-            onClick={() => supabase.auth.signOut()}
+            onClick={async () => {
+              await supabase.auth.signOut()
+              navigate('/', { replace: true })
+            }}
           >
             <LogOut className="h-4 w-4" aria-hidden />
             Log Out

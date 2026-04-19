@@ -292,7 +292,10 @@ export default function DashboardLayout() {
           <button
             type="button"
             className="flex w-full items-center justify-center gap-2 rounded-lg border border-stone-200 bg-stone-50 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-100"
-            onClick={() => supabase.auth.signOut()}
+            onClick={async () => {
+              await supabase.auth.signOut();
+              navigate("/", { replace: true });
+            }}
           >
             <LogOut className="h-4 w-4" aria-hidden />
             Log Out

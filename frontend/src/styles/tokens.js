@@ -71,7 +71,7 @@ export const publicNavCtaGuest =
   'rounded-lg border border-emerald-800/25 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-900 shadow-sm transition hover:border-emerald-800/40 hover:bg-emerald-50/90'
 
 export const publicLayoutScrollMain =
-  'min-h-0 flex-1 overflow-y-auto overscroll-y-contain'
+  'min-h-0 flex-1 overflow-y-auto overscroll-y-contain scroll-smooth'
 
 // ——— Typography ———
 

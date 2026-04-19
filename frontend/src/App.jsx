@@ -1,7 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { supabase } from "./utils/supabase";
-import { apiUrl } from "./utils/api";
 import { SessionProvider } from "./context/SessionContext";
 import RequireAuth from "./components/RequireAuth";
 import RequireAdmin from "./components/RequireAdmin";
@@ -40,7 +39,6 @@ import AcceptInvitation from "./pages/AcceptInvitation";
 export default function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [backendData, setBackendData] = useState(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: initial } }) => {
@@ -57,29 +55,6 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const testBackendConnection = useCallback(async () => {
-    if (!session) {
-      setBackendData({ error: "No session" });
-      return;
-    }
-    try {
-      const res = await fetch(apiUrl("/api/me"), {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-
-      const text = await res.text();
-
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}: ${text}`);
-      }
-
-      const data = JSON.parse(text);
-      setBackendData(data);
-    } catch (err) {
-      setBackendData({ error: err.message });
-    }
-  }, [session]);
-
   if (loading) {
     return (
       <div className="flex h-dvh items-center justify-center overflow-hidden bg-[#0f172a] text-slate-300">
@@ -89,12 +64,7 @@ export default function App() {
   }
 
   return (
-    <SessionProvider
-      session={session}
-      backendData={backendData}
-      setBackendData={setBackendData}
-      testBackendConnection={testBackendConnection}
-    >
+    <SessionProvider session={session}>
       <div className="h-full min-h-0 overflow-hidden">
         <BrowserRouter>
           <Routes>

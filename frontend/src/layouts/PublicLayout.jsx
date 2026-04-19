@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import BrandLogo from '../components/BrandLogo'
 import PublicFooter from '../components/PublicFooter'
@@ -15,8 +16,14 @@ export default function PublicLayout() {
   const { session, userRole } = useSession()
   const isAdmin = String(userRole || '').toLowerCase() === 'admin'
   const { pathname } = useLocation()
+  const scrollMainRef = useRef(null)
   const landingHasOwnNav = pathname === '/'
   const showPublicFooter = !landingHasOwnNav && pathname !== '/auth'
+
+  useLayoutEffect(() => {
+    const el = scrollMainRef.current
+    if (el) el.scrollTop = 0
+  }, [pathname])
 
   return (
     <div className={publicLayoutShell}>
@@ -45,7 +52,7 @@ export default function PublicLayout() {
           </div>
         </header>
       )}
-      <div className={publicLayoutScrollMain}>
+      <div ref={scrollMainRef} className={publicLayoutScrollMain}>
         <div className="flex min-h-full flex-col">
           <div className="flex-1">
             <Outlet />
