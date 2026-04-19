@@ -66,8 +66,8 @@ export default function MeetingCalendar({
   }
 
   return (
-    <div className={`${cardLight} border border-stone-200 p-4 sm:p-5`}>
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className={`${cardLight} border border-stone-200 p-4 shadow-sm sm:p-6`}>
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-lg font-bold text-emerald-800">
           {monthLabel(year, monthIndex)}
         </h2>
@@ -98,15 +98,16 @@ export default function MeetingCalendar({
         </div>
       </div>
 
+      {/* Equal row heights: `minmax` keeps cells tall enough on small screens; `1fr` shares extra space on large screens */}
       <div
-        className="grid grid-cols-7 gap-1 sm:gap-1.5"
+        className="grid grid-cols-7 gap-2 sm:gap-3 [grid-auto-rows:minmax(7.25rem,1fr)]"
         role="grid"
         aria-label="Meeting calendar"
       >
         {WEEKDAYS.map((wd) => (
           <div
             key={wd}
-            className="pb-1 text-center text-[10px] font-semibold uppercase tracking-wide text-stone-500 sm:text-xs"
+            className="flex items-end justify-center pb-2 text-center text-[10px] font-bold uppercase tracking-wider text-stone-500 sm:pb-2.5 sm:text-xs"
             role="columnheader"
           >
             {wd}
@@ -117,7 +118,7 @@ export default function MeetingCalendar({
             return (
               <div
                 key={`e-${idx}`}
-                className="min-h-[4.5rem] rounded-xl border border-transparent sm:min-h-[5.25rem]"
+                className="min-h-0 rounded-2xl border border-transparent bg-stone-50/40"
                 aria-hidden
               />
             );
@@ -127,10 +128,14 @@ export default function MeetingCalendar({
           const dayMeetings = key ? (byDay.get(key) ?? []) : [];
           const count = dayMeetings.length;
           const firstTitle = dayMeetings[0]?.title ?? "";
-          const preview = count ? truncate(firstTitle, 42) : "";
+          const preview = count ? truncate(firstTitle, 64) : "";
 
           return (
-            <div key={key ?? idx} role="gridcell">
+            <div
+              key={key ?? idx}
+              role="gridcell"
+              className="flex min-h-0 min-w-0"
+            >
               <CalendarDayCell
                 dayNumber={date.getDate()}
                 isToday={key !== null && key === todayKey}
@@ -146,7 +151,7 @@ export default function MeetingCalendar({
         })}
       </div>
 
-      <p className="mt-3 text-xs text-stone-500">
+      <p className="mt-4 text-xs text-stone-500 sm:text-sm">
         Tip: click a day to see all meetings scheduled for that date.
       </p>
     </div>

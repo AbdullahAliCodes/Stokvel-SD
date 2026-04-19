@@ -1,5 +1,6 @@
 /**
  * One cell in the month grid: day number, optional meeting preview, selected state.
+ * Sizing is driven by the parent grid (`minmax` row height + `h-full`); this button fills the cell.
  */
 export default function CalendarDayCell({
   dayNumber,
@@ -12,57 +13,75 @@ export default function CalendarDayCell({
 }) {
   const hasMeetings = meetingCount > 0;
 
+  const base =
+    "group relative flex h-full min-h-0 w-full flex-col rounded-2xl border text-left shadow-sm transition-all duration-200 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2";
+
+  const todayStyle = isToday
+    ? "border-emerald-300/90 bg-gradient-to-b from-emerald-50 via-white to-white shadow-emerald-900/5 before:pointer-events-none before:absolute before:inset-x-2 before:top-1.5 before:h-1 before:rounded-full before:bg-emerald-500/85"
+    : "border-stone-200/95 bg-white";
+
+  const selectedStyle = selected
+    ? "z-[1] border-emerald-600 bg-emerald-50/90 shadow-md ring-2 ring-emerald-600/35 ring-offset-1 ring-offset-white"
+    : "";
+
+  const hoverStyle = selected
+    ? "hover:bg-emerald-50"
+    : "hover:z-[1] hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-50/50 hover:shadow-md hover:shadow-stone-300/40 active:translate-y-0 active:shadow-sm";
+
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`flex min-h-[4.5rem] flex-col items-stretch rounded-xl border p-1.5 text-left transition sm:min-h-[5.25rem] sm:p-2 ${
-        selected
-          ? "border-emerald-600 bg-emerald-50 ring-2 ring-emerald-600/30"
-          : "border-stone-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/40"
-      } ${isToday ? "shadow-sm ring-1 ring-emerald-700/25" : ""}`}
+      className={`${base} ${todayStyle} ${selectedStyle} ${hoverStyle} p-2.5 pb-2 sm:p-3 sm:pb-2.5`}
     >
-      <span
-        className={`text-xs font-semibold sm:text-sm ${
-          isToday ? "text-emerald-800" : "text-stone-700"
-        }`}
-      >
-        {dayNumber}
+      <div className="flex shrink-0 items-baseline gap-1.5">
+        <span
+          className={`inline-flex h-7 min-w-[1.75rem] items-center justify-center rounded-lg text-sm font-bold tabular-nums sm:h-8 sm:min-w-[2rem] sm:text-base ${
+            isToday
+              ? "bg-emerald-600 text-white shadow-sm shadow-emerald-900/15"
+              : "bg-stone-100/90 text-stone-800 group-hover:bg-emerald-100/80 group-hover:text-emerald-900"
+          } ${selected && !isToday ? "bg-emerald-100 text-emerald-900" : ""} ${
+            selected && isToday ? "bg-emerald-700 text-white" : ""
+          }`}
+        >
+          {dayNumber}
+        </span>
         {isToday ? (
-          <span className="ml-1 text-[10px] font-medium uppercase text-emerald-600">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700 sm:text-xs">
             Today
           </span>
         ) : null}
-      </span>
+      </div>
+
       {hasMeetings ? (
-        <div className="mt-auto min-h-0 flex-1">
+        <div className="mt-2 flex min-h-0 flex-1 flex-col gap-1.5">
           {previewTitle ? (
             <p
-              className="line-clamp-2 text-[10px] leading-tight text-stone-700 sm:text-xs"
+              className="line-clamp-3 text-[11px] font-medium leading-snug text-stone-800 sm:text-xs sm:leading-relaxed"
               title={previewTitle}
             >
               {previewTitle}
             </p>
           ) : null}
-          <div className="mt-1 flex items-center gap-1">
-            <span className="inline-flex h-1.5 min-w-[1.25rem] flex-wrap gap-0.5">
-              {Array.from({ length: Math.min(meetingCount, 3) }).map((_, i) => (
-                <span
-                  key={i}
-                  className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-600"
-                  aria-hidden
-                />
-              ))}
-            </span>
-            {meetingCount > 1 ? (
-              <span className="text-[10px] font-medium text-stone-500">
-                +{meetingCount - 1}
+          <div className="mt-auto flex items-center gap-2 pt-0.5">
+            <span
+              className="inline-flex items-center gap-1 rounded-full bg-emerald-100/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-900 ring-1 ring-emerald-200/80 sm:text-xs"
+              aria-label={`${meetingCount} meeting${meetingCount === 1 ? "" : "s"}`}
+            >
+              <span className="flex gap-1" aria-hidden>
+                {Array.from({ length: Math.min(meetingCount, 3) }).map((_, i) => (
+                  <span
+                    key={i}
+                    className="h-1.5 w-1.5 rounded-full bg-emerald-600 sm:h-2 sm:w-2"
+                  />
+                ))}
               </span>
-            ) : null}
+              {meetingCount > 1 ? <span>+{meetingCount - 1}</span> : null}
+            </span>
           </div>
         </div>
       ) : (
-        <span className="mt-auto text-[10px] text-stone-300 sm:text-xs"> </span>
+        <div className="mt-2 min-h-[2.5rem] flex-1 rounded-lg bg-stone-50/60 sm:min-h-[2.75rem]" aria-hidden />
       )}
     </button>
   );
