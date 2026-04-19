@@ -32,7 +32,7 @@ export default function PublicLayout() {
           <div className={publicLayoutNavRow}>
             <div className="flex min-h-0 max-h-full min-w-0 shrink-0 self-stretch items-center">
               <BrandLogo
-                to={!session ? '/' : isAdmin ? '/admin/groups' : '/home'}
+                to={session && isAdmin ? '/admin/groups' : '/'}
                 className="h-full min-h-0 max-h-full"
                 imgClassName="max-h-full w-auto max-w-[min(58vw,360px)] object-contain object-left sm:max-w-[min(50vw,400px)] md:max-w-[min(44vw,440px)]"
               />
