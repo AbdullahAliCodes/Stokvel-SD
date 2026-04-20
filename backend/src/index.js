@@ -201,6 +201,34 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'Stokvel API' })
 })
 
+app.get('/api/public/stokvels', async (_req, res) => {
+  try {
+    const svc = getServiceSupabase()
+    if (!svc) {
+      return res.status(500).json({
+        error: 'Server configuration error: missing service role key.',
+      })
+    }
+
+    const { data, error } = await svc
+      .from('stokvels')
+      .select('id, name, type, contribution_amount, members_count, cycle_length, created_at')
+      .eq('is_public', true)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('GET /api/public/stokvels:', error)
+      return res.status(500).json({ error: error.message || 'Failed to load public stokvels.' })
+    }
+
+    return res.json(Array.isArray(data) ? data : [])
+  } catch (err) {
+    console.error('GET /api/public/stokvels:', err)
+    return res.status(500).json({ error: 'Internal Server Error' })
+  }
+})
+
 app.post('/api/uploads/documents', requireAuth, (req, res) => {
   documentsUpload.array('documents', 10)(req, res, async (err) => {
     if (err) {
@@ -390,6 +418,7 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
       membersCount,
       memberDetails,
       documents,
+      isPublic,
     } = req.body ?? {}
 
     if (!name || typeof name !== 'string' || !name.trim()) {
@@ -437,6 +466,7 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
       members_count: parsedMembersCount,
       member_details: parsedDetails,
       documents: parsedDocuments,
+      is_public: Boolean(isPublic),
     }
     if (typeof type === 'string' && (type === 'Rotating' || type === 'Fixed')) {
       insertRow.type = type
@@ -525,7 +555,6 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
       for (const rawUid of mergedMemberUuids) {
         const uid = normalizeUuid(rawUid)
         if (!uid || uid === creatorId) continue
-        if (!UUID_RE_MEMBER_DETAILS.test(uid)) continue
         if (handledUserIds.has(uid)) continue
         const { error: me } = await svc.from('stokvel_members').insert([
           {
@@ -591,6 +620,72 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('POST /api/stokvels:', err)
     res.status(500).json({ error: 'Internal Server Error' })
+  }
+})
+
+app.post('/api/stokvels/:id/join', requireAuth, async (req, res) => {
+  try {
+    const stokvelId = normalizeUuid(req.params?.id)
+    if (!stokvelId) {
+      return res.status(400).json({ error: 'Invalid stokvel id.' })
+    }
+
+    const userSupabase = createUserSupabaseFromReq(req)
+
+    const { data: stokvelRow, error: stokvelErr } = await userSupabase
+      .from('stokvels')
+      .select('id, is_public, status')
+      .eq('id', stokvelId)
+      .eq('is_public', true)
+      .eq('status', 'active')
+      .maybeSingle()
+
+    if (stokvelErr) {
+      console.error('POST /api/stokvels/:id/join stokvel lookup:', stokvelErr)
+      return res.status(500).json({ error: stokvelErr.message || 'Failed to verify stokvel.' })
+    }
+    if (!stokvelRow?.id) {
+      return res
+        .status(400)
+        .json({ error: 'This group is not available to join publicly.' })
+    }
+
+    const { data: existingMembership, error: memberLookupErr } = await userSupabase
+      .from('stokvel_members')
+      .select('user_id')
+      .eq('stokvel_id', stokvelId)
+      .eq('user_id', req.user.id)
+      .maybeSingle()
+
+    if (memberLookupErr) {
+      console.error('POST /api/stokvels/:id/join membership lookup:', memberLookupErr)
+      return res
+        .status(500)
+        .json({ error: memberLookupErr.message || 'Failed to verify membership.' })
+    }
+    if (existingMembership?.user_id) {
+      return res.status(400).json({ error: 'You are already a member of this group.' })
+    }
+
+    const { error: insertErr } = await userSupabase.from('stokvel_members').insert([
+      {
+        stokvel_id: stokvelId,
+        user_id: req.user.id,
+        group_role: 'member',
+      },
+    ])
+    if (insertErr) {
+      console.error('POST /api/stokvels/:id/join insert:', insertErr)
+      return res
+        .status(500)
+        .json({ error: insertErr.message || 'Failed to join group.' })
+    }
+
+    clearDashboardCacheForUser(req.user.id)
+    return res.status(201).json({ success: true, stokvelId })
+  } catch (err) {
+    console.error('POST /api/stokvels/:id/join:', err)
+    return res.status(500).json({ error: 'Internal Server Error' })
   }
 })
 
