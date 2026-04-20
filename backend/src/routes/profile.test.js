@@ -106,6 +106,7 @@ describe('Profile Router', () => {
           firstName: 'John',
           lastName: 'Doe',
           username: 'john_doe',
+          email: '',
         },
       })
     })
@@ -196,11 +197,13 @@ describe('Profile Router', () => {
     })
 
     it('updates and returns fresh profile', async () => {
+      // username taken check
+      mockClient._state.maybeSingleQueue.push({ data: null, error: null })
       // existing profile lookup
       mockClient._state.maybeSingleQueue.push({ data: { id: 'test-user-id' }, error: null })
       // fresh profile read after update
       mockClient._state.singleQueue.push({
-        data: { first_name: 'Jane', last_name: 'Smith', username: 'jane_smith' },
+        data: { first_name: 'Jane', last_name: 'Smith', username: 'jane_smith', email: '' },
         error: null,
       })
 
@@ -215,6 +218,7 @@ describe('Profile Router', () => {
           firstName: 'Jane',
           lastName: 'Smith',
           username: 'jane_smith',
+          email: '',
         },
       })
       expect(normalizeUsername).toHaveBeenCalledWith('jane_smith')
