@@ -18,6 +18,7 @@ import {
   User,
   UserPlus,
   ClipboardList,
+  Settings,
 } from "lucide-react";
 import { supabase } from "../utils/supabase";
 import { useSession } from "../context/SessionContext";
@@ -151,6 +152,11 @@ export default function DashboardLayout() {
     return roleBadgeForGroupRole(selectedMembership.group_role);
   }, [selectedMembership]);
 
+  const myGroupRole = useMemo(
+    () => String(selectedMembership?.group_role ?? "").trim().toLowerCase(),
+    [selectedMembership],
+  );
+
   useEffect(() => {
     if (memberships === null || !stokvel_id) return;
     if (!knownMembershipIds.has(String(stokvel_id))) {
@@ -261,6 +267,15 @@ export default function DashboardLayout() {
             />
             Dashboard
           </NavLink>
+          {myGroupRole === "admin" && scopedPrefix ? (
+            <NavLink to={`${scopedPrefix}/settings`} className={linkClass}>
+              <Settings
+                className="h-4 w-4 shrink-0 text-emerald-700"
+                aria-hidden
+              />
+              Settings
+            </NavLink>
+          ) : null}
           <NavLink
             to={
               scopedPrefix

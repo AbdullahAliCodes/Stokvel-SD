@@ -211,6 +211,104 @@ router.get("/:id", requireAuth, async (req, res) => {
   }
 });
 
+router.patch("/:id", requireAuth, async (req, res) => {
+  try {
+    const stokvelId = req.params.id;
+    if (!UUID_RE_STOKVEL_PARAM.test(String(stokvelId))) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    const userSupabase = userScopedSupabase(req);
+    const { data: membership, error: membershipError } = await userSupabase
+      .from("stokvel_members")
+      .select("group_role")
+      .eq("stokvel_id", stokvelId)
+      .eq("user_id", req.user.id)
+      .maybeSingle();
+
+    if (membershipError) {
+      console.error("PATCH /api/stokvels/:id membership:", membershipError);
+      return res.status(500).json({ error: membershipError.message });
+    }
+    if (!membership) return res.status(404).json({ error: "Not found" });
+    if (String(membership.group_role || "").toLowerCase() !== "admin") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const {
+      name,
+      contribution_amount: contributionAmountRaw,
+      meeting_frequency: meetingFrequencyRaw,
+      is_public: isPublicRaw,
+    } = req.body ?? {};
+
+    const patch = {};
+
+    if (name !== undefined) {
+      if (typeof name !== "string" || name.trim().length === 0) {
+        return res
+          .status(400)
+          .json({ error: "name must be a non-empty string." });
+      }
+      patch.name = name.trim();
+    }
+
+    if (contributionAmountRaw !== undefined) {
+      const parsed = Number(contributionAmountRaw);
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        return res
+          .status(400)
+          .json({ error: "contribution_amount must be a number greater than 0." });
+      }
+      patch.contribution_amount = parsed;
+    }
+
+    if (meetingFrequencyRaw !== undefined) {
+      if (
+        meetingFrequencyRaw !== "weekly" &&
+        meetingFrequencyRaw !== "bi-weekly" &&
+        meetingFrequencyRaw !== "monthly"
+      ) {
+        return res.status(400).json({
+          error:
+            "meeting_frequency must be one of: weekly, bi-weekly, monthly.",
+        });
+      }
+      patch.meeting_frequency = meetingFrequencyRaw;
+    }
+
+    if (isPublicRaw !== undefined) {
+      if (typeof isPublicRaw !== "boolean") {
+        return res.status(400).json({ error: "is_public must be a boolean." });
+      }
+      patch.is_public = isPublicRaw;
+    }
+
+    if (Object.keys(patch).length === 0) {
+      return res.status(400).json({ error: "No valid fields provided." });
+    }
+
+    const writer = getServiceSupabase() ?? userSupabase;
+    const { data: stokvel, error: updateError } = await writer
+      .from("stokvels")
+      .update(patch)
+      .eq("id", stokvelId)
+      .select("*")
+      .maybeSingle();
+
+    if (updateError) {
+      console.error("PATCH /api/stokvels/:id update:", updateError);
+      return res.status(500).json({ error: updateError.message });
+    }
+    if (!stokvel) return res.status(404).json({ error: "Not found" });
+
+    return res.json({ success: true, stokvel });
+  } catch (err) {
+    console.error("PATCH /api/stokvels/:id:", err);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 router.get("/:id/meetings", requireAuth, async (req, res) => {
   try {
     const stokvelId = req.params.id;
