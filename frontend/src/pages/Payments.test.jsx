@@ -1,0 +1,304 @@
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import Payments from "./Payments";
+
+const { routerState, sessionState } = vi.hoisted(() => ({
+  routerState: { params: { stokvel_id: "stok-1" } },
+  sessionState: {
+    current: { session: { access_token: "token-1", user: { id: "u1" } } },
+  },
+}));
+
+const readViewCacheMock = vi.fn();
+const writeViewCacheMock = vi.fn();
+
+vi.mock("react-router-dom", () => ({
+  Link: ({ to, children, ...rest }) => (
+    <a href={to} data-to={to} {...rest}>
+      {children}
+    </a>
+  ),
+  useParams: () => routerState.params,
+}));
+
+vi.mock("../context/SessionContext", () => ({
+  useSession: () => sessionState.current,
+}));
+
+vi.mock("../utils/api", () => ({
+  apiUrl: (path) => `http://test${path}`,
+}));
+
+vi.mock("../utils/viewCache", () => ({
+  readViewCache: (...args) => readViewCacheMock(...args),
+  writeViewCache: (...args) => writeViewCacheMock(...args),
+}));
+
+vi.mock("../components/MarketRatesWidget", () => ({
+  default: ({ memberMonthlyContribution }) => (
+    <div data-testid="rates-widget">Rates:{memberMonthlyContribution}</div>
+  ),
+}));
+
+vi.mock("../components/QuickPayModal", () => ({
+  default: ({ onClose, onDebugStep, onSuccess, onRecordError, monthlyContribution }) => (
+    <div data-testid="quickpay-modal">
+      <button type="button" onClick={() => onDebugStep("modal-debug")}>
+        debug
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          onSuccess(monthlyContribution, {
+            id: "c100",
+            amount: monthlyContribution,
+            paid_at: "2026-04-20T10:00:00.000Z",
+            user_id: "u1",
+          })
+        }
+      >
+        success
+      </button>
+      <button type="button" onClick={() => onRecordError("record failed")}>
+        record-error
+      </button>
+      <button type="button" onClick={onClose}>
+        close
+      </button>
+    </div>
+  ),
+}));
+
+function okJson(json) {
+  return { ok: true, text: async () => JSON.stringify(json) };
+}
+
+function failText(text) {
+  return { ok: false, text: async () => text };
+}
+
+function setupFetch({ detail, meetings, treasurerPatch }) {
+  global.fetch = vi.fn(async (url, opts = {}) => {
+    const method = opts.method ?? "GET";
+    const u = String(url);
+    if (u.endsWith("/api/stokvels/stok-1") && method === "GET") return detail;
+    if (u.endsWith("/api/stokvels/stok-1/meetings") && method === "GET") return meetings;
+    if (u.endsWith("/api/stokvels/stok-1/treasurer") && method === "PATCH") return treasurerPatch;
+    throw new Error(`Unhandled fetch ${method} ${u}`);
+  });
+}
+
+const members = [
+  { user_id: "u1", group_role: "member", profiles: { first_name: "Ada", last_name: "L" } },
+  { user_id: "u2", group_role: "treasurer", profiles: { email: "john@example.com" } },
+];
+
+const detailBase = {
+  membership: { group_role: "member", stokvels: { name: "Fallback Group" } },
+  stokvel: { id: "stok-1", name: "Main Group", status: "active", contribution_amount: 500 },
+  members,
+  totalContribution: 2000,
+  contributions: [{ id: "c1", amount: 500, paid_at: "2026-04-20", profiles: { full_name: "Ada L" } }],
+};
+
+function renderPayments() {
+  return render(<Payments />);
+}
+
+describe("Payments", () => {
+  beforeEach(() => {
+    routerState.params = { stokvel_id: "stok-1" };
+    sessionState.current = { session: { access_token: "token-1", user: { id: "u1" } } };
+    readViewCacheMock.mockReset();
+    writeViewCacheMock.mockReset();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns null when stokvel_id is missing", () => {
+    routerState.params = {};
+    setupFetch({ detail: okJson(detailBase), meetings: okJson({ meetings: [] }) });
+
+    const { container } = renderPayments();
+    expect(container.firstChild).toBeNull();
+  });
+
+  it("shows sign-in message when session is missing", () => {
+    sessionState.current = { session: null };
+    setupFetch({ detail: okJson(detailBase), meetings: okJson({ meetings: [] }) });
+
+    renderPayments();
+    expect(screen.getByText("Sign in to view this stokvel.")).toBeInTheDocument();
+  });
+
+  it("renders loaded finance dashboard with stats, tables, links and widgets", async () => {
+    readViewCacheMock.mockReturnValue(null);
+    setupFetch({ detail: okJson(detailBase), meetings: okJson({ meetings: [{ id: "m1" }] }) });
+
+    renderPayments();
+
+    expect(await screen.findByText("Payments & finances")).toBeInTheDocument();
+    expect(screen.getByText("Main Group")).toBeInTheDocument();
+    expect(screen.getByText("Current treasurer")).toBeInTheDocument();
+    expect(screen.getAllByText("john").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("rates-widget")).toHaveTextContent("Rates:500");
+    expect(screen.getByRole("link", { name: "Meetings" })).toHaveAttribute(
+      "href",
+      "/group/stok-1/meetings",
+    );
+    expect(screen.getByText("Recent contributions")).toBeInTheDocument();
+    expect(screen.getByText("Payout queue")).toBeInTheDocument();
+    expect(screen.getAllByText("Ada L").length).toBeGreaterThan(0);
+  });
+
+  it("shows empty table messages when contributions and members are empty", async () => {
+    const detail = { ...detailBase, members: [], contributions: [] };
+    readViewCacheMock.mockReturnValue(null);
+    setupFetch({ detail: okJson(detail), meetings: okJson({ meetings: [] }) });
+
+    renderPayments();
+
+    await screen.findByText("No contributions yet.");
+    expect(screen.getByText("No payout schedule yet.")).toBeInTheDocument();
+  });
+
+  it("renders pending and rejected status banners", async () => {
+    readViewCacheMock.mockReturnValue(null);
+    setupFetch({
+      detail: okJson({
+        ...detailBase,
+        stokvel: { ...detailBase.stokvel, status: "pending" },
+      }),
+      meetings: okJson({ meetings: [] }),
+    });
+    renderPayments();
+    expect(await screen.findByText("Awaiting approval.")).toBeInTheDocument();
+
+    setupFetch({
+      detail: okJson({
+        ...detailBase,
+        stokvel: { ...detailBase.stokvel, status: "rejected" },
+      }),
+      meetings: okJson({ meetings: [] }),
+    });
+    renderPayments();
+    expect(await screen.findByText("Application rejected.")).toBeInTheDocument();
+  });
+
+  it("opens quick pay modal, handles debug/success/close, and updates contributions", async () => {
+    readViewCacheMock.mockReturnValue(null);
+    setupFetch({ detail: okJson(detailBase), meetings: okJson({ meetings: [] }) });
+
+    renderPayments();
+    await screen.findByText("Payments & finances");
+
+    fireEvent.click(screen.getByRole("button", { name: /Pay monthly contribution/i }));
+    expect(screen.getByTestId("quickpay-modal")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "debug" }));
+    expect(screen.getByText(/Payment debug: modal-debug/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "success" }));
+    await waitFor(() =>
+      expect(screen.queryByTestId("quickpay-modal")).not.toBeInTheDocument(),
+    );
+    expect(screen.getByText(/Payment debug: Optimistic UI updated, refreshing from server/)).toBeInTheDocument();
+  });
+
+  it("shows record error from quick pay callback", async () => {
+    readViewCacheMock.mockReturnValue(null);
+    setupFetch({ detail: okJson(detailBase), meetings: okJson({ meetings: [] }) });
+
+    renderPayments();
+    await screen.findByText("Payments & finances");
+    fireEvent.click(screen.getByRole("button", { name: /Pay monthly contribution/i }));
+    fireEvent.click(screen.getByRole("button", { name: "record-error" }));
+
+    expect(await screen.findByText(/Payment succeeded, but contribution was not recorded/)).toBeInTheDocument();
+  });
+
+  it("disables quick pay when stokvel is not active", async () => {
+    readViewCacheMock.mockReturnValue(null);
+    setupFetch({
+      detail: okJson({
+        ...detailBase,
+        stokvel: { ...detailBase.stokvel, status: "pending" },
+      }),
+      meetings: okJson({ meetings: [] }),
+    });
+
+    renderPayments();
+    const quickPayBtn = await screen.findByRole("button", { name: /Pay monthly contribution/i });
+    expect(quickPayBtn).toBeDisabled();
+  });
+
+  it("shows and saves treasurer assignment for manager roles", async () => {
+    const detail = {
+      ...detailBase,
+      membership: { ...detailBase.membership, group_role: "admin" },
+      members: [
+        { user_id: "u1", group_role: "admin", profiles: { full_name: "Admin One" } },
+        { user_id: "u2", group_role: "member", profiles: { full_name: "Member Two" } },
+      ],
+    };
+    readViewCacheMock.mockReturnValue(null);
+    setupFetch({
+      detail: okJson(detail),
+      meetings: okJson({ meetings: [] }),
+      treasurerPatch: okJson({ ok: true }),
+    });
+
+    renderPayments();
+    await screen.findByText("Assign treasurer");
+
+    fireEvent.change(screen.getByLabelText("Treasurer member"), { target: { value: "u2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save treasurer" }));
+
+    expect(await screen.findByText("Treasurer updated.")).toBeInTheDocument();
+  });
+
+  it("shows treasurer save error and respects cancel confirmation", async () => {
+    const detail = {
+      ...detailBase,
+      membership: { ...detailBase.membership, group_role: "admin" },
+      members: [
+        { user_id: "u1", group_role: "admin", profiles: { full_name: "Admin One" } },
+        { user_id: "u2", group_role: "member", profiles: { full_name: "Member Two" } },
+      ],
+    };
+    readViewCacheMock.mockReturnValue(null);
+    setupFetch({
+      detail: okJson(detail),
+      meetings: okJson({ meetings: [] }),
+      treasurerPatch: failText('{"error":"Patch failed"}'),
+    });
+
+    renderPayments();
+    await screen.findByText("Assign treasurer");
+
+    fireEvent.change(screen.getByLabelText("Treasurer member"), { target: { value: "u2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save treasurer" }));
+    expect(await screen.findByText("Patch failed")).toBeInTheDocument();
+
+    vi.mocked(window.confirm).mockReturnValue(false);
+    fireEvent.click(screen.getByRole("button", { name: "Save treasurer" }));
+    const patchCalls = global.fetch.mock.calls.filter(
+      ([u, o]) => String(u).endsWith("/treasurer") && o?.method === "PATCH",
+    );
+    expect(patchCalls).toHaveLength(1);
+  });
+
+  it("shows load error when detail request fails", async () => {
+    readViewCacheMock.mockReturnValue(null);
+    setupFetch({
+      detail: failText("boom"),
+      meetings: okJson({ meetings: [] }),
+    });
+
+    renderPayments();
+    expect(await screen.findByText("boom")).toBeInTheDocument();
+  });
+});
