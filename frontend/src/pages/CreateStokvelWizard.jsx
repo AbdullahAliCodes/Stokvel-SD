@@ -204,6 +204,7 @@ export function CreateStokvelWizard({ variant = "admin" }) {
   const [payoutOrder, setPayoutOrder] = useState("randomize");
   const [meetingFrequency, setMeetingFrequency] = useState("monthly");
   const [cycleLength, setCycleLength] = useState("1");
+  const [isPublic, setIsPublic] = useState(false);
   const [documentFiles, setDocumentFiles] = useState([]);
   const [uploadingDocs, setUploadingDocs] = useState(false);
   const [dropzoneActive, setDropzoneActive] = useState(false);
@@ -786,6 +787,7 @@ export function CreateStokvelWizard({ variant = "admin" }) {
           membersCount,
           memberDetails: memberDetailsPayload,
           documents: documentUrls,
+          isPublic,
           initialMemberIds,
           ...(isAdmin
             ? { treasurerUserId: treasurerIdForAdmin }
@@ -1071,6 +1073,24 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                       <option value="bi-annually">Bi-Annually</option>
                     </select>
                   </label>
+                  <div className="sm:col-span-2">
+                    <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-4 py-3 transition-colors hover:border-emerald-300 hover:bg-emerald-50">
+                      <input
+                        type="checkbox"
+                        checked={isPublic}
+                        onChange={(e) => setIsPublic(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 rounded border-emerald-300 accent-emerald-600"
+                      />
+                      <span>
+                        <span className="block text-sm font-semibold text-emerald-900">
+                          Make this Stokvel Public
+                        </span>
+                        <span className="mt-1 block text-xs text-stone-600">
+                          Anyone on the platform will be able to see and request to join this group.
+                        </span>
+                      </span>
+                    </label>
+                  </div>
                 </div>
               </div>
             ) : null}

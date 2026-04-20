@@ -24,6 +24,8 @@ const ICONS = {
  * @param {{ label: string, value: string }[]} props.metrics — expect two items for layout
  * @param {'users'|'wallet'|'landmark'} props.icon
  * @param {string} [props.applyHref]
+ * @param {() => void | Promise<void>} [props.onApply]
+ * @param {boolean} [props.isJoining]
  */
 export default function OpportunityCard({
   name,
@@ -31,6 +33,8 @@ export default function OpportunityCard({
   metrics,
   icon,
   applyHref = '/auth',
+  onApply,
+  isJoining = false,
 }) {
   const Icon = ICONS[icon] ?? ICONS.users
   const [m1, m2] = metrics
@@ -62,12 +66,23 @@ export default function OpportunityCard({
         ) : null}
       </div>
 
-      <Link
-        to={applyHref}
-        className={`${btnPrimary} mt-6 inline-flex w-full items-center justify-center sm:mt-auto`}
-      >
-        Apply to join
-      </Link>
+      {typeof onApply === 'function' ? (
+        <button
+          type="button"
+          onClick={onApply}
+          disabled={isJoining}
+          className={`${btnPrimary} mt-6 inline-flex w-full items-center justify-center sm:mt-auto disabled:cursor-not-allowed disabled:opacity-70`}
+        >
+          {isJoining ? 'Joining...' : 'Apply to join'}
+        </button>
+      ) : (
+        <Link
+          to={applyHref}
+          className={`${btnPrimary} mt-6 inline-flex w-full items-center justify-center sm:mt-auto`}
+        >
+          Apply to join
+        </Link>
+      )}
     </article>
   )
 }
