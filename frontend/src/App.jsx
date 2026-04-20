@@ -31,6 +31,7 @@ import StokvelDashboard from "./pages/StokvelDashboard";
 import Meetings from "./pages/Meetings";
 import MeetingDetails from "./pages/MeetingDetails";
 import Payments from "./pages/Payments";
+import Settings from "./pages/Settings";
 import Support from "./pages/Support";
 import Landing from "./pages/Landing";
 import PublicStokvels from "./pages/PublicStokvels";
@@ -107,6 +108,7 @@ export default function App() {
                     <Route index element={<GroupScopeIndexRedirect />} />
                     <Route path="dashboard" element={<StokvelDashboard />} />
                     <Route path="payments" element={<Payments />} />
+                    <Route path="settings" element={<Settings />} />
                     <Route path="meetings" element={<Meetings />} />
                     <Route
                       path="meetings/:meeting_id"
