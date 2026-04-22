@@ -1,5 +1,17 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+function futureDatetimeLocal() {
+  const d = new Date(Date.now() + 7 * 24 * 3600 * 1000)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function pastDatetimeLocal() {
+  const d = new Date(Date.now() - 3600 * 1000)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import AdminEditStokvel from './AdminEditStokvel'
 import { SessionContext } from '../context/SessionContext'
@@ -283,7 +295,7 @@ describe('AdminEditStokvel', () => {
       const btn = await screen.findByRole('button', { name: 'Schedule meeting' })
       
       fireEvent.change(screen.getByLabelText(/Meeting title/i), { target: { value: 'Test Meet' } })
-      fireEvent.change(screen.getByLabelText(/Date & time/i), { target: { value: '2026-02-01T10:00' } })
+      fireEvent.change(screen.getByLabelText(/Date & time/i), { target: { value: futureDatetimeLocal() } })
       
       confirmSpy.mockReturnValueOnce(false)
       fireEvent.click(btn)
@@ -297,7 +309,7 @@ describe('AdminEditStokvel', () => {
       const btn = await screen.findByRole('button', { name: 'Schedule meeting' })
       
       fireEvent.change(screen.getByLabelText(/Meeting title/i), { target: { value: 'Test Meet' } })
-      fireEvent.change(screen.getByLabelText(/Date & time/i), { target: { value: '2026-02-01T10:00' } })
+      fireEvent.change(screen.getByLabelText(/Date & time/i), { target: { value: futureDatetimeLocal() } })
       
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -318,7 +330,7 @@ describe('AdminEditStokvel', () => {
       const btn = await screen.findByRole('button', { name: 'Schedule meeting' })
       
       fireEvent.change(screen.getByLabelText(/Meeting title/i), { target: { value: 'Test Meet' } })
-      fireEvent.change(screen.getByLabelText(/Date & time/i), { target: { value: '2026-02-01T10:00' } })
+      fireEvent.change(screen.getByLabelText(/Date & time/i), { target: { value: futureDatetimeLocal() } })
       
       mockFetch.mockResolvedValueOnce({
         ok: false,
@@ -327,6 +339,22 @@ describe('AdminEditStokvel', () => {
 
       fireEvent.click(btn)
       expect(await screen.findByText('Bad Request')).toBeInTheDocument()
+    })
+
+    it('does not schedule when datetime is in the past locally', async () => {
+      mockLoadSuccess()
+      renderWithProviders(<AdminEditStokvel />, { session: { access_token: 'fake-token' } })
+      const btn = await screen.findByRole('button', { name: 'Schedule meeting' })
+
+      fireEvent.change(screen.getByLabelText(/Meeting title/i), { target: { value: 'Test Meet' } })
+      fireEvent.change(screen.getByLabelText(/Date & time/i), {
+        target: { value: pastDatetimeLocal() },
+      })
+      fireEvent.click(btn)
+
+      expect(confirmSpy).not.toHaveBeenCalled()
+      expect(await screen.findByRole('alert')).toHaveTextContent(/already passed/i)
+      expect(mockFetch).toHaveBeenCalledTimes(2)
     })
 
     it('cancels saving minutes if confirmed is false', async () => {
