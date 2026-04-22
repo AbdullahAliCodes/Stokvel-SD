@@ -13,6 +13,7 @@ import {
   errorBox,
   cardLight,
 } from '../ui'
+import { validateMeetingScheduleLocal } from '../utils/meetingScheduleValidation'
 
 function parseApiError(text) {
   try {
@@ -57,6 +58,7 @@ export default function AdminEditStokvel() {
     agenda: '',
   })
   const [minutesDraft, setMinutesDraft] = useState({})
+  const [meetingScheduleErrorShakeKey, setMeetingScheduleErrorShakeKey] = useState(0)
 
   useEffect(() => {
     if (!session?.access_token || !id) return
@@ -170,10 +172,16 @@ export default function AdminEditStokvel() {
   async function handleCreateMeeting(e) {
     e.preventDefault()
     if (!session?.access_token || !id) return
-    if (!confirmAction('Schedule this meeting and send member notifications?')) return
-    setMeetingSaving(true)
     setMeetingError('')
     setMeetingInfo('')
+    const scheduleCheck = validateMeetingScheduleLocal(meetingForm.meetingDate)
+    if (!scheduleCheck.ok) {
+      setMeetingError(scheduleCheck.message)
+      setMeetingScheduleErrorShakeKey((k) => k + 1)
+      return
+    }
+    if (!confirmAction('Schedule this meeting and send member notifications?')) return
+    setMeetingSaving(true)
     try {
       const res = await fetch(apiUrl(`/api/stokvels/${id}/meetings`), {
         method: 'POST',
@@ -196,8 +204,10 @@ export default function AdminEditStokvel() {
       }
       setMeetingForm({ title: '', meetingDate: '', meetingLink: '', agenda: '' })
       setMeetingInfo('Meeting scheduled and notifications sent.')
+      setMeetingScheduleErrorShakeKey(0)
     } catch (err) {
       setMeetingError(err.message ?? String(err))
+      setMeetingScheduleErrorShakeKey((k) => k + 1)
     } finally {
       setMeetingSaving(false)
     }
@@ -209,6 +219,7 @@ export default function AdminEditStokvel() {
     setMeetingSaving(true)
     setMeetingError('')
     setMeetingInfo('')
+    setMeetingScheduleErrorShakeKey(0)
     try {
       const res = await fetch(apiUrl(`/api/stokvels/${id}/meetings/${meetingId}/minutes`), {
         method: 'PATCH',
@@ -238,6 +249,7 @@ export default function AdminEditStokvel() {
     setMeetingSaving(true)
     setMeetingError('')
     setMeetingInfo('')
+    setMeetingScheduleErrorShakeKey(0)
     try {
       const res = await fetch(apiUrl(`/api/stokvels/${id}/meetings/${meetingId}`), {
         method: 'DELETE',
@@ -428,7 +440,17 @@ export default function AdminEditStokvel() {
             Admins and treasurers can schedule meetings, set agendas, and record minutes.
           </p>
           {meetingError ? (
-            <p className={`${errorBox} mb-3`} role="alert">
+            <p
+              key={
+                meetingScheduleErrorShakeKey > 0
+                  ? `meeting-schedule-err-${meetingScheduleErrorShakeKey}`
+                  : 'meeting-err-static'
+              }
+              className={`${errorBox} mb-3${
+                meetingScheduleErrorShakeKey > 0 ? ' animate-meeting-schedule-shake' : ''
+              }`}
+              role="alert"
+            >
               {meetingError}
             </p>
           ) : null}
@@ -462,7 +484,12 @@ export default function AdminEditStokvel() {
                 onChange={(ev) =>
                   setMeetingForm((prev) => ({ ...prev, meetingDate: ev.target.value }))
                 }
-                className={inputLight}
+                aria-invalid={meetingScheduleErrorShakeKey > 0 && Boolean(meetingError)}
+                className={`${inputLight} transition-shadow duration-200 ${
+                  meetingScheduleErrorShakeKey > 0 && meetingError
+                    ? 'ring-2 ring-red-500/70 ring-offset-2 ring-offset-stone-50 dark:ring-offset-slate-900'
+                    : ''
+                }`}
                 required
               />
             </label>

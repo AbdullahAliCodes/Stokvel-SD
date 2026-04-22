@@ -101,6 +101,20 @@ function futureIso() {
   return new Date(Date.now() + 24 * 3600 * 1000).toISOString();
 }
 
+/** `datetime-local` string strictly in the future (local TZ), for schedule form tests */
+function futureDatetimeLocal() {
+  const d = new Date(Date.now() + 7 * 24 * 3600 * 1000);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** `datetime-local` in the past (local TZ), for validation tests — avoids fake timers with findBy* */
+function pastDatetimeLocal() {
+  const d = new Date(Date.now() - 3600 * 1000);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function pastIso() {
   return new Date(Date.now() - 24 * 3600 * 1000).toISOString();
 }
@@ -273,6 +287,8 @@ describe("Meetings page", () => {
       minutes: "",
     };
 
+    const meetingDateLocal = futureDatetimeLocal();
+
     setupFetchHandlers({
       detail: makeResponse({ json: baseDetail }),
       meetings: makeResponse({ json: { meetings: [meetingUpcoming] } }),
@@ -287,7 +303,7 @@ describe("Meetings page", () => {
       target: { value: "  New Session  " },
     });
     fireEvent.change(screen.getByLabelText("Date & time *"), {
-      target: { value: "2026-04-30T10:00" },
+      target: { value: meetingDateLocal },
     });
     fireEvent.change(screen.getByLabelText("Meeting link"), {
       target: { value: "  https://new  " },
@@ -306,10 +322,34 @@ describe("Meetings page", () => {
     const body = JSON.parse(createCall[1].body);
     expect(body).toEqual({
       title: "New Session",
-      meetingDate: "2026-04-30T10:00",
+      meetingDate: meetingDateLocal,
       meetingLink: "https://new",
       agenda: "agenda",
     });
+  });
+
+  it("does not submit schedule when datetime is not in the future locally", async () => {
+    readViewCacheMock.mockReturnValue(null);
+    setupFetchHandlers({
+      detail: makeResponse({ json: baseDetail }),
+      meetings: makeResponse({ json: { meetings: [meetingUpcoming] } }),
+      create: makeResponse({ json: { meeting: { id: "x" } } }),
+    });
+
+    renderMeetings();
+    await screen.findByText("Planning Session");
+
+    const fetchCountAfterLoad = global.fetch.mock.calls.length;
+
+    fireEvent.click(screen.getByRole("button", { name: "Schedule new meeting" }));
+    fireEvent.change(screen.getByLabelText("Title *"), { target: { value: "Past meet" } });
+    fireEvent.change(screen.getByLabelText("Date & time *"), {
+      target: { value: pastDatetimeLocal() },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create meeting" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/already passed/i);
+    expect(global.fetch.mock.calls.length).toBe(fetchCountAfterLoad);
   });
 
   it("shows schedule error on create failure and allows canceling modal", async () => {
@@ -326,7 +366,7 @@ describe("Meetings page", () => {
     fireEvent.click(screen.getByRole("button", { name: "Schedule new meeting" }));
     fireEvent.change(screen.getByLabelText("Title *"), { target: { value: "x" } });
     fireEvent.change(screen.getByLabelText("Date & time *"), {
-      target: { value: "2026-04-30T10:00" },
+      target: { value: futureDatetimeLocal() },
     });
     fireEvent.click(screen.getByRole("button", { name: "Create meeting" }));
     expect(await screen.findByText("Create failed")).toBeInTheDocument();

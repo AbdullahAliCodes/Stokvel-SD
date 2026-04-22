@@ -12,6 +12,7 @@ import {
   pageSubtitle,
 } from "../ui";
 import { readViewCache, writeViewCache } from "../utils/viewCache";
+import { validateMeetingScheduleLocal } from "../utils/meetingScheduleValidation";
 import MeetingCalendar from "../components/meetings/MeetingCalendar";
 import MeetingDetailsPanel from "../components/meetings/MeetingDetailsPanel";
 
@@ -89,6 +90,8 @@ export default function Meetings() {
   });
   const [scheduleSaving, setScheduleSaving] = useState(false);
   const [scheduleError, setScheduleError] = useState("");
+  /** Bumped on schedule submit errors so the alert replay its shake animation */
+  const [scheduleErrorShakeKey, setScheduleErrorShakeKey] = useState(0);
 
   useEffect(() => {
     if (!stokvel_id) {
@@ -303,10 +306,16 @@ export default function Meetings() {
   async function handleCreateMeeting(e) {
     e.preventDefault();
     if (!session?.access_token || !stokvel_id) return;
-    setScheduleSaving(true);
     setScheduleError("");
     setMeetingActionError("");
     setMeetingActionOk("");
+    const scheduleCheck = validateMeetingScheduleLocal(scheduleForm.meetingDate);
+    if (!scheduleCheck.ok) {
+      setScheduleError(scheduleCheck.message);
+      setScheduleErrorShakeKey((k) => k + 1);
+      return;
+    }
+    setScheduleSaving(true);
     try {
       const res = await fetch(apiUrl(`/api/stokvels/${stokvel_id}/meetings`), {
         method: "POST",
@@ -345,6 +354,7 @@ export default function Meetings() {
       setMeetingActionOk("Meeting scheduled.");
     } catch (err) {
       setScheduleError(err.message ?? String(err));
+      setScheduleErrorShakeKey((k) => k + 1);
     } finally {
       setScheduleSaving(false);
     }
@@ -665,7 +675,12 @@ export default function Meetings() {
                   onChange={(e) =>
                     setScheduleForm((p) => ({ ...p, meetingDate: e.target.value }))
                   }
-                  className={`${inputLight} mt-1`}
+                  aria-invalid={Boolean(scheduleError)}
+                  className={`${inputLight} mt-1 transition-shadow duration-200 ${
+                    scheduleError && scheduleErrorShakeKey
+                      ? "ring-2 ring-red-500/70 ring-offset-2 ring-offset-stone-50 dark:ring-offset-slate-900"
+                      : ""
+                  }`}
                 />
               </label>
               <label className="block text-xs font-semibold uppercase text-stone-500">
@@ -692,7 +707,15 @@ export default function Meetings() {
                   placeholder={"- Welcome\n- Contributions review"}
                 />
               </label>
-              {scheduleError ? <p className={`text-sm ${errorBox}`}>{scheduleError}</p> : null}
+              {scheduleError ? (
+                <p
+                  key={scheduleErrorShakeKey}
+                  className={`text-sm ${errorBox} animate-meeting-schedule-shake`}
+                  role="alert"
+                >
+                  {scheduleError}
+                </p>
+              ) : null}
               <div className="flex flex-wrap gap-2 pt-2">
                 <button type="submit" className={btnPrimary} disabled={scheduleSaving}>
                   {scheduleSaving ? "Saving…" : "Create meeting"}
