@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from "react";
 import {
   CartesianGrid,
   Line,
@@ -7,57 +7,59 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-} from 'recharts'
-import { apiUrl } from '../utils/api'
-import { cardLight } from '../ui'
+} from "recharts";
+import { apiUrl } from "../utils/api";
+import { cardLight } from "../ui";
 
-const CHART_MONTHS = [1, 2, 3, 6, 9, 12]
+const CHART_MONTHS = [1, 2, 3, 6, 9, 12];
 
 function buildProjectionPoints(contribution, primeRatePercent) {
-  const pmt = Number(contribution) || 0
-  const annual = Number(primeRatePercent)
-  if (!Number.isFinite(annual)) return []
+  const pmt = Number(contribution) || 0;
+  const annual = Number(primeRatePercent);
+  if (!Number.isFinite(annual)) return [];
 
-  const r = annual / 100 / 12
+  const r = annual / 100 / 12;
   return CHART_MONTHS.map((month) => {
-    const fv =
-      r === 0 ? pmt * month : pmt * ((Math.pow(1 + r, month) - 1) / r)
-    return { month: `M${month}`, value: parseFloat(fv.toFixed(2)) }
-  })
+    const fv = r === 0 ? pmt * month : pmt * ((Math.pow(1 + r, month) - 1) / r);
+    return { month: `M${month}`, value: parseFloat(fv.toFixed(2)) };
+  });
 }
 
 export default function MarketRatesWidget({ memberMonthlyContribution = 0 }) {
-  const [rates, setRates] = useState(null)
-  const [projection, setProjection] = useState([])
-  const [error, setError] = useState(null)
+  const [rates, setRates] = useState(null);
+  const [projection, setProjection] = useState([]);
+  const [error, setError] = useState(null);
 
-  const contribution = Number(memberMonthlyContribution) || 0
+  const contribution = Number(memberMonthlyContribution) || 0;
 
   const loadRates = useCallback(async () => {
-    setError(null)
+    setError(null);
     try {
-      const res = await fetch(apiUrl('/api/market-rates'))
-      const text = await res.text()
-      const data = text ? JSON.parse(text) : {}
-      if (!res.ok) throw new Error(data?.error || text || `HTTP ${res.status}`)
-      setRates(data)
+      const res = await fetch(apiUrl("/api/market-rates"));
+      const text = await res.text();
+      const data = text ? JSON.parse(text) : {};
+      if (!res.ok) throw new Error(data?.error || text || `HTTP ${res.status}`);
+      setRates(data);
     } catch (e) {
-      setRates(null)
-      setError(e instanceof Error ? e.message : String(e))
+      setRates(null);
+      setError(e instanceof Error ? e.message : String(e));
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
-    void loadRates()
-  }, [loadRates])
+    void loadRates();
+  }, [loadRates]);
 
   useEffect(() => {
-    if (rates?.prime_rate == null || !Number.isFinite(Number(rates.prime_rate))) {
-      setProjection([])
-      return
+    if (
+      rates?.prime_rate == null ||
+      !Number.isFinite(Number(rates.prime_rate))
+    ) {
+      setProjection([]);
+      return;
     }
-    setProjection(buildProjectionPoints(contribution, rates.prime_rate))
-  }, [rates, contribution])
+    setProjection(buildProjectionPoints(contribution, rates.prime_rate));
+  }, [rates, contribution]);
 
   if (error) {
     return (
@@ -65,7 +67,7 @@ export default function MarketRatesWidget({ memberMonthlyContribution = 0 }) {
         <p className="text-sm font-bold text-emerald-800">SA reference rates</p>
         <p className="mt-2 text-xs text-red-800">{error}</p>
       </div>
-    )
+    );
   }
 
   if (!rates) {
@@ -73,7 +75,7 @@ export default function MarketRatesWidget({ memberMonthlyContribution = 0 }) {
       <div className={`${cardLight} p-6`}>
         <p className="text-sm text-stone-500">Loading rates…</p>
       </div>
-    )
+    );
   }
 
   return (
@@ -84,16 +86,17 @@ export default function MarketRatesWidget({ memberMonthlyContribution = 0 }) {
           Repo: <strong className="text-emerald-900">{rates.repo_rate}%</strong>
         </span>
         <span className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-emerald-800">
-          Prime: <strong className="text-emerald-900">{rates.prime_rate}%</strong>
+          Prime:{" "}
+          <strong className="text-emerald-900">{rates.prime_rate}%</strong>
         </span>
         <span className="text-stone-500">
-          Updated{' '}
+          Updated{" "}
           {rates.last_updated
-            ? new Date(rates.last_updated).toLocaleString('en-ZA', {
-                dateStyle: 'medium',
-                timeStyle: 'short',
+            ? new Date(rates.last_updated).toLocaleString("en-ZA", {
+                dateStyle: "medium",
+                timeStyle: "short",
               })
-            : '—'}
+            : "—"}
         </span>
       </div>
       <div>
@@ -107,29 +110,38 @@ export default function MarketRatesWidget({ memberMonthlyContribution = 0 }) {
         ) : (
           <div className="h-[220px] w-full min-w-0">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={projection} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgb(231 229 228)" />
-                <XAxis dataKey="month" tick={{ fill: '#78716c', fontSize: 10 }} />
+              <LineChart
+                data={projection}
+                margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="rgb(231 229 228)"
+                />
+                <XAxis
+                  dataKey="month"
+                  tick={{ fill: "#78716c", fontSize: 10 }}
+                />
                 <YAxis
-                  tick={{ fill: '#78716c', fontSize: 10 }}
+                  tick={{ fill: "#78716c", fontSize: 10 }}
                   tickFormatter={(v) =>
-                    `R${Number(v).toLocaleString('en-ZA', { maximumFractionDigits: 0 })}`
+                    `R${Number(v).toLocaleString("en-ZA", { maximumFractionDigits: 0 })}`
                   }
                 />
                 <Tooltip
                   contentStyle={{
-                    background: '#ffffff',
-                    border: '1px solid rgb(214 211 209)',
+                    background: "#ffffff",
+                    border: "1px solid rgb(214 211 209)",
                     borderRadius: 8,
                     fontSize: 12,
-                    color: '#292524',
+                    color: "#292524",
                   }}
                   formatter={(v) => [
-                    `R${Number(v).toLocaleString('en-ZA', {
+                    `R${Number(v).toLocaleString("en-ZA", {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}`,
-                    'Balance',
+                    "Balance",
                   ]}
                 />
                 <Line
@@ -137,7 +149,7 @@ export default function MarketRatesWidget({ memberMonthlyContribution = 0 }) {
                   dataKey="value"
                   stroke="#047857"
                   strokeWidth={2}
-                  dot={{ r: 3, fill: '#047857' }}
+                  dot={{ r: 3, fill: "#047857" }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -145,5 +157,5 @@ export default function MarketRatesWidget({ memberMonthlyContribution = 0 }) {
         )}
       </div>
     </div>
-  )
+  );
 }

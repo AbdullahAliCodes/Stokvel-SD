@@ -69,82 +69,91 @@ export default function App() {
       <SessionProvider session={session}>
         <div className="h-full min-h-0 overflow-hidden">
           <BrowserRouter>
-          <Routes>
-            <Route path="/home" element={<Navigate to="/" replace />} />
-            <Route element={<PublicLayout />}>
-              <Route path="/" element={<Landing />} />
-              <Route path="/stokvels" element={<PublicStokvels />} />
-              <Route
-                path="/auth"
-                element={session ? <AuthRedirect /> : <Auth />}
-              />
-              <Route path="/accept-invitation" element={<AcceptInvitation />} />
-            </Route>
-
-            <Route element={<RequireAuth session={session} />}>
-              <Route element={<RequireMember />}>
-                <Route path="/dashboard" element={<DashboardGateway />} />
-                <Route path="/onboarding" element={<Onboarding />} />
-
+            <Routes>
+              <Route path="/home" element={<Navigate to="/" replace />} />
+              <Route element={<PublicLayout />}>
+                <Route path="/" element={<Landing />} />
+                <Route path="/stokvels" element={<PublicStokvels />} />
                 <Route
-                  path="/stokvels/:id"
-                  element={<LegacyStokvelToGroup />}
+                  path="/auth"
+                  element={session ? <AuthRedirect /> : <Auth />}
                 />
                 <Route
-                  path="/meetings"
-                  element={<LegacyMeetingsListRedirect />}
+                  path="/accept-invitation"
+                  element={<AcceptInvitation />}
                 />
-                <Route
-                  path="/meetings/:id"
-                  element={<LegacyMeetingDetailRedirect />}
-                />
+              </Route>
 
-                <Route element={<DashboardLayout />}>
-                  <Route path="/apply" element={<Apply />} />
-                  <Route path="/account" element={<Account />} />
-                  <Route path="/support" element={<Support />} />
-                  <Route path="/my-payout" element={<LegacyMyPayoutRedirect />} />
-                  <Route path="/group/:stokvel_id">
-                    <Route index element={<GroupScopeIndexRedirect />} />
-                    <Route path="dashboard" element={<StokvelDashboard />} />
-                    <Route path="payments" element={<Payments />} />
-                    <Route path="settings" element={<Settings />} />
-                    <Route path="meetings" element={<Meetings />} />
+              <Route element={<RequireAuth session={session} />}>
+                <Route element={<RequireMember />}>
+                  <Route path="/dashboard" element={<DashboardGateway />} />
+                  <Route path="/onboarding" element={<Onboarding />} />
+
+                  <Route
+                    path="/stokvels/:id"
+                    element={<LegacyStokvelToGroup />}
+                  />
+                  <Route
+                    path="/meetings"
+                    element={<LegacyMeetingsListRedirect />}
+                  />
+                  <Route
+                    path="/meetings/:id"
+                    element={<LegacyMeetingDetailRedirect />}
+                  />
+
+                  <Route element={<DashboardLayout />}>
+                    <Route path="/apply" element={<Apply />} />
+                    <Route path="/account" element={<Account />} />
+                    <Route path="/support" element={<Support />} />
                     <Route
-                      path="meetings/:meeting_id"
-                      element={<MeetingDetails />}
+                      path="/my-payout"
+                      element={<LegacyMyPayoutRedirect />}
+                    />
+                    <Route path="/group/:stokvel_id">
+                      <Route index element={<GroupScopeIndexRedirect />} />
+                      <Route path="dashboard" element={<StokvelDashboard />} />
+                      <Route path="payments" element={<Payments />} />
+                      <Route path="settings" element={<Settings />} />
+                      <Route path="meetings" element={<Meetings />} />
+                      <Route
+                        path="meetings/:meeting_id"
+                        element={<MeetingDetails />}
+                      />
+                    </Route>
+                  </Route>
+                </Route>
+
+                <Route element={<RequireAdmin />}>
+                  <Route path="/admin" element={<AdminLayout />}>
+                    <Route
+                      index
+                      element={<Navigate to="/admin/groups" replace />}
+                    />
+                    <Route path="groups" element={<AdminGroups />} />
+                    <Route
+                      path="groups/:id/review"
+                      element={<AdminReviewStokvel />}
+                    />
+                    <Route
+                      path="groups/:id/edit"
+                      element={<AdminEditStokvel />}
+                    />
+                    <Route path="account" element={<Account />} />
+                    <Route
+                      path="tickets"
+                      element={<AdminPlaceholder title="Issue Tickets" />}
+                    />
+                    <Route
+                      path="create-group"
+                      element={<AdminCreateStokvel />}
                     />
                   </Route>
                 </Route>
               </Route>
 
-              <Route element={<RequireAdmin />}>
-                <Route path="/admin" element={<AdminLayout />}>
-                  <Route
-                    index
-                    element={<Navigate to="/admin/groups" replace />}
-                  />
-                  <Route path="groups" element={<AdminGroups />} />
-                  <Route
-                    path="groups/:id/review"
-                    element={<AdminReviewStokvel />}
-                  />
-                  <Route
-                    path="groups/:id/edit"
-                    element={<AdminEditStokvel />}
-                  />
-                  <Route path="account" element={<Account />} />
-                  <Route
-                    path="tickets"
-                    element={<AdminPlaceholder title="Issue Tickets" />}
-                  />
-                  <Route path="create-group" element={<AdminCreateStokvel />} />
-                </Route>
-              </Route>
-            </Route>
-
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
           </BrowserRouter>
         </div>
       </SessionProvider>
