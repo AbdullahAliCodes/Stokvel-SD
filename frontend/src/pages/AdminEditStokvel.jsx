@@ -40,7 +40,6 @@ export default function AdminEditStokvel() {
   const [type, setType] = useState('Rotating')
   const [status, setStatus] = useState('active')
   const [contributionAmount, setContributionAmount] = useState('')
-  const [payoutStrategy, setPayoutStrategy] = useState('Auto-Rotate')
   const [cycleLength, setCycleLength] = useState('12')
 
   const [memberUsername, setMemberUsername] = useState('')
@@ -91,7 +90,6 @@ export default function AdminEditStokvel() {
           setContributionAmount(
             s.contribution_amount != null ? String(s.contribution_amount) : '',
           )
-          setPayoutStrategy(s.payout_strategy ?? 'Auto-Rotate')
           setCycleLength(s.cycle_length != null ? String(s.cycle_length) : '12')
           setMeetings(Array.isArray(meetingsData.meetings) ? meetingsData.meetings : [])
         }
@@ -128,7 +126,6 @@ export default function AdminEditStokvel() {
           type,
           status,
           contributionAmount: amount,
-          payoutStrategy,
           cycleLength: cycle,
         }),
       })
@@ -349,17 +346,6 @@ export default function AdminEditStokvel() {
               onChange={(ev) => setContributionAmount(ev.target.value)}
               className={inputLight}
             />
-          </label>
-          <label className={labelLight}>
-            Payout schedule
-            <select
-              value={payoutStrategy}
-              onChange={(ev) => setPayoutStrategy(ev.target.value)}
-              className={inputLight}
-            >
-              <option value="Manual">Manual</option>
-              <option value="Auto-Rotate">Auto-Rotate</option>
-            </select>
           </label>
           <label className={labelLight}>
             Cycle length

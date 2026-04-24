@@ -15,6 +15,7 @@ import {
   sendGroupStatusEmail,
   sendInvitationEmail,
 } from '../utils/invitations.js'
+import { activateStokvel } from '../utils/stokvelActivation.js'
 
 const router = Router()
 
@@ -99,7 +100,6 @@ async function updateStokvelReturningRow(client, stokvelId, patch) {
 }
 
 const ALLOWED_TYPES = new Set(['Rotating', 'Fixed'])
-const ALLOWED_PAYOUT = new Set(['Manual', 'Auto-Rotate'])
 const ALLOWED_STATUS = new Set(['pending', 'active', 'rejected'])
 
 const UUID_RE =
@@ -370,11 +370,11 @@ async function resolveUserIdByUsername(client, normalized) {
 router.post('/stokvels', requireAuth, requireAdmin, async (req, res) => {
   try {
     const client = dbClient(req)
+    const body = req.body ?? {}
     const {
       name,
       type,
       contributionAmount,
-      payoutStrategy,
       cycleLength,
       initialMemberIds,
       treasurerUserId,
@@ -383,7 +383,7 @@ router.post('/stokvels', requireAuth, requireAdmin, async (req, res) => {
       meetingFrequency,
       memberDetails,
       documents,
-    } = req.body ?? {}
+    } = body
 
     const trimmedName = typeof name === 'string' ? name.trim() : ''
     if (!trimmedName) {
@@ -397,10 +397,6 @@ router.post('/stokvels', requireAuth, requireAdmin, async (req, res) => {
 
     if (!ALLOWED_TYPES.has(type)) {
       return res.status(400).json({ error: 'Invalid stokvel type' })
-    }
-
-    if (!ALLOWED_PAYOUT.has(payoutStrategy)) {
-      return res.status(400).json({ error: 'Invalid payout schedule' })
     }
 
     const cycle = Number(cycleLength)
@@ -430,12 +426,21 @@ router.post('/stokvels', requireAuth, requireAdmin, async (req, res) => {
     const membersCountNorm = normalizeMembersCount(membersCount)
     const normalizedMemberDetails = normalizeMemberDetails(memberDetails, membersCountNorm ?? 500)
 
+    const potIn = body.payout_order_type ?? body.payoutOrderType ?? payoutOrder
+    const payoutOrderType =
+      typeof potIn === 'string' && potIn.toLowerCase() === 'manual' ? 'manual' : 'randomize'
+    const proposedRaw = body.proposed_payout_sequence ?? body.proposedPayoutSequence
+    const proposedSeq = Array.isArray(proposedRaw)
+      ? proposedRaw.filter((id) => typeof id === 'string')
+      : []
+
     const insertRow = {
       name: trimmedName,
       type,
       contribution_amount: amount,
-      payout_strategy: payoutStrategy,
-      payout_order: typeof payoutOrder === 'string' ? payoutOrder : 'randomize',
+      payout_order: payoutOrderType === 'manual' ? 'manual' : 'randomize',
+      payout_order_type: payoutOrderType,
+      proposed_payout_sequence: proposedSeq,
       meeting_frequency: typeof meetingFrequency === 'string' ? meetingFrequency : 'monthly',
       cycle_length: cycle,
       members_count: membersCountNorm,
@@ -558,7 +563,27 @@ router.post('/stokvels', requireAuth, requireAdmin, async (req, res) => {
       ),
     )
 
-    return res.status(201).json({ success: true, stokvel })
+    const svcAct = getServiceSupabase() ?? client
+    const act = await activateStokvel(stokvel.id, svcAct)
+    if (!act.ok) {
+      console.error('admin POST /stokvels activateStokvel:', act.error)
+      await client.from('stokvel_members').delete().eq('stokvel_id', stokvel.id)
+      const { error: rbDel } = await client.from('stokvels').delete().eq('id', stokvel.id)
+      if (rbDel) console.error('admin POST /stokvels rollback stokvel:', rbDel)
+      return res.status(400).json({
+        error:
+          act.error ||
+          'Payout schedule could not be generated (check paying members vs cycle length).',
+      })
+    }
+
+    const { data: stokvelOut } = await client
+      .from('stokvels')
+      .select('*')
+      .eq('id', stokvel.id)
+      .maybeSingle()
+
+    return res.status(201).json({ success: true, stokvel: stokvelOut ?? stokvel })
   } catch (err) {
     console.error('POST /api/admin/stokvels:', err)
     return res.status(500).json({ error: 'Internal Server Error' })
@@ -725,7 +750,7 @@ router.get('/stokvels', requireAuth, requireAdmin, async (req, res) => {
     const { data, error } = await client
       .from('stokvels')
       .select(
-        'id, name, type, status, contribution_amount, payout_strategy, cycle_length, created_at',
+        'id, name, type, status, contribution_amount, cycle_length, created_at',
       )
       .order('created_at', { ascending: false })
 
@@ -814,18 +839,30 @@ router.patch('/stokvels/:stokvelId', requireAuth, requireAdmin, async (req, res)
       patch.type = body.type
     }
 
-    if (body.payoutStrategy !== undefined) {
-      if (!ALLOWED_PAYOUT.has(body.payoutStrategy)) {
-        return res.status(400).json({ error: 'Invalid payout schedule' })
-      }
-      patch.payout_strategy = body.payoutStrategy
-    }
+    const activating = body.status === 'active'
 
     if (body.status !== undefined) {
       if (!ALLOWED_STATUS.has(body.status)) {
         return res.status(400).json({ error: 'Invalid status' })
       }
-      patch.status = body.status
+      if (!activating) {
+        patch.status = body.status
+      }
+    }
+
+    if (body.payoutOrderType !== undefined) {
+      const t = String(body.payoutOrderType).toLowerCase()
+      if (t !== 'manual' && t !== 'randomize') {
+        return res.status(400).json({ error: 'Invalid payout order type' })
+      }
+      patch.payout_order_type = t
+    }
+
+    if (body.proposedPayoutSequence !== undefined) {
+      if (!Array.isArray(body.proposedPayoutSequence)) {
+        return res.status(400).json({ error: 'proposedPayoutSequence must be an array of UUID strings' })
+      }
+      patch.proposed_payout_sequence = body.proposedPayoutSequence.filter((id) => typeof id === 'string')
     }
 
     if (body.contributionAmount !== undefined) {
@@ -846,91 +883,130 @@ router.patch('/stokvels/:stokvelId', requireAuth, requireAdmin, async (req, res)
       patch.cycle_length = cycle
     }
 
-    if (Object.keys(patch).length === 0) {
+    if (Object.keys(patch).length === 0 && !activating) {
       return res.status(400).json({ error: 'No valid fields to update.' })
     }
 
-    const { stokvel: updated, error: upErr } = await updateStokvelReturningRow(client, stokvelId, patch)
+    if (activating) {
+      const { data: preRow } = await client
+        .from('stokvels')
+        .select('id, name, status')
+        .eq('id', stokvelId)
+        .maybeSingle()
+      const groupNameForInvites = typeof preRow?.name === 'string' ? preRow.name : ''
 
-    if (upErr) {
-      console.error('PATCH /api/admin/stokvels:', upErr)
-      return res.status(500).json({ error: upErr.message || String(upErr) || 'Update failed' })
-    }
+      const { data: pendingInvites, error: invitesError } = await client
+        .from('invitations')
+        .select('id, email, group_role')
+        .eq('stokvel_id', stokvelId)
+        .eq('status', 'pending_group_request')
 
-    if (!updated) {
-      return res.status(404).json({ error: 'Stokvel not found after update.' })
-    }
+      if (!invitesError && Array.isArray(pendingInvites)) {
+        for (const invite of pendingInvites) {
+          const inviteEmail = normalizeInviteEmail(invite.email)
+          if (!inviteEmail) continue
 
-    if ('status' in patch) {
-      const { creatorEmail } = await getGroupAndCreatorContact(client, stokvelId)
-      const recipient = normalizeInviteEmail(creatorEmail)
-      if (recipient && (patch.status === 'active' || patch.status === 'rejected')) {
-        await sendGroupStatusEmail({
-          to: recipient,
-          groupName: updated.name,
-          status: patch.status,
-        })
-      }
+          const { data: profile } = await client
+            .from('profiles')
+            .select('id')
+            .eq('email', inviteEmail)
+            .maybeSingle()
 
-      if (patch.status === 'active') {
-        const { data: pendingInvites, error: invitesError } = await client
-          .from('invitations')
-          .select('id, email, group_role')
-          .eq('stokvel_id', stokvelId)
-          .eq('status', 'pending_group_request')
-
-        if (!invitesError && Array.isArray(pendingInvites)) {
-          for (const invite of pendingInvites) {
-            const inviteEmail = normalizeInviteEmail(invite.email)
-            if (!inviteEmail) continue
-
-            const { data: profile } = await client
-              .from('profiles')
-              .select('id')
-              .eq('email', inviteEmail)
-              .maybeSingle()
-
-            const inviteRole =
-              typeof invite.group_role === 'string' && invite.group_role.trim()
-                ? invite.group_role.trim().toLowerCase()
-                : null
-            if (profile?.id) {
-              const role = inviteRole || (await groupRoleForUserProfile(client, profile.id))
-              const { error: insErr } = await client.from('stokvel_members').upsert(
-                {
-                  stokvel_id: stokvelId,
-                  user_id: profile.id,
-                  group_role: role,
-                },
-                { onConflict: 'stokvel_id,user_id' },
-              )
-              if (!insErr) {
-                await sendGroupAddedEmail({ to: inviteEmail, groupName: updated.name, role })
-              }
-            } else {
-              const { data: created } = await createInvitation(client, {
-                stokvelId,
-                email: inviteEmail,
-                invitedBy: req.user.id,
-                status: 'pending',
-                groupRole: inviteRole,
-              })
-              if (created?.token) {
-                await sendInvitationEmail({
-                  to: inviteEmail,
-                  groupName: updated.name,
-                  token: created.token,
-                })
-              }
+          const inviteRole =
+            typeof invite.group_role === 'string' && invite.group_role.trim()
+              ? invite.group_role.trim().toLowerCase()
+              : null
+          if (profile?.id) {
+            const role = inviteRole || (await groupRoleForUserProfile(client, profile.id))
+            const { error: insErr } = await client.from('stokvel_members').upsert(
+              {
+                stokvel_id: stokvelId,
+                user_id: profile.id,
+                group_role: role,
+              },
+              { onConflict: 'stokvel_id,user_id' },
+            )
+            if (!insErr) {
+              await sendGroupAddedEmail({ to: inviteEmail, groupName: groupNameForInvites, role })
             }
-
-            await client.from('invitations').update({ status: 'processed' }).eq('id', invite.id)
+          } else {
+            const { data: created } = await createInvitation(client, {
+              stokvelId,
+              email: inviteEmail,
+              invitedBy: req.user.id,
+              status: 'pending',
+              groupRole: inviteRole,
+            })
+            if (created?.token) {
+              await sendInvitationEmail({
+                to: inviteEmail,
+                groupName: groupNameForInvites,
+                token: created.token,
+              })
+            }
           }
+
+          await client.from('invitations').update({ status: 'processed' }).eq('id', invite.id)
         }
       }
     }
 
-    return res.json({ success: true, stokvel: updated })
+    if (Object.keys(patch).length > 0) {
+      const { stokvel: upRow, error: upErr } = await updateStokvelReturningRow(client, stokvelId, patch)
+
+      if (upErr) {
+        console.error('PATCH /api/admin/stokvels:', upErr)
+        return res.status(500).json({ error: upErr.message || String(upErr) || 'Update failed' })
+      }
+
+      if (!upRow) {
+        return res.status(404).json({ error: 'Stokvel not found after update.' })
+      }
+    }
+
+    if (activating) {
+      const svc = getServiceSupabase()
+      if (!svc) {
+        return res.status(500).json({
+          error:
+            'Server configuration error: SUPABASE_SERVICE_ROLE_KEY is required to activate a stokvel and generate payouts.',
+        })
+      }
+      const act = await activateStokvel(stokvelId, svc)
+      if (!act.ok) {
+        return res.status(400).json({
+          error: act.error || 'Activation failed (payout schedule or member roster).',
+        })
+      }
+    }
+
+    const { data: finalRow, error: finErr } = await client
+      .from('stokvels')
+      .select('*')
+      .eq('id', stokvelId)
+      .maybeSingle()
+
+    if (finErr) {
+      console.error('PATCH /api/admin/stokvels refetch:', finErr)
+      return res.status(500).json({ error: finErr.message })
+    }
+    if (!finalRow) {
+      return res.status(404).json({ error: 'Stokvel not found after update.' })
+    }
+
+    if (body.status === 'active' || body.status === 'rejected') {
+      const { creatorEmail } = await getGroupAndCreatorContact(client, stokvelId)
+      const recipient = normalizeInviteEmail(creatorEmail)
+      if (recipient && (body.status === 'active' || body.status === 'rejected')) {
+        await sendGroupStatusEmail({
+          to: recipient,
+          groupName: finalRow.name,
+          status: body.status,
+        })
+      }
+    }
+
+    return res.json({ success: true, stokvel: finalRow })
   } catch (err) {
     console.error('PATCH /api/admin/stokvels:', err)
     return res.status(500).json({ error: 'Internal Server Error' })

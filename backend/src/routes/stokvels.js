@@ -8,8 +8,15 @@ import {
 import { getServiceSupabase } from "../utils/supabaseAdmin.js";
 import axios from "axios";
 import { searchProfilesForMemberInvite } from "../utils/profileUserSearch.js";
+import {
+  getCurrentPaymentCycle,
+  getTargetMonthForPaidAt,
+  isPaidAtInWindowForTargetMonth,
+} from "../utils/dates.js";
 
 const router = Router();
+
+const TARGET_MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 const UUID_RE_MEMBER =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -117,6 +124,102 @@ router.get("/", requireAuth, async (req, res) => {
 /** Profile search for member invites (two path segments so this never collides with `/:id`). */
 router.get("/members/search", requireAuth, searchProfilesForMemberInvite);
 
+/** Treasurer / group admin flags a missed contribution for a member and cycle. */
+router.post("/:id/missed-payments", requireAuth, async (req, res) => {
+  try {
+    const stokvelId = req.params.id;
+    if (!UUID_RE_STOKVEL_PARAM.test(String(stokvelId))) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    const { user_id: bodyUserId, target_month: targetMonthRaw } = req.body ?? {};
+    const targetMonth =
+      typeof targetMonthRaw === "string" ? targetMonthRaw.trim() : "";
+    if (!TARGET_MONTH_RE.test(targetMonth)) {
+      return res
+        .status(400)
+        .json({ error: "target_month must be a valid YYYY-MM string." });
+    }
+
+    const uid =
+      typeof bodyUserId === "string" ? bodyUserId.trim().toLowerCase() : "";
+    if (!UUID_RE_MEMBER.test(uid)) {
+      return res.status(400).json({ error: "Invalid user_id." });
+    }
+
+    const userSupabase = userScopedSupabase(req);
+    const { data: membership, error: memErr } = await userSupabase
+      .from("stokvel_members")
+      .select("group_role")
+      .eq("stokvel_id", stokvelId)
+      .eq("user_id", req.user.id)
+      .maybeSingle();
+
+    if (memErr) {
+      console.error("POST missed-payments membership:", memErr);
+      return res.status(500).json({ error: memErr.message });
+    }
+    if (!membership) {
+      return res.status(403).json({ error: "Not a member of this stokvel." });
+    }
+    const role = String(membership.group_role || "").toLowerCase();
+    if (!["admin", "treasurer"].includes(role)) {
+      return res.status(403).json({
+        error: "Only group admin or treasurer can flag missed payments.",
+      });
+    }
+
+    const { data: targetMember, error: tmErr } = await userSupabase
+      .from("stokvel_members")
+      .select("user_id")
+      .eq("stokvel_id", stokvelId)
+      .eq("user_id", uid)
+      .maybeSingle();
+
+    if (tmErr) {
+      console.error("POST missed-payments target member:", tmErr);
+      return res.status(500).json({ error: tmErr.message });
+    }
+    if (!targetMember?.user_id) {
+      return res
+        .status(400)
+        .json({ error: "User is not a member of this stokvel." });
+    }
+
+    const svc = getServiceSupabase();
+    if (!svc) {
+      return res.status(500).json({
+        error:
+          "Server configuration error: cannot record flags without service role access.",
+      });
+    }
+
+    const { error: insErr } = await svc.from("missed_payments").insert([
+      {
+        stokvel_id: stokvelId,
+        user_id: uid,
+        target_month: targetMonth,
+        flagged_by: req.user.id,
+      },
+    ]);
+
+    if (insErr) {
+      if (insErr.code === "23505") {
+        return res
+          .status(200)
+          .json({ success: true, alreadyFlagged: true });
+      }
+      console.error("POST missed-payments insert:", insErr);
+      return res.status(500).json({ error: insErr.message });
+    }
+
+    return res.status(201).json({ success: true, alreadyFlagged: false });
+  } catch (err) {
+    console.error("POST /api/stokvels/:id/missed-payments:", err);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 router.get("/:id", requireAuth, async (req, res) => {
   try {
     const stokvelId = req.params.id;
@@ -159,13 +262,57 @@ router.get("/:id", requireAuth, async (req, res) => {
     const { data: contributions, error: contributionsError } =
       await access.reader
         .from("contributions")
-        .select("id, amount, paid_at, user_id")
+        .select("id, amount, paid_at, user_id, target_month, paystack_reference")
         .eq("stokvel_id", stokvelId)
         .order("paid_at", { ascending: false });
 
     if (contributionsError) {
       console.error("GET /api/stokvels/:id contributions:", contributionsError);
       return res.status(500).json({ error: contributionsError.message });
+    }
+
+    const currentCycle = getCurrentPaymentCycle(new Date());
+
+    const svc = getServiceSupabase();
+    let payouts = [];
+    let missedPayments = [];
+
+    if (svc) {
+      const { data: payoutRows, error: payoutErr } = await svc
+        .from("payouts")
+        .select(
+          "id, stokvel_id, user_id, target_month, scheduled_payout_date, cycle_index, created_at",
+        )
+        .eq("stokvel_id", stokvelId);
+
+      if (payoutErr) {
+        console.error("GET /api/stokvels/:id payouts:", payoutErr);
+        return res.status(500).json({ error: payoutErr.message });
+      }
+      payouts = (payoutRows ?? []).slice().sort((a, b) => {
+        const da = String(a.scheduled_payout_date ?? "");
+        const db = String(b.scheduled_payout_date ?? "");
+        if (da !== db) return da < db ? -1 : da > db ? 1 : 0;
+        return (Number(a.cycle_index) || 0) - (Number(b.cycle_index) || 0);
+      });
+
+      const { data: missedRows, error: missedErr } = await svc
+        .from("missed_payments")
+        .select(
+          "id, stokvel_id, user_id, target_month, resolved_at, flagged_by, created_at",
+        )
+        .eq("stokvel_id", stokvelId)
+        .is("resolved_at", null);
+
+      if (missedErr) {
+        console.error("GET /api/stokvels/:id missed_payments:", missedErr);
+        return res.status(500).json({ error: missedErr.message });
+      }
+      missedPayments = missedRows ?? [];
+    } else {
+      console.warn(
+        "GET /api/stokvels/:id: SUPABASE_SERVICE_ROLE_KEY missing; payouts and missed_payments omitted.",
+      );
     }
 
     const contributorIds = [
@@ -204,6 +351,9 @@ router.get("/:id", requireAuth, async (req, res) => {
       members: members ?? [],
       totalContribution,
       contributions: contributionsWithProfiles,
+      currentCycle,
+      payouts,
+      missedPayments,
     });
   } catch (err) {
     console.error("GET /api/stokvels/:id:", err);
@@ -689,17 +839,48 @@ router.post("/:id/contributions", requireAuth, async (req, res) => {
 // POST /api/stokvels/:id/payments/verify
 router.post("/:id/payments/verify", requireAuth, async (req, res) => {
   try {
-    const { reference, amount } = req.body;
-    const stokvel_id = req.params.id;
+    const { reference } = req.body ?? {};
     const user_id = req.user.id;
-    if (!reference || typeof reference !== "string") {
+
+    if (!reference || typeof reference !== "string" || !reference.trim()) {
       return res.status(400).json({ error: "Payment reference is required." });
+    }
+
+    const rawId = typeof req.params?.id === "string" ? req.params.id.trim() : "";
+    const stokvel_id = UUID_RE_STOKVEL_PARAM.test(rawId) ? rawId.toLowerCase() : null;
+
+    if (!stokvel_id) {
+      return res.status(400).json({ error: "Invalid stokvel id." });
+    }
+
+    const paystackRef = reference.trim();
+
+    const svc = getServiceSupabase();
+    if (!svc) {
+      return res.status(500).json({
+        error:
+          "Server configuration error: cannot verify payments without service role access.",
+      });
+    }
+
+    const { data: existingRef, error: dupLookupErr } = await svc
+      .from("contributions")
+      .select("id")
+      .eq("paystack_reference", paystackRef)
+      .maybeSingle();
+
+    if (dupLookupErr) {
+      console.error("POST payments/verify dup lookup:", dupLookupErr);
+      return res.status(500).json({ error: dupLookupErr.message });
+    }
+    if (existingRef?.id) {
+      return res.status(409).json({ error: "This payment reference was already recorded." });
     }
 
     let paystackResponse;
     try {
       paystackResponse = await axios.get(
-        `https://api.paystack.co/transaction/verify/${reference}`,
+        `https://api.paystack.co/transaction/verify/${encodeURIComponent(paystackRef)}`,
         {
           headers: {
             Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
@@ -718,25 +899,143 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
     }
     const { data } = paystackResponse;
 
-    if (data.data.status !== "success") {
+    if (data?.data?.status !== "success") {
       return res.status(400).json({ error: "Payment not successful" });
     }
 
-    const verified_amount = data.data.amount / 100;
+    const tx = data.data;
+    const verified_amount = tx.amount / 100;
 
-    const userSupabase = userScopedSupabase(req);
-    const { data: contribution, error } = await userSupabase
+    const paidRaw = tx.paid_at ?? tx.paidAt;
+    let paidAt;
+    if (paidRaw == null) {
+      paidAt = new Date();
+    } else if (typeof paidRaw === "number") {
+      paidAt = new Date(paidRaw * 1000);
+    } else {
+      paidAt = new Date(paidRaw);
+    }
+    if (Number.isNaN(paidAt.getTime())) {
+      return res.status(502).json({ error: "Paystack response missing a valid paid_at timestamp." });
+    }
+
+    const targetMonth = getTargetMonthForPaidAt(paidAt);
+    if (!targetMonth) {
+      return res.status(400).json({ error: "Could not derive contribution cycle (target_month)." });
+    }
+
+    const { data: stokvel, error: stErr } = await svc
+      .from("stokvels")
+      .select("id, type, status")
+      .eq("id", stokvel_id)
+      .maybeSingle();
+
+    if (stErr) {
+      console.error("POST payments/verify stokvel:", stErr);
+      return res.status(500).json({ error: stErr.message });
+    }
+    if (!stokvel?.id || stokvel.status !== "active") {
+      return res.status(400).json({ error: "Stokvel is not active or was not found." });
+    }
+
+    const { data: membership, error: memErr } = await svc
+      .from("stokvel_members")
+      .select("user_id")
+      .eq("stokvel_id", stokvel_id)
+      .eq("user_id", user_id)
+      .maybeSingle();
+
+    if (memErr) {
+      console.error("POST payments/verify membership:", memErr);
+      return res.status(500).json({ error: memErr.message });
+    }
+    if (!membership) {
+      return res.status(403).json({ error: "Not a member of this stokvel." });
+    }
+
+    const inWindow = isPaidAtInWindowForTargetMonth(paidAt, targetMonth);
+    if (!inWindow) {
+      const { data: missedRows, error: missErr } = await svc
+        .from("missed_payments")
+        .select("id")
+        .eq("stokvel_id", stokvel_id)
+        .eq("user_id", user_id)
+        .is("resolved_at", null)
+        .limit(1);
+
+      if (missErr) {
+        console.error("POST payments/verify missed_payments:", missErr);
+        return res.status(500).json({ error: missErr.message });
+      }
+      if (!Array.isArray(missedRows) || missedRows.length === 0) {
+        return res.status(403).json({
+          error: "Payment is outside the valid window for this cycle, and no open missed-payment flag was found.",
+        });
+      }
+    }
+
+    if (String(stokvel.type) === "Rotating") {
+      const { data: recvRow, error: recvErr } = await svc
+        .from("payouts")
+        .select("id")
+        .eq("stokvel_id", stokvel_id)
+        .eq("target_month", targetMonth)
+        .eq("user_id", user_id)
+        .maybeSingle();
+
+      if (recvErr) {
+        console.error("POST payments/verify payouts:", recvErr);
+        return res.status(500).json({ error: recvErr.message });
+      }
+      if (recvRow?.id) {
+        return res.status(403).json({
+          error: "You are the scheduled payout receiver for this cycle and cannot record a contribution for it.",
+        });
+      }
+    }
+
+    const { data: contribution, error: insErr } = await svc
       .from("contributions")
-      .insert([{ stokvel_id, user_id, amount: verified_amount }])
-      .select("id, stokvel_id, user_id, amount, paid_at")
+      .insert([
+        {
+          stokvel_id,
+          user_id,
+          amount: verified_amount,
+          paid_at: paidAt.toISOString(),
+          target_month: targetMonth,
+          paystack_reference: paystackRef,
+        },
+      ])
+      .select(
+        "id, stokvel_id, user_id, amount, paid_at, target_month, paystack_reference",
+      )
       .single();
 
-    if (error) return res.status(500).json({ error: error.message });
+    if (insErr) {
+      const msg = String(insErr.message || insErr);
+      if (msg.includes("duplicate") || insErr.code === "23505") {
+        return res.status(409).json({ error: "This payment reference was already recorded." });
+      }
+      console.error("POST payments/verify insert:", insErr);
+      return res.status(500).json({ error: msg });
+    }
 
-    res.json({ success: true, contribution });
+    const { error: resolveErr } = await svc
+      .from("missed_payments")
+      .update({ resolved_at: new Date().toISOString() })
+      .eq("stokvel_id", stokvel_id)
+      .eq("user_id", user_id)
+      .eq("target_month", targetMonth)
+      .is("resolved_at", null);
+
+    if (resolveErr) {
+      console.error("POST payments/verify missed_payments resolve:", resolveErr);
+    }
+
+    return res.json({ success: true, contribution });
   } catch (err) {
     console.error("POST payments/verify:", err);
-    res.status(500).json({ error: "Verification failed" });
+    return res.status(500).json({ error: "Verification failed" });
   }
 });
 

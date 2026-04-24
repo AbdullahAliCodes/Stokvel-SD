@@ -1,25 +1,26 @@
-import axios from 'axios'
-import { updateMarketRates } from '../services/marketDataService.js'
+import axios from "axios";
+import { updateMarketRates } from "../services/marketDataService.js";
 
-const FRED_OBSERVATIONS_URL = 'https://api.stlouisfed.org/fred/series/observations'
+const FRED_OBSERVATIONS_URL =
+  "https://api.stlouisfed.org/fred/series/observations";
 
 /**
  * FRED / OECD: South Africa central bank policy rate (monthly, percent).
  * https://fred.stlouisfed.org/series/IRSTCB01ZAM156N
  * Underlying authority: SARB; series may lag MPC dates slightly.
  */
-const DEFAULT_SA_POLICY_SERIES_ID = 'IRSTCB01ZAM156N'
+const DEFAULT_SA_POLICY_SERIES_ID = "IRSTCB01ZAM156N";
 
-const MAX_FRED_ATTEMPTS = 3
+const MAX_FRED_ATTEMPTS = 3;
 
 function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function summarizeFredBody(data, maxLen = 400) {
-  if (data == null) return ''
-  const s = typeof data === 'string' ? data : JSON.stringify(data)
-  return s.length > maxLen ? `${s.slice(0, maxLen)}…` : s
+  if (data == null) return "";
+  const s = typeof data === "string" ? data : JSON.stringify(data);
+  return s.length > maxLen ? `${s.slice(0, maxLen)}…` : s;
 }
 
 /**
@@ -27,54 +28,56 @@ function summarizeFredBody(data, maxLen = 400) {
  * Retries a few times on HTTP 5xx / rate limit / network blips.
  */
 async function fetchFredObservationsJson(apiKey, seriesId) {
-  let lastErr = null
+  let lastErr = null;
   for (let attempt = 1; attempt <= MAX_FRED_ATTEMPTS; attempt += 1) {
     try {
       const { data, status } = await axios.get(FRED_OBSERVATIONS_URL, {
         params: {
           series_id: seriesId,
           api_key: apiKey,
-          file_type: 'json',
-          sort_order: 'desc',
+          file_type: "json",
+          sort_order: "desc",
           limit: 1,
         },
         timeout: 20_000,
         validateStatus: () => true,
         headers: {
-          Accept: 'application/json',
-          'User-Agent': 'StokvelBackend/1.0 (FRED client)',
+          Accept: "application/json",
+          "User-Agent": "StokvelBackend/1.0 (FRED client)",
         },
-      })
+      });
 
       if (status === 200 && data?.error_code == null) {
-        return data
+        return data;
       }
 
-      const detail = summarizeFredBody(data)
+      const detail = summarizeFredBody(data);
       if (status === 429 || (status >= 500 && attempt < MAX_FRED_ATTEMPTS)) {
         console.warn(
           `[FRED] attempt ${attempt}/${MAX_FRED_ATTEMPTS} HTTP ${status}, retrying… ${detail}`,
-        )
-        await sleep(1500 * attempt)
-        continue
+        );
+        await sleep(1500 * attempt);
+        continue;
       }
 
-      throw new Error(
-        `FRED HTTP ${status}: ${detail || '(empty body)'}`,
-      )
+      throw new Error(`FRED HTTP ${status}: ${detail || "(empty body)"}`);
     } catch (err) {
-      lastErr = err
-      if (axios.isAxiosError(err) && err.response == null && attempt < MAX_FRED_ATTEMPTS) {
+      lastErr = err;
+      if (
+        axios.isAxiosError(err) &&
+        err.response == null &&
+        attempt < MAX_FRED_ATTEMPTS
+      ) {
         console.warn(
-          `[FRED] attempt ${attempt}/${MAX_FRED_ATTEMPTS} network error (${err.code ?? 'unknown'}), retrying…`,
-        )
-        await sleep(1500 * attempt)
-        continue
+          `[FRED] attempt ${attempt}/${MAX_FRED_ATTEMPTS} network error (${err.code ?? "unknown"}), retrying…`,
+        );
+        await sleep(1500 * attempt);
+        continue;
       }
-      throw err
+      throw err;
     }
   }
-  throw lastErr ?? new Error('FRED: exhausted retries')
+  throw lastErr ?? new Error("FRED: exhausted retries");
 }
 
 /**
@@ -82,59 +85,60 @@ async function fetchFredObservationsJson(apiKey, seriesId) {
  * On failure, logs only — last values in Supabase stay valid.
  */
 export async function fetchRepoRateFromFred() {
-  const apiKey = process.env.FRED_API_KEY?.trim()
+  const apiKey = process.env.FRED_API_KEY?.trim();
   if (!apiKey) {
-    console.warn('[FRED] FRED_API_KEY not set; skipping rate fetch')
-    return
+    console.warn("[FRED] FRED_API_KEY not set; skipping rate fetch");
+    return;
   }
 
   const seriesId =
-    process.env.FRED_SA_POLICY_RATE_SERIES_ID?.trim() || DEFAULT_SA_POLICY_SERIES_ID
+    process.env.FRED_SA_POLICY_RATE_SERIES_ID?.trim() ||
+    DEFAULT_SA_POLICY_SERIES_ID;
 
-  let repoRate
+  let repoRate;
   try {
-    const data = await fetchFredObservationsJson(apiKey, seriesId)
+    const data = await fetchFredObservationsJson(apiKey, seriesId);
 
     if (data?.error_code != null) {
       throw new Error(
         data?.error_message || data?.message || `FRED error ${data.error_code}`,
-      )
+      );
     }
 
-    const obs = data?.observations?.[0]
-    if (!obs || obs.value == null || obs.value === '.') {
-      throw new Error('FRED returned no usable observation')
+    const obs = data?.observations?.[0];
+    if (!obs || obs.value == null || obs.value === ".") {
+      throw new Error("FRED returned no usable observation");
     }
 
-    repoRate = parseFloat(String(obs.value).replace(',', '.'))
+    repoRate = parseFloat(String(obs.value).replace(",", "."));
     if (!Number.isFinite(repoRate)) {
-      throw new Error(`Invalid rate from FRED: ${obs.value}`)
+      throw new Error(`Invalid rate from FRED: ${obs.value}`);
     }
 
     console.log(
       `[FRED] Policy rate ${seriesId} (${obs.date}): ${repoRate}% → updating market_data`,
-    )
+    );
   } catch (err) {
     if (axios.isAxiosError(err)) {
-      const st = err.response?.status
-      const body = summarizeFredBody(err.response?.data)
+      const st = err.response?.status;
+      const body = summarizeFredBody(err.response?.data);
       console.error(
-        '[FRED] Request failed:',
+        "[FRED] Request failed:",
         err.message,
-        st != null ? `HTTP ${st}` : '',
-        body ? `body: ${body}` : '',
-      )
+        st != null ? `HTTP ${st}` : "",
+        body ? `body: ${body}` : "",
+      );
     } else {
-      const msg = err instanceof Error ? err.message : String(err)
-      console.error('[FRED] Rate fetch failed:', msg)
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[FRED] Rate fetch failed:", msg);
     }
-    return
+    return;
   }
 
   try {
-    await updateMarketRates(repoRate)
+    await updateMarketRates(repoRate);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    console.error('[FRED] Supabase market_data update failed:', msg)
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[FRED] Supabase market_data update failed:", msg);
   }
 }
