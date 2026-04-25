@@ -4,7 +4,6 @@ import { requireAuth } from '../middleware/auth.js'
 import { requireAdmin } from '../middleware/requireAdmin.js'
 import { getServiceSupabase } from '../utils/supabaseAdmin.js'
 import {
-  ensurePlatformAdminsInStokvel,
   groupRoleForUserProfile,
 } from '../utils/platformAdminStokvelMembers.js'
 import { normalizeUsername } from '../utils/username.js'
@@ -534,19 +533,6 @@ router.post('/stokvels', requireAuth, requireAdmin, async (req, res) => {
             'Failed to add selected members; the group was not created.',
         })
       }
-    }
-
-    const { error: syncErr } = await ensurePlatformAdminsInStokvel(client, stokvel.id)
-    if (syncErr) {
-      console.error('admin stokvels platform admin sync:', syncErr)
-      await client.from('stokvel_members').delete().eq('stokvel_id', stokvel.id)
-      const { error: rb3 } = await client.from('stokvels').delete().eq('id', stokvel.id)
-      if (rb3) console.error('admin stokvels rollback after sync:', rb3)
-      return res.status(500).json({
-        error:
-          syncErr.message ||
-          'Failed to attach all platform admins to this stokvel; group was not created.',
-      })
     }
 
     await applyMemberDetailEmailsToProfiles(client, normalizedMemberDetails, allowedProfileEmailIds)

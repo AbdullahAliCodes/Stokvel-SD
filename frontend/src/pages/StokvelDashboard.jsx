@@ -50,7 +50,7 @@ function memberDisplay(p) {
 export default function StokvelDashboard() {
   const { stokvel_id } = useParams()
   const navigate = useNavigate()
-  const { session } = useSession()
+  const { session, userRole } = useSession()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [meetingsError, setMeetingsError] = useState('')
@@ -157,6 +157,9 @@ export default function StokvelDashboard() {
   const expectedPayout = monthlyContribution * memberCount
   const myGroupRole =
     members.find((m) => m.user_id === session?.user?.id)?.group_role || membership?.group_role
+  const isAdminAccess =
+    String(userRole || "").toLowerCase() === "admin" ||
+    String(myGroupRole || "").toLowerCase() === "admin"
 
   const nextMeeting = useMemo(() => {
     const nowTs = Date.now()
@@ -208,9 +211,15 @@ export default function StokvelDashboard() {
             <h1 className="text-2xl font-bold tracking-tight text-emerald-800 sm:text-3xl">
               {groupName}
             </h1>
-            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-emerald-800">
-              {formatGroupRole(myGroupRole)}
-            </span>
+            {isAdminAccess ? (
+              <span className="rounded-full border border-amber-700 bg-amber-700 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-white">
+                Admin
+              </span>
+            ) : (
+              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-emerald-800">
+                {formatGroupRole(myGroupRole)}
+              </span>
+            )}
             {!isActiveStokvel && stokvelStatus ? (
               <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-amber-900">
                 {stokvelStatus}

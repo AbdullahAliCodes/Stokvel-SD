@@ -25,11 +25,18 @@ function activeIdsSet(sortedActive) {
 }
 
 export default function DashboardGateway() {
-  const { session } = useSession()
+  const { session, userRole } = useSession()
   const navigate = useNavigate()
+  const roleResolved = userRole !== null && userRole !== undefined && userRole !== 'loading'
+  const isAdmin = String(userRole || '').toLowerCase() === 'admin'
 
   useEffect(() => {
     if (!session?.user?.id || !session?.access_token) return
+    if (!roleResolved) return
+    if (isAdmin) {
+      navigate('/admin/groups', { replace: true })
+      return
+    }
 
     let cancelled = false
 
@@ -87,7 +94,7 @@ export default function DashboardGateway() {
     return () => {
       cancelled = true
     }
-  }, [session, navigate])
+  }, [session, userRole, roleResolved, isAdmin, navigate])
 
   return (
     <div className="flex h-dvh items-center justify-center overflow-hidden bg-[#F4F5F0] text-stone-600">

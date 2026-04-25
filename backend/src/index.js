@@ -10,7 +10,6 @@ import profileRouter from './routes/profile.js'
 import invitationsRouter from './routes/invitations.js'
 import { getServiceSupabase } from './utils/supabaseAdmin.js'
 import {
-  ensurePlatformAdminsInStokvel,
   normalizeUuid,
 } from './utils/platformAdminStokvelMembers.js'
 import {
@@ -609,9 +608,6 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
         }
         handledEmails.add(em)
       }
-
-      const { error: syncErr } = await ensurePlatformAdminsInStokvel(svc, stokvelId)
-      if (syncErr) throw syncErr
 
       let proposedPayoutSequenceOut = proposedFromBody ?? []
       if (proposedFromBody == null) {

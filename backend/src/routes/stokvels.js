@@ -75,23 +75,43 @@ async function getMembershipForStokvel(client, stokvelId, userId) {
   return { data, error };
 }
 
-async function requireStokvelAccess({ req, userSupabase, stokvelId }) {
+async function resolveGroupAccess({ req, userSupabase, stokvelId }) {
   const platformAdmin = isPlatformAdmin(req);
-  const reader = platformAdmin
-    ? (getServiceSupabase() ?? userSupabase)
-    : userSupabase;
+  const service = getServiceSupabase();
+  const reader = platformAdmin ? (service ?? userSupabase) : userSupabase;
+  const writer = platformAdmin ? (service ?? userSupabase) : (service ?? userSupabase);
+
+  if (platformAdmin) {
+    return {
+      error: null,
+      reader,
+      writer,
+      membership: { group_role: "admin", synthetic: true },
+      platformAdmin: true,
+    };
+  }
+
   const { data: membership, error } = await getMembershipForStokvel(
-    reader,
+    userSupabase,
     stokvelId,
     req.user.id,
   );
-  if (error) return { error, reader, membership: null };
-  if (!membership && !platformAdmin)
-    return { error: new Error("Not found"), reader, membership: null };
+  if (error) return { error, reader, writer, membership: null, platformAdmin: false };
+  if (!membership) {
+    return {
+      error: new Error("Not found"),
+      reader,
+      writer,
+      membership: null,
+      platformAdmin: false,
+    };
+  }
   return {
     error: null,
     reader,
-    membership: membership ?? { group_role: "admin" },
+    writer,
+    membership,
+    platformAdmin: false,
   };
 }
 
@@ -99,6 +119,11 @@ function canManageMeetingsForGroup(membership) {
   return ["admin", "treasurer"].includes(
     String(membership?.group_role || "").toLowerCase(),
   );
+}
+
+function requireGroupRole(access, allowedRoles) {
+  const role = String(access?.membership?.group_role || "").toLowerCase();
+  return allowedRoles.includes(role);
 }
 router.get("/", requireAuth, async (req, res) => {
   try {
@@ -148,28 +173,21 @@ router.post("/:id/missed-payments", requireAuth, async (req, res) => {
     }
 
     const userSupabase = userScopedSupabase(req);
-    const { data: membership, error: memErr } = await userSupabase
-      .from("stokvel_members")
-      .select("group_role")
-      .eq("stokvel_id", stokvelId)
-      .eq("user_id", req.user.id)
-      .maybeSingle();
-
-    if (memErr) {
-      console.error("POST missed-payments membership:", memErr);
-      return res.status(500).json({ error: memErr.message });
+    const access = await resolveGroupAccess({ req, userSupabase, stokvelId });
+    if (access.error) {
+      if (access.error.message === "Not found") {
+        return res.status(404).json({ error: "Not found" });
+      }
+      console.error("POST missed-payments membership:", access.error);
+      return res.status(500).json({ error: access.error.message });
     }
-    if (!membership) {
-      return res.status(403).json({ error: "Not a member of this stokvel." });
-    }
-    const role = String(membership.group_role || "").toLowerCase();
-    if (!["admin", "treasurer"].includes(role)) {
+    if (!requireGroupRole(access, ["admin", "treasurer"])) {
       return res.status(403).json({
         error: "Only group admin or treasurer can flag missed payments.",
       });
     }
 
-    const { data: targetMember, error: tmErr } = await userSupabase
+    const { data: targetMember, error: tmErr } = await access.reader
       .from("stokvel_members")
       .select("user_id")
       .eq("stokvel_id", stokvelId)
@@ -227,7 +245,7 @@ router.get("/:id", requireAuth, async (req, res) => {
       return res.status(404).json({ error: "Not found" });
     }
     const userSupabase = userScopedSupabase(req);
-    const access = await requireStokvelAccess({ req, userSupabase, stokvelId });
+    const access = await resolveGroupAccess({ req, userSupabase, stokvelId });
     if (access.error) {
       if (access.error.message === "Not found")
         return res.status(404).json({ error: "Not found" });
@@ -369,19 +387,15 @@ router.patch("/:id", requireAuth, async (req, res) => {
     }
 
     const userSupabase = userScopedSupabase(req);
-    const { data: membership, error: membershipError } = await userSupabase
-      .from("stokvel_members")
-      .select("group_role")
-      .eq("stokvel_id", stokvelId)
-      .eq("user_id", req.user.id)
-      .maybeSingle();
-
-    if (membershipError) {
-      console.error("PATCH /api/stokvels/:id membership:", membershipError);
-      return res.status(500).json({ error: membershipError.message });
+    const access = await resolveGroupAccess({ req, userSupabase, stokvelId });
+    if (access.error) {
+      if (access.error.message === "Not found") {
+        return res.status(404).json({ error: "Not found" });
+      }
+      console.error("PATCH /api/stokvels/:id membership:", access.error);
+      return res.status(500).json({ error: access.error.message });
     }
-    if (!membership) return res.status(404).json({ error: "Not found" });
-    if (String(membership.group_role || "").toLowerCase() !== "admin") {
+    if (!requireGroupRole(access, ["admin"])) {
       return res.status(403).json({ error: "Forbidden" });
     }
 
@@ -438,8 +452,7 @@ router.patch("/:id", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "No valid fields provided." });
     }
 
-    const writer = getServiceSupabase() ?? userSupabase;
-    const { data: stokvel, error: updateError } = await writer
+    const { data: stokvel, error: updateError } = await access.writer
       .from("stokvels")
       .update(patch)
       .eq("id", stokvelId)
@@ -463,7 +476,7 @@ router.get("/:id/meetings", requireAuth, async (req, res) => {
   try {
     const stokvelId = req.params.id;
     const userSupabase = userScopedSupabase(req);
-    const access = await requireStokvelAccess({ req, userSupabase, stokvelId });
+    const access = await resolveGroupAccess({ req, userSupabase, stokvelId });
     if (access.error) {
       if (access.error.message === "Not found")
         return res.status(404).json({ error: "Not found" });
@@ -490,13 +503,14 @@ router.post("/:id/meetings", requireAuth, async (req, res) => {
   try {
     const stokvelId = req.params.id;
     const userSupabase = userScopedSupabase(req);
-    const writer = getServiceSupabase() ?? userSupabase;
-    const { data: strictMembership, error: strictMembershipError } =
-      await getMembershipForStokvel(userSupabase, stokvelId, req.user.id);
-    if (strictMembershipError)
-      return res.status(500).json({ error: strictMembershipError.message });
-    if (!strictMembership) return res.status(404).json({ error: "Not found" });
-    if (!canManageMeetingsForGroup(strictMembership)) {
+    const access = await resolveGroupAccess({ req, userSupabase, stokvelId });
+    if (access.error) {
+      if (access.error.message === "Not found") {
+        return res.status(404).json({ error: "Not found" });
+      }
+      return res.status(500).json({ error: access.error.message });
+    }
+    if (!canManageMeetingsForGroup(access.membership)) {
       return res
         .status(403)
         .json({ error: "Only admin or treasurer can schedule meetings." });
@@ -520,7 +534,7 @@ router.post("/:id/meetings", requireAuth, async (req, res) => {
         .json({ error: "Title and meeting date are required." });
     }
 
-    const { data: created, error: createError } = await writer
+    const { data: created, error: createError } = await access.writer
       .from("meetings")
       .insert({
         stokvel_id: stokvelId,
@@ -590,13 +604,14 @@ router.patch("/:id/meetings/:meetingId", requireAuth, async (req, res) => {
     const stokvelId = req.params.id;
     const meetingId = req.params.meetingId;
     const userSupabase = userScopedSupabase(req);
-    const writer = getServiceSupabase() ?? userSupabase;
-    const { data: strictMembership, error: strictMembershipError } =
-      await getMembershipForStokvel(userSupabase, stokvelId, req.user.id);
-    if (strictMembershipError)
-      return res.status(500).json({ error: strictMembershipError.message });
-    if (!strictMembership) return res.status(404).json({ error: "Not found" });
-    if (!canManageMeetingsForGroup(strictMembership)) {
+    const access = await resolveGroupAccess({ req, userSupabase, stokvelId });
+    if (access.error) {
+      if (access.error.message === "Not found") {
+        return res.status(404).json({ error: "Not found" });
+      }
+      return res.status(500).json({ error: access.error.message });
+    }
+    if (!canManageMeetingsForGroup(access.membership)) {
       return res
         .status(403)
         .json({ error: "Only admin or treasurer can edit meetings." });
@@ -618,7 +633,7 @@ router.patch("/:id/meetings/:meetingId", requireAuth, async (req, res) => {
     }
     patch.updated_at = new Date().toISOString();
 
-    const { data, error } = await writer
+    const { data, error } = await access.writer
       .from("meetings")
       .update(patch)
       .eq("id", meetingId)
@@ -645,14 +660,14 @@ router.patch(
       const stokvelId = req.params.id;
       const meetingId = req.params.meetingId;
       const userSupabase = userScopedSupabase(req);
-      const writer = getServiceSupabase() ?? userSupabase;
-      const { data: strictMembership, error: strictMembershipError } =
-        await getMembershipForStokvel(userSupabase, stokvelId, req.user.id);
-      if (strictMembershipError)
-        return res.status(500).json({ error: strictMembershipError.message });
-      if (!strictMembership)
-        return res.status(404).json({ error: "Not found" });
-      if (!canManageMeetingsForGroup(strictMembership)) {
+      const access = await resolveGroupAccess({ req, userSupabase, stokvelId });
+      if (access.error) {
+        if (access.error.message === "Not found") {
+          return res.status(404).json({ error: "Not found" });
+        }
+        return res.status(500).json({ error: access.error.message });
+      }
+      if (!canManageMeetingsForGroup(access.membership)) {
         return res
           .status(403)
           .json({ error: "Only admin or treasurer can record minutes." });
@@ -660,7 +675,7 @@ router.patch(
 
       const minutes =
         typeof req.body?.minutes === "string" ? req.body.minutes.trim() : "";
-      const { data, error } = await writer
+      const { data, error } = await access.writer
         .from("meetings")
         .update({
           minutes: minutes || null,
@@ -691,19 +706,20 @@ router.delete("/:id/meetings/:meetingId", requireAuth, async (req, res) => {
     const stokvelId = req.params.id;
     const meetingId = req.params.meetingId;
     const userSupabase = userScopedSupabase(req);
-    const writer = getServiceSupabase() ?? userSupabase;
-    const { data: strictMembership, error: strictMembershipError } =
-      await getMembershipForStokvel(userSupabase, stokvelId, req.user.id);
-    if (strictMembershipError)
-      return res.status(500).json({ error: strictMembershipError.message });
-    if (!strictMembership) return res.status(404).json({ error: "Not found" });
-    if (!canManageMeetingsForGroup(strictMembership)) {
+    const access = await resolveGroupAccess({ req, userSupabase, stokvelId });
+    if (access.error) {
+      if (access.error.message === "Not found") {
+        return res.status(404).json({ error: "Not found" });
+      }
+      return res.status(500).json({ error: access.error.message });
+    }
+    if (!canManageMeetingsForGroup(access.membership)) {
       return res.status(403).json({
         error: "Only this group admin or treasurer can delete meetings.",
       });
     }
 
-    const { data, error } = await writer
+    const { data, error } = await access.writer
       .from("meetings")
       .delete()
       .eq("id", meetingId)
@@ -729,23 +745,14 @@ router.patch("/:id/treasurer", requireAuth, async (req, res) => {
     }
 
     const userSupabase = userScopedSupabase(req);
-    const writer = getServiceSupabase() ?? userSupabase;
-
-    const { data: requesterMembership, error: requesterMembershipError } =
-      await userSupabase
-        .from("stokvel_members")
-        .select("group_role")
-        .eq("stokvel_id", stokvelId)
-        .eq("user_id", req.user.id)
-        .maybeSingle();
-
-    if (requesterMembershipError) {
-      return res.status(500).json({ error: requesterMembershipError.message });
+    const access = await resolveGroupAccess({ req, userSupabase, stokvelId });
+    if (access.error) {
+      if (access.error.message === "Not found") {
+        return res.status(404).json({ error: "Not found" });
+      }
+      return res.status(500).json({ error: access.error.message });
     }
-    if (!requesterMembership) {
-      return res.status(404).json({ error: "Not found" });
-    }
-    if (!["admin", "treasurer"].includes(requesterMembership.group_role)) {
+    if (!requireGroupRole(access, ["admin", "treasurer"])) {
       return res
         .status(403)
         .json({ error: "Only an admin or treasurer can change treasurer." });
@@ -768,7 +775,7 @@ router.patch("/:id/treasurer", requireAuth, async (req, res) => {
         .json({ error: "Selected user is not a member of this stokvel." });
     }
 
-    const { error: demoteError } = await writer
+    const { error: demoteError } = await access.writer
       .from("stokvel_members")
       .update({ group_role: "member" })
       .eq("stokvel_id", stokvelId)
@@ -778,7 +785,7 @@ router.patch("/:id/treasurer", requireAuth, async (req, res) => {
       return res.status(500).json({ error: demoteError.message });
     }
 
-    const { error: assignError } = await writer
+    const { error: assignError } = await access.writer
       .from("stokvel_members")
       .update({ group_role: "treasurer" })
       .eq("stokvel_id", stokvelId)
