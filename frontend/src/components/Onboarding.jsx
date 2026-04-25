@@ -1,7 +1,24 @@
-import { Link } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { UserPlus, Home } from 'lucide-react'
+import { useSession } from '../context/SessionContext'
 
 export default function Onboarding() {
+  const { userRole } = useSession()
+  const roleResolved = userRole !== null && userRole !== undefined && userRole !== 'loading'
+  const isAdmin = String(userRole || '').toLowerCase() === 'admin'
+
+  if (!roleResolved) {
+    return (
+      <div className="flex h-dvh items-center justify-center overflow-hidden bg-[#F4F5F0] text-stone-600">
+        <p className="text-sm tracking-wide">Loading…</p>
+      </div>
+    )
+  }
+
+  if (isAdmin) {
+    return <Navigate to="/admin/groups" replace />
+  }
+
   return (
     <div className="flex h-dvh flex-col items-center justify-center overflow-hidden bg-[#F4F5F0] p-6 text-stone-800">
       <div className="max-w-md rounded-2xl border border-stone-200 bg-white p-8 text-center shadow-sm">

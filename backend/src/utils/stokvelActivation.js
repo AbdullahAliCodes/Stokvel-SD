@@ -94,22 +94,14 @@ export async function activateStokvel(stokvelId, serviceSupabase, opts = {}) {
 
   const { data: memberRows, error: memErr } = await serviceSupabase
     .from('stokvel_members')
-    .select('user_id, profiles(role)')
+    .select('user_id')
     .eq('stokvel_id', stokvelId)
 
   if (memErr) {
     return { ok: false, error: memErr.message || String(memErr) }
   }
 
-  /** Platform staff (profiles.role = admin) are attached for ops; they are not paying cycle slots. */
-  const payingRows = (memberRows ?? []).filter((r) => {
-    const pr = r?.profiles
-    const role = Array.isArray(pr) ? pr[0]?.role : pr?.role
-    return String(role || '').toLowerCase() !== 'admin'
-  })
-  const sourceIds =
-    payingRows.length > 0 ? payingRows : (memberRows ?? [])
-  const memberIds = normalizeUuidArray(sourceIds.map((r) => r.user_id)).sort()
+  const memberIds = normalizeUuidArray((memberRows ?? []).map((r) => r.user_id)).sort()
 
   if (memberIds.length !== cycleLen) {
     return {

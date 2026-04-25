@@ -19,6 +19,7 @@ import {
   UserPlus,
   ClipboardList,
   Settings,
+  Shield,
 } from "lucide-react";
 import { supabase } from "../utils/supabase";
 import { useSession } from "../context/SessionContext";
@@ -56,7 +57,7 @@ function roleBadgeForGroupRole(groupRole) {
 }
 
 export default function DashboardLayout() {
-  const { session } = useSession();
+  const { session, userRole } = useSession();
   const navigate = useNavigate();
   const location = useLocation();
   const groupPathMatch = location.pathname.match(/^\/group\/([^/]+)/);
@@ -146,20 +147,28 @@ export default function DashboardLayout() {
   }, [memberships, stokvel_id]);
 
   const sidebarRoleBadge = useMemo(() => {
+    if (String(userRole || "").toLowerCase() === "admin") {
+      return { label: "Admin | Superuser", className: "bg-red-700 text-white" };
+    }
     if (!selectedMembership) {
       return { label: "Member", className: "bg-emerald-800 text-white" };
     }
     return roleBadgeForGroupRole(selectedMembership.group_role);
-  }, [selectedMembership]);
+  }, [selectedMembership, userRole]);
 
   const myGroupRole = useMemo(
     () => String(selectedMembership?.group_role ?? "").trim().toLowerCase(),
     [selectedMembership],
   );
+  const effectiveGroupRole =
+    String(userRole || "").toLowerCase() === "admin" ? "admin" : myGroupRole;
 
   useEffect(() => {
     if (memberships === null || !stokvel_id) return;
-    if (!knownMembershipIds.has(String(stokvel_id))) {
+    if (
+      !knownMembershipIds.has(String(stokvel_id)) &&
+      String(userRole || "").toLowerCase() !== "admin"
+    ) {
       navigate("/dashboard", { replace: true });
       return;
     }
@@ -168,7 +177,7 @@ export default function DashboardLayout() {
     } catch {
       // ignore
     }
-  }, [memberships, stokvel_id, knownMembershipIds, navigate]);
+  }, [memberships, stokvel_id, knownMembershipIds, navigate, userRole]);
 
   const firstActiveId = activeStokvels[0]?.stokvels?.id
     ? String(activeStokvels[0].stokvels.id)
@@ -187,7 +196,8 @@ export default function DashboardLayout() {
   const blockOutlet =
     memberships !== null &&
     onScopedRoute &&
-    !knownMembershipIds.has(String(stokvel_id));
+    !knownMembershipIds.has(String(stokvel_id)) &&
+    String(userRole || "").toLowerCase() !== "admin";
 
   if (memberships === null && isScopedPath) {
     return (
@@ -267,15 +277,6 @@ export default function DashboardLayout() {
             />
             Dashboard
           </NavLink>
-          {myGroupRole === "admin" && scopedPrefix ? (
-            <NavLink to={`${scopedPrefix}/settings`} className={linkClass}>
-              <Settings
-                className="h-4 w-4 shrink-0 text-emerald-700"
-                aria-hidden
-              />
-              Settings
-            </NavLink>
-          ) : null}
           <NavLink
             to={
               scopedPrefix
@@ -305,6 +306,21 @@ export default function DashboardLayout() {
             <Wallet className="h-4 w-4 shrink-0 text-emerald-700" aria-hidden />
             Payments
           </NavLink>
+          {String(userRole || "").toLowerCase() === "admin" ? (
+            <NavLink to="/admin/groups" className={linkClass}>
+              <Shield className="h-4 w-4 shrink-0 text-emerald-700" aria-hidden />
+              Back to admin
+            </NavLink>
+          ) : null}
+          {effectiveGroupRole === "admin" && scopedPrefix ? (
+            <NavLink to={`${scopedPrefix}/settings`} className={linkClass}>
+              <Settings
+                className="h-4 w-4 shrink-0 text-emerald-700"
+                aria-hidden
+              />
+              Settings
+            </NavLink>
+          ) : null}
         </nav>
         <div className="mx-2 mb-2 flex shrink-0 flex-col gap-1">
           <NavLink to="/account" className={linkClass}>

@@ -26,8 +26,8 @@ export default function AdminLayout() {
         className={`${cardLight} flex w-full shrink-0 flex-col overflow-hidden border-t-4 border-emerald-700 md:h-full md:w-[240px] md:min-w-[240px] md:max-w-[240px]`}
       >
         <div className="shrink-0 border-b border-stone-200 p-4">
-          <div className="rounded-lg bg-emerald-800 py-2 text-center text-xs font-bold uppercase tracking-wide text-white">
-            Admin
+          <div className="rounded-lg bg-red-700 py-2 text-center text-xs font-bold uppercase tracking-wide text-white">
+            Admin | Superuser
           </div>
           <div className="mt-3 flex justify-center">
             <BrandLogo to="/admin/groups" imgClassName="h-10 w-auto md:h-12" />
