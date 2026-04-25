@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
+import { Loader2 } from 'lucide-react'
 import { useSession } from '../context/SessionContext'
 import { apiUrl } from '../utils/api'
 import {
@@ -539,7 +540,11 @@ export default function Payments() {
 
       {error ? <p className={`mb-6 ${errorBox}`}>{error}</p> : null}
 
-      {session && loading ? <p className="text-sm text-stone-500">Loading…</p> : null}
+      {session && loading ? (
+        <div className="flex justify-center p-8">
+          <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+        </div>
+      ) : null}
 
       {session && !loading && membership ? (
         <>
@@ -554,44 +559,86 @@ export default function Payments() {
             ))}
           </div>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <MarketRatesWidget memberMonthlyContribution={monthlyContribution} />
-            <div className={`${cardLight} p-6`}>
-              <span className="text-sm font-bold text-stone-800 dark:text-stone-100">Quick Pay</span>
-              <p className="mt-2 text-sm text-stone-600 dark:text-stone-300">{cycleBannerText}</p>
-              {paymentDebug ? (
-                <p className="mt-2 text-xs text-amber-800 dark:text-amber-200" role="status">
-                  Payment debug: {paymentDebug}
-                </p>
-              ) : null}
-              <button
-                type="button"
-                disabled={!quickPayEnabled}
-                onClick={() => quickPayEnabled && setQuickPayOpen(true)}
-                className={`${btnPrimary} mt-4 w-full py-3 text-base disabled:cursor-not-allowed disabled:opacity-40`}
-              >
-                {monthlyContribution > 0
-                  ? `Pay monthly contribution (${formatZAR(monthlyContribution)})`
-                  : 'Pay monthly contribution'}
-              </button>
-              {!quickPayEnabled && quickPayDisabledReason ? (
-                <p className="mt-2 text-xs text-stone-500 dark:text-stone-400">{quickPayDisabledReason}</p>
-              ) : null}
-              <p className="mt-4 text-xs text-stone-600 dark:text-stone-400">
-                Schedules and minutes are on the{' '}
-                <Link
-                  to={`/group/${stokvel_id}/meetings`}
-                  className="font-medium text-emerald-800 underline-offset-2 hover:underline dark:text-emerald-300"
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-stretch">
+            <div className="h-full">
+              <MarketRatesWidget memberMonthlyContribution={monthlyContribution} className="h-full" />
+            </div>
+            <div className="flex h-full flex-col gap-4">
+              <div className={`${cardLight} p-4`}>
+                <span className="text-sm font-bold text-stone-800 dark:text-stone-100">Quick Pay</span>
+                <p className="mt-1 text-sm text-stone-600 dark:text-stone-300">{cycleBannerText}</p>
+                {paymentDebug ? (
+                  <p className="mt-1 text-xs text-amber-800 dark:text-amber-200" role="status">
+                    Payment debug: {paymentDebug}
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  disabled={!quickPayEnabled}
+                  onClick={() => quickPayEnabled && setQuickPayOpen(true)}
+                  className={`${btnPrimary} mt-3 w-full py-2.5 text-base disabled:cursor-not-allowed disabled:opacity-40`}
                 >
-                  Meetings
-                </Link>{' '}
-                page.
-              </p>
+                  {monthlyContribution > 0
+                    ? `Pay monthly contribution (${formatZAR(monthlyContribution)})`
+                    : 'Pay monthly contribution'}
+                </button>
+                {!quickPayEnabled && quickPayDisabledReason ? (
+                  <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">{quickPayDisabledReason}</p>
+                ) : null}
+              </div>
+
+              <section className={`${cardLight} min-h-0 flex-1 p-4`}>
+                <h3 className="mb-3 border-b border-stone-200 pb-2 text-lg font-bold text-emerald-800 dark:border-slate-700 dark:text-emerald-300">
+                  Payout schedule
+                </h3>
+                <p className="mb-3 text-xs text-stone-500 dark:text-stone-400">
+                  Scheduled payouts from the group roster (amount ≈ pool for that cycle).
+                </p>
+                <div className={tableWrap}>
+                  <table className="w-full min-w-[280px] text-left text-sm text-stone-800 dark:text-stone-100">
+                    <thead>
+                      <tr className={tableHead}>
+                        <th className="p-3">Date</th>
+                        <th className="p-3">Member</th>
+                        <th className="p-3">Expected amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loading ? (
+                        <tr className={tableRow}>
+                          <td colSpan={3} className="p-6">
+                            <div className="flex justify-center">
+                              <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+                            </div>
+                          </td>
+                        </tr>
+                      ) : payouts.length === 0 ? (
+                        <tr className={tableRow}>
+                          <td colSpan={3} className="p-6 text-center text-stone-500 italic">
+                            No payout schedule yet.
+                          </td>
+                        </tr>
+                      ) : (
+                        payouts.map((p) => {
+                          const prof = members.find((m) => m.user_id === p.user_id)?.profiles ?? null
+                          return (
+                            <tr key={p.id ?? `${p.user_id}-${p.target_month}`} className={tableRow}>
+                              <td className="p-3 whitespace-nowrap">{formatScheduleDate(p.scheduled_payout_date)}</td>
+                              <td className="p-3">{memberDisplay(prof)}</td>
+                              <td className="p-3">{formatZAR(expectedPayout)}</td>
+                            </tr>
+                          )
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
             </div>
           </div>
 
-          <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-3">
-            <div className="space-y-8 lg:col-span-2">
+          <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="order-1 space-y-8 lg:col-span-2">
               <section>
                 <h3 className="mb-4 border-b border-stone-200 pb-2 text-lg font-bold text-emerald-800 dark:border-slate-700 dark:text-emerald-300">
                   Cycle ledger
@@ -601,7 +648,7 @@ export default function Payments() {
                     No contribution cycles recorded yet.
                   </p>
                 ) : (
-                  <div className="space-y-6">
+                  <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                     {ledgerMonths.map((month) => {
                       const isPastMonth = month < refMonth
                       return (
@@ -683,7 +730,7 @@ export default function Payments() {
               </section>
             </div>
 
-            <div>
+            <div className="order-2">
               {canManageTreasurer ? (
                 <section className="mb-8">
                   <h3 className="mb-4 border-b border-stone-200 pb-2 text-lg font-bold text-emerald-800 dark:border-slate-700 dark:text-emerald-300">
@@ -718,45 +765,6 @@ export default function Payments() {
                   </div>
                 </section>
               ) : null}
-              <section>
-                <h3 className="mb-4 border-b border-stone-200 pb-2 text-lg font-bold text-emerald-800 dark:border-slate-700 dark:text-emerald-300">
-                  Payout schedule
-                </h3>
-                <p className="mb-3 text-xs text-stone-500 dark:text-stone-400">
-                  Scheduled payouts from the group roster (amount ≈ pool for that cycle).
-                </p>
-                <div className={tableWrap}>
-                  <table className="w-full min-w-[280px] text-left text-sm text-stone-800 dark:text-stone-100">
-                    <thead>
-                      <tr className={tableHead}>
-                        <th className="p-3">Date</th>
-                        <th className="p-3">Member</th>
-                        <th className="p-3">Expected amount</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {payouts.length === 0 ? (
-                        <tr className={tableRow}>
-                          <td colSpan={3} className="p-6 text-center text-stone-500 italic">
-                            No payout schedule yet.
-                          </td>
-                        </tr>
-                      ) : (
-                        payouts.map((p) => {
-                          const prof = members.find((m) => m.user_id === p.user_id)?.profiles ?? null
-                          return (
-                            <tr key={p.id ?? `${p.user_id}-${p.target_month}`} className={tableRow}>
-                              <td className="p-3 whitespace-nowrap">{formatScheduleDate(p.scheduled_payout_date)}</td>
-                              <td className="p-3">{memberDisplay(prof)}</td>
-                              <td className="p-3">{formatZAR(expectedPayout)}</td>
-                            </tr>
-                          )
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
             </div>
           </div>
 

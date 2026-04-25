@@ -146,7 +146,7 @@ describe("Payments", () => {
     expect(screen.getByText("Sign in to view this stokvel.")).toBeInTheDocument();
   });
 
-  it("renders loaded finance dashboard with stats, tables, links and widgets", async () => {
+  it("renders loaded finance dashboard with stats, tables and widgets", async () => {
     readViewCacheMock.mockReturnValue(null);
     setupFetch({ detail: okJson(detailBase), meetings: okJson({ meetings: [{ id: "m1" }] }) });
 
@@ -157,10 +157,6 @@ describe("Payments", () => {
     expect(screen.getByText("Current treasurer")).toBeInTheDocument();
     expect(screen.getAllByText("john").length).toBeGreaterThan(0);
     expect(screen.getByTestId("rates-widget")).toHaveTextContent("Rates:500");
-    expect(screen.getByRole("link", { name: "Meetings" })).toHaveAttribute(
-      "href",
-      "/group/stok-1/meetings",
-    );
     expect(screen.getByText("Cycle ledger")).toBeInTheDocument();
     expect(screen.getByText("Payout schedule")).toBeInTheDocument();
     expect(screen.getAllByText("Ada L").length).toBeGreaterThan(0);
