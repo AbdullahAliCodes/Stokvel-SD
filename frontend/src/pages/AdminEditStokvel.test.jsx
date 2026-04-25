@@ -61,7 +61,6 @@ describe('AdminEditStokvel', () => {
           type: 'Rotating',
           status: 'active',
           contribution_amount: 500,
-          payout_strategy: 'Auto-Rotate',
           cycle_length: 6,
         }
       })
@@ -166,7 +165,6 @@ describe('AdminEditStokvel', () => {
             type: 'Rotating',
             status: 'active',
             contributionAmount: 500,
-            payoutStrategy: 'Auto-Rotate',
             cycleLength: 6,
           })
         }))

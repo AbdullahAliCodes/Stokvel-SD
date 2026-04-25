@@ -95,10 +95,22 @@ const members = [
 
 const detailBase = {
   membership: { group_role: "member", stokvels: { name: "Fallback Group" } },
-  stokvel: { id: "stok-1", name: "Main Group", status: "active", contribution_amount: 500 },
+  stokvel: { id: "stok-1", name: "Main Group", status: "active", contribution_amount: 500, type: "Fixed" },
   members,
   totalContribution: 2000,
-  contributions: [{ id: "c1", amount: 500, paid_at: "2026-04-20", profiles: { full_name: "Ada L" } }],
+  contributions: [
+    {
+      id: "c1",
+      amount: 500,
+      paid_at: "2026-04-20",
+      user_id: "u1",
+      target_month: "2026-03",
+      profiles: { full_name: "Ada L" },
+    },
+  ],
+  currentCycle: { targetMonth: "2026-04", inPaymentWindow: true },
+  payouts: [],
+  missedPayments: [],
 };
 
 function renderPayments() {
@@ -134,7 +146,7 @@ describe("Payments", () => {
     expect(screen.getByText("Sign in to view this stokvel.")).toBeInTheDocument();
   });
 
-  it("renders loaded finance dashboard with stats, tables, links and widgets", async () => {
+  it("renders loaded finance dashboard with stats, tables and widgets", async () => {
     readViewCacheMock.mockReturnValue(null);
     setupFetch({ detail: okJson(detailBase), meetings: okJson({ meetings: [{ id: "m1" }] }) });
 
@@ -145,12 +157,8 @@ describe("Payments", () => {
     expect(screen.getByText("Current treasurer")).toBeInTheDocument();
     expect(screen.getAllByText("john").length).toBeGreaterThan(0);
     expect(screen.getByTestId("rates-widget")).toHaveTextContent("Rates:500");
-    expect(screen.getByRole("link", { name: "Meetings" })).toHaveAttribute(
-      "href",
-      "/group/stok-1/meetings",
-    );
-    expect(screen.getByText("Recent contributions")).toBeInTheDocument();
-    expect(screen.getByText("Payout queue")).toBeInTheDocument();
+    expect(screen.getByText("Cycle ledger")).toBeInTheDocument();
+    expect(screen.getByText("Payout schedule")).toBeInTheDocument();
     expect(screen.getAllByText("Ada L").length).toBeGreaterThan(0);
   });
 
@@ -161,7 +169,7 @@ describe("Payments", () => {
 
     renderPayments();
 
-    await screen.findByText("No contributions yet.");
+    await screen.findByText("No contribution cycles recorded yet.");
     expect(screen.getByText("No payout schedule yet.")).toBeInTheDocument();
   });
 
@@ -205,7 +213,7 @@ describe("Payments", () => {
     await waitFor(() =>
       expect(screen.queryByTestId("quickpay-modal")).not.toBeInTheDocument(),
     );
-    expect(screen.getByText(/Payment debug: Optimistic UI updated, refreshing from server/)).toBeInTheDocument();
+    expect(await screen.findByText(/Payment debug: Ledger refreshed from server/)).toBeInTheDocument();
   });
 
   it("shows record error from quick pay callback", async () => {

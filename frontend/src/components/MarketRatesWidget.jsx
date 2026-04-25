@@ -26,7 +26,7 @@ function buildProjectionPoints(contribution, primeRatePercent) {
   })
 }
 
-export default function MarketRatesWidget({ memberMonthlyContribution = 0 }) {
+export default function MarketRatesWidget({ memberMonthlyContribution = 0, className = '' }) {
   const [rates, setRates] = useState(null)
   const [projection, setProjection] = useState([])
   const [error, setError] = useState(null)
@@ -61,7 +61,7 @@ export default function MarketRatesWidget({ memberMonthlyContribution = 0 }) {
 
   if (error) {
     return (
-      <div className={`${cardLight} p-6`}>
+      <div className={`${cardLight} ${className} p-6`}>
         <p className="text-sm font-bold text-emerald-800">SA reference rates</p>
         <p className="mt-2 text-xs text-red-800">{error}</p>
       </div>
@@ -70,14 +70,14 @@ export default function MarketRatesWidget({ memberMonthlyContribution = 0 }) {
 
   if (!rates) {
     return (
-      <div className={`${cardLight} p-6`}>
+      <div className={`${cardLight} ${className} p-6`}>
         <p className="text-sm text-stone-500">Loading rates…</p>
       </div>
     )
   }
 
   return (
-    <div className={`${cardLight} flex flex-col gap-4 p-6`}>
+    <div className={`${cardLight} ${className} flex flex-col gap-4 p-6`}>
       <p className="text-sm font-bold text-emerald-800">SA reference rates</p>
       <div className="flex flex-wrap gap-3 text-xs text-stone-700">
         <span className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-emerald-800">

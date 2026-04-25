@@ -10,10 +10,16 @@ import {
   ChevronLeft,
   ChevronRight,
   FileText,
+  GripVertical,
   MailPlus,
   Upload,
   X,
 } from "lucide-react";
+import {
+  DragDropContext,
+  Draggable,
+  Droppable,
+} from "@hello-pangea/dnd";
 import { useSession } from "../context/SessionContext";
 import { apiUrl } from "../utils/api";
 import {
@@ -189,6 +195,32 @@ function memberAvatarLetter(m) {
   return "?";
 }
 
+/** Registered roster UUIDs in table order (creator first, then others). */
+function rosterRegisteredUuidsInOrder(selectedMembers) {
+  const out = [];
+  for (const m of selectedMembers) {
+    const id = String(m?.id ?? "").trim().toLowerCase();
+    if (UUID_RE.test(id)) out.push(id);
+  }
+  return out;
+}
+
+function memberByUuid(selectedMembers, uuid) {
+  const u = String(uuid ?? "").trim().toLowerCase();
+  return (
+    selectedMembers.find((m) => String(m.id ?? "").trim().toLowerCase() === u) ??
+    null
+  );
+}
+
+function memberPayoutRowRoleLabel(m, isAdminWizard) {
+  if (!m) return "—";
+  if (m.isCreator && !isAdminWizard) return "Admin (Chairperson)";
+  if (!isAdminWizard) return "Member";
+  if (m.isPending) return "Member (invite pending)";
+  return typeof m.role === "string" && m.role.trim() ? m.role : "Member";
+}
+
 /** @param {{ variant?: 'admin' | 'member' }} props */
 export function CreateStokvelWizard({ variant = "admin" }) {
   const { session } = useSession();
@@ -200,8 +232,12 @@ export function CreateStokvelWizard({ variant = "admin" }) {
   const [name, setName] = useState("");
   const [type, setType] = useState("Rotating");
   const [contributionAmount, setContributionAmount] = useState("");
-  const [payoutStrategy, setPayoutStrategy] = useState("Auto-Rotate");
-  const [payoutOrder, setPayoutOrder] = useState("randomize");
+  const [payoutOrderType, setPayoutOrderType] = useState(
+    /** @type {'randomize' | 'manual'} */ ("randomize"),
+  );
+  const [proposedPayoutSequence, setProposedPayoutSequence] = useState(
+    /** @type {string[]} */ ([]),
+  );
   const [meetingFrequency, setMeetingFrequency] = useState("monthly");
   const [cycleLength, setCycleLength] = useState("1");
   const [isPublic, setIsPublic] = useState(false);
@@ -357,6 +393,33 @@ export function CreateStokvelWizard({ variant = "admin" }) {
     const n = Math.max(1, selectedMembers.length);
     setCycleLength(String(n));
   }, [selectedMembers.length]);
+
+  /** Keep proposed UUID list aligned with roster; preserve manual drag order for existing ids. */
+  useEffect(() => {
+    const rosterIds = rosterRegisteredUuidsInOrder(selectedMembers);
+    if (payoutOrderType !== "manual") {
+      setProposedPayoutSequence([]);
+      return;
+    }
+    setProposedPayoutSequence((prev) => {
+      const rosterSet = new Set(rosterIds);
+      const kept = prev.filter((id) => rosterSet.has(id));
+      const keptSet = new Set(kept);
+      const appended = rosterIds.filter((id) => !keptSet.has(id));
+      return [...kept, ...appended];
+    });
+  }, [selectedMembers, payoutOrderType]);
+
+  const handlePayoutDragEnd = useCallback((result) => {
+    if (!result.destination) return;
+    if (result.destination.index === result.source.index) return;
+    setProposedPayoutSequence((items) => {
+      const next = Array.from(items);
+      const [removed] = next.splice(result.source.index, 1);
+      next.splice(result.destination.index, 0, removed);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (!session?.access_token) return undefined;
@@ -756,6 +819,36 @@ export function CreateStokvelWizard({ variant = "admin" }) {
     )
       return;
 
+    const rosterUuidList = rosterRegisteredUuidsInOrder(selectedMembers);
+    if (payoutOrderType === "manual") {
+      if (proposedPayoutSequence.length !== rosterUuidList.length) {
+        return setFormError(
+          `Manual payout order must list every registered member once (${rosterUuidList.length} expected, ${proposedPayoutSequence.length} in order). Use the Members tab to fix the list or choose Randomize.`,
+        );
+      }
+      const seqSet = new Set(proposedPayoutSequence);
+      if (seqSet.size !== proposedPayoutSequence.length) {
+        return setFormError(
+          "Manual payout order has duplicate entries. Re-order the list or switch to Randomize.",
+        );
+      }
+      const rosterSet = new Set(rosterUuidList);
+      for (const id of proposedPayoutSequence) {
+        if (!rosterSet.has(id)) {
+          return setFormError(
+            "Manual payout order includes an ID that is not on the roster.",
+          );
+        }
+      }
+      for (const id of rosterUuidList) {
+        if (!seqSet.has(id)) {
+          return setFormError(
+            "Manual payout order is missing a registered member.",
+          );
+        }
+      }
+    }
+
     const initialMemberIds = selectedMembers
       .filter((m) => m.id !== myUserId && UUID_RE.test(m.id))
       .map((m) => m.id);
@@ -780,14 +873,15 @@ export function CreateStokvelWizard({ variant = "admin" }) {
           name: name.trim(),
           type,
           contributionAmount: amountNum,
-          payoutStrategy,
-          payoutOrder,
           meetingFrequency,
           cycleLength: cycleNum,
           membersCount,
           memberDetails: memberDetailsPayload,
           documents: documentUrls,
           isPublic,
+          payout_order_type: payoutOrderType,
+          proposed_payout_sequence:
+            payoutOrderType === "manual" ? proposedPayoutSequence : [],
           initialMemberIds,
           ...(isAdmin
             ? { treasurerUserId: treasurerIdForAdmin }
@@ -1038,28 +1132,6 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                       value={contributionAmount}
                       onChange={(e) => setContributionAmount(e.target.value)}
                     />
-                  </label>
-                  <label className={labelLight}>
-                    Payout schedule
-                    <select
-                      className={inputLight}
-                      value={payoutStrategy}
-                      onChange={(e) => setPayoutStrategy(e.target.value)}
-                    >
-                      <option value="Manual">Manual</option>
-                      <option value="Auto-Rotate">Auto-Rotate</option>
-                    </select>
-                  </label>
-                  <label className={labelLight}>
-                    Payout order
-                    <select
-                      className={inputLight}
-                      value={payoutOrder}
-                      onChange={(e) => setPayoutOrder(e.target.value)}
-                    >
-                      <option value="randomize">Randomize</option>
-                      <option value="manual">Manual</option>
-                    </select>
                   </label>
                   <label className={labelLight}>
                     Meeting frequency
@@ -1478,6 +1550,112 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                     </label>
                   </div>
                 ) : null}
+
+                <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+                  <p className="mb-1 text-sm font-medium text-stone-800">
+                    Payout order
+                  </p>
+                  <p className="mb-3 text-xs font-normal text-stone-600">
+                    Applies when an admin activates the group. Randomize shuffles
+                    registered members; Manual lets you set the exact sequence
+                    (registered users only — email-only invites are added after
+                    they join).
+                  </p>
+                  <div className="flex flex-wrap gap-4">
+                    <label className="flex cursor-pointer items-center gap-2 text-sm text-stone-800">
+                      <input
+                        type="radio"
+                        name="payoutOrderType"
+                        className="h-4 w-4 accent-emerald-600"
+                        checked={payoutOrderType === "randomize"}
+                        onChange={() => setPayoutOrderType("randomize")}
+                      />
+                      Randomize at activation
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-2 text-sm text-stone-800">
+                      <input
+                        type="radio"
+                        name="payoutOrderType"
+                        className="h-4 w-4 accent-emerald-600"
+                        checked={payoutOrderType === "manual"}
+                        onChange={() => setPayoutOrderType("manual")}
+                      />
+                      Manual (drag to reorder)
+                    </label>
+                  </div>
+
+                  {payoutOrderType === "manual" ? (
+                    <div className="mt-4">
+                      {proposedPayoutSequence.length === 0 ? (
+                        <p className="text-xs text-stone-500">
+                          Add registered members to set payout order.
+                        </p>
+                      ) : (
+                        <DragDropContext onDragEnd={handlePayoutDragEnd}>
+                          <Droppable droppableId="stokvel-payout-order">
+                            {(droppableProvided) => (
+                              <ul
+                                ref={droppableProvided.innerRef}
+                                {...droppableProvided.droppableProps}
+                                className="flex flex-col gap-2 rounded-lg border border-stone-200 bg-stone-50/80 p-2"
+                              >
+                                {proposedPayoutSequence.map((uid, index) => {
+                                  const m = memberByUuid(selectedMembers, uid);
+                                  const nameLabel =
+                                    m != null
+                                      ? m.isCreator && !isAdmin
+                                        ? "You"
+                                        : displayName(m)
+                                      : uid;
+                                  return (
+                                    <Draggable
+                                      key={uid}
+                                      draggableId={uid}
+                                      index={index}
+                                    >
+                                      {(dragProvided, snapshot) => (
+                                        <li
+                                          ref={dragProvided.innerRef}
+                                          {...dragProvided.draggableProps}
+                                          className={`flex items-center gap-3 rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm shadow-sm ${
+                                            snapshot.isDragging
+                                              ? "ring-2 ring-emerald-500/40"
+                                              : ""
+                                          }`}
+                                        >
+                                          <button
+                                            type="button"
+                                            className="touch-none rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                                            aria-label="Drag to reorder"
+                                            {...dragProvided.dragHandleProps}
+                                          >
+                                            <GripVertical className="h-4 w-4" />
+                                          </button>
+                                          <div className="min-w-0 flex-1">
+                                            <p className="truncate font-medium text-stone-900">
+                                              {nameLabel}
+                                            </p>
+                                            <p className="truncate text-xs text-stone-600">
+                                              {memberPayoutRowRoleLabel(m, isAdmin)}
+                                              {m?.username
+                                                ? ` · @${m.username}`
+                                                : ""}
+                                            </p>
+                                          </div>
+                                        </li>
+                                      )}
+                                    </Draggable>
+                                  );
+                                })}
+                                {droppableProvided.placeholder}
+                              </ul>
+                            )}
+                          </Droppable>
+                        </DragDropContext>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
 
                 {selectedMembers.length === 0 ? (
                   <p className="text-xs text-stone-500">Loading your row…</p>

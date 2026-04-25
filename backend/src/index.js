@@ -315,7 +315,7 @@ app.get('/api/my-stokvels', requireAuth, async (req, res) => {
     const { data, error } = await userSupabase
       .from('stokvel_members')
       .select(
-        'stokvel_id, group_role, stokvels(id, name, status, contribution_amount, type, payout_strategy, cycle_length)',
+        'stokvel_id, group_role, stokvels(id, name, status, contribution_amount, type, cycle_length)',
       )
       .eq('user_id', req.user.id)
 
@@ -411,7 +411,8 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
       contributionAmount,
       meetingFrequency,
       payoutOrder,
-      payoutStrategy,
+      payoutOrderType,
+      proposedPayoutSequence,
       cycleLength,
       treasurerUserId: treasurerUserIdRaw,
       initialMemberIds: initialMemberIdsRaw,
@@ -420,6 +421,10 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
       documents,
       isPublic,
     } = req.body ?? {}
+    const payoutOrderTypeRaw =
+      req.body?.payout_order_type ?? payoutOrderType ?? payoutOrder
+    const proposedPayoutRaw =
+      req.body?.proposed_payout_sequence ?? proposedPayoutSequence
 
     if (!name || typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({ error: 'Group name is required.' })
@@ -457,11 +462,21 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
 
     const parsedDetails = normalizeMemberDetails(memberDetails, parsedMembersCount ?? 500)
     const parsedDocuments = normalizeDocuments(documents)
+    const payoutOrderTypeNorm =
+      typeof payoutOrderTypeRaw === 'string' && payoutOrderTypeRaw.toLowerCase() === 'manual'
+        ? 'manual'
+        : 'randomize'
+    const proposedFromBody = Array.isArray(proposedPayoutRaw)
+      ? proposedPayoutRaw.filter((x) => typeof x === 'string')
+      : null
+
     const insertRow = {
       name: name.trim(),
       status: 'pending',
       contribution_amount: Number(contributionAmount) || 0,
-      payout_order: typeof payoutOrder === 'string' ? payoutOrder : 'randomize',
+      payout_order: payoutOrderTypeNorm === 'manual' ? 'manual' : 'randomize',
+      payout_order_type: payoutOrderTypeNorm,
+      proposed_payout_sequence: proposedFromBody ?? [],
       meeting_frequency: typeof meetingFrequency === 'string' ? meetingFrequency : 'monthly',
       members_count: parsedMembersCount,
       member_details: parsedDetails,
@@ -470,12 +485,6 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
     }
     if (typeof type === 'string' && (type === 'Rotating' || type === 'Fixed')) {
       insertRow.type = type
-    }
-    if (
-      typeof payoutStrategy === 'string' &&
-      (payoutStrategy === 'Manual' || payoutStrategy === 'Auto-Rotate')
-    ) {
-      insertRow.payout_strategy = payoutStrategy
     }
     const cyc = Number(cycleLength)
     if (Number.isInteger(cyc) && cyc >= 1 && cyc <= 240) {
@@ -603,6 +612,27 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
 
       const { error: syncErr } = await ensurePlatformAdminsInStokvel(svc, stokvelId)
       if (syncErr) throw syncErr
+
+      let proposedPayoutSequenceOut = proposedFromBody ?? []
+      if (proposedFromBody == null) {
+        const seen = new Set()
+        for (const raw of [treasurerUuid, ...mergedMemberUuids]) {
+          const uid = normalizeUuid(raw)
+          if (!uid || uid === creatorId || seen.has(uid)) continue
+          seen.add(uid)
+          proposedPayoutSequenceOut.push(uid)
+        }
+      }
+
+      const { error: propErr } = await svc
+        .from('stokvels')
+        .update({
+          payout_order_type: payoutOrderTypeNorm,
+          proposed_payout_sequence: proposedPayoutSequenceOut,
+          payout_order: payoutOrderTypeNorm === 'manual' ? 'manual' : 'randomize',
+        })
+        .eq('id', stokvelId)
+      if (propErr) throw propErr
     } catch (pipelineErr) {
       console.error('POST /api/stokvels membership pipeline:', pipelineErr)
       await deleteStokvelCascade(svc, stokvelId)
@@ -615,7 +645,17 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
     }
 
     clearDashboardCacheForUser(req.user.id)
-    res.status(201).json({ success: true, stokvel: newStokvel })
+
+    const { data: stokvelForResponse, error: refetchErr } = await userSupabase
+      .from('stokvels')
+      .select('*')
+      .eq('id', stokvelId)
+      .maybeSingle()
+    if (refetchErr) {
+      console.error('POST /api/stokvels refetch stokvel:', refetchErr)
+    }
+
+    res.status(201).json({ success: true, stokvel: stokvelForResponse ?? newStokvel })
     console.log(`[perf] POST /api/stokvels ${elapsedMs(started).toFixed(1)}ms user=${req.user.id}`)
   } catch (err) {
     console.error('POST /api/stokvels:', err)

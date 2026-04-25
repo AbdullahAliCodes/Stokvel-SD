@@ -48,6 +48,11 @@ jest.unstable_mockModule('../utils/invitations.js', () => ({
   sendInvitationEmail: mockSendInvitationEmail,
 }))
 
+const mockActivateStokvel = jest.fn()
+jest.unstable_mockModule('../utils/stokvelActivation.js', () => ({
+  activateStokvel: (...args) => mockActivateStokvel(...args),
+}))
+
 const { default: router } = await import('./adminStokvels.js')
 
 /**
@@ -79,6 +84,9 @@ function createSupabaseMock() {
               return selectChain
             },
             neq() {
+              return selectChain
+            },
+            is() {
               return selectChain
             },
             in() {
@@ -124,18 +132,25 @@ function createSupabaseMock() {
           }
         },
         update() {
+          const inner = {
+            eq() {
+              return inner
+            },
+            is() {
+              return inner
+            },
+            select() {
+              return Promise.resolve(
+                dequeue(`${table}.updateSelect`, { data: [], error: null }),
+              )
+            },
+            then(resolve) {
+              resolve(dequeue(`${table}.updateEq`, { error: null }))
+            },
+          }
           return {
             eq() {
-              return {
-                select() {
-                  return Promise.resolve(
-                    dequeue(`${table}.updateSelect`, { data: [], error: null }),
-                  )
-                },
-                then(resolve) {
-                  resolve(dequeue(`${table}.updateEq`, { error: null }))
-                },
-              }
+              return inner
             },
           }
         },
@@ -198,6 +213,8 @@ beforeEach(() => {
   mockEnsurePlatformAdminsInStokvel.mockResolvedValue({ error: null })
   mockCreateInvitation.mockResolvedValue({ data: { token: 'tok-1' }, error: null })
   mockGetServiceSupabase.mockReturnValue(null)
+  mockActivateStokvel.mockReset()
+  mockActivateStokvel.mockResolvedValue({ ok: true })
 })
 
 describe('adminStokvels routes', () => {
@@ -293,7 +310,7 @@ describe('adminStokvels routes', () => {
     it('returns 400 when contribution amount is invalid', async () => {
       const handler = getHandler('post', '/stokvels')
       const req = makeReq({
-        body: { name: 'A', contributionAmount: 0, type: 'Rotating', payoutStrategy: 'Manual', cycleLength: 1 },
+        body: { name: 'A', contributionAmount: 0, type: 'Rotating', cycleLength: 1 },
       })
       const res = makeRes()
 
@@ -308,7 +325,7 @@ describe('adminStokvels routes', () => {
     it('returns 400 when stokvel type is invalid', async () => {
       const handler = getHandler('post', '/stokvels')
       const req = makeReq({
-        body: { name: 'A', contributionAmount: 10, type: 'Other', payoutStrategy: 'Manual', cycleLength: 1 },
+        body: { name: 'A', contributionAmount: 10, type: 'Other', cycleLength: 1 },
       })
       const res = makeRes()
 
@@ -325,7 +342,7 @@ describe('adminStokvels routes', () => {
       client.__enqueue('stokvels.selectMaybeSingle', { data: null, error: { message: 'dup check failed' } })
 
       const req = makeReq({
-        body: { name: 'Group A', contributionAmount: 100, type: 'Rotating', payoutStrategy: 'Manual', cycleLength: 6 },
+        body: { name: 'Group A', contributionAmount: 100, type: 'Rotating', cycleLength: 6 },
       })
       const res = makeRes()
 
@@ -342,7 +359,7 @@ describe('adminStokvels routes', () => {
       client.__enqueue('stokvels.selectMaybeSingle', { data: { id: 'existing' }, error: null })
 
       const req = makeReq({
-        body: { name: 'Group A', contributionAmount: 100, type: 'Rotating', payoutStrategy: 'Manual', cycleLength: 6 },
+        body: { name: 'Group A', contributionAmount: 100, type: 'Rotating', cycleLength: 6 },
       })
       const res = makeRes()
 
@@ -369,7 +386,6 @@ describe('adminStokvels routes', () => {
           name: 'Group A',
           contributionAmount: 100,
           type: 'Rotating',
-          payoutStrategy: 'Manual',
           cycleLength: 6,
         },
       })
@@ -393,13 +409,17 @@ describe('adminStokvels routes', () => {
       client.__enqueue('profiles.selectMany', { data: [{ id: 'u2', role: 'user' }], error: null })
       client.__enqueue('stokvel_members.insert', { error: null })
       mockEnsurePlatformAdminsInStokvel.mockResolvedValue({ error: null })
+      client.__enqueue('profiles.selectMaybeSingle', { data: { email: 'member@test.com' }, error: null })
+      client.__enqueue('stokvels.selectMaybeSingle', {
+        data: { id: 's1', name: 'Group A', status: 'active' },
+        error: null,
+      })
 
       const req = makeReq({
         body: {
           name: 'Group A',
           contributionAmount: 100,
           type: 'Rotating',
-          payoutStrategy: 'Manual',
           cycleLength: 6,
           initialMemberIds: ['22222222-2222-4222-8222-222222222222'],
           treasurerUserId: '22222222-2222-4222-8222-222222222222',
@@ -413,9 +433,10 @@ describe('adminStokvels routes', () => {
       await handler(req, res)
 
       expect(res.status).toHaveBeenCalledWith(201)
+      expect(mockActivateStokvel).toHaveBeenCalled()
       expect(res.json).toHaveBeenCalledWith({
         success: true,
-        stokvel: { id: 's1', name: 'Group A' },
+        stokvel: { id: 's1', name: 'Group A', status: 'active' },
       })
     })
   })
@@ -683,10 +704,11 @@ describe('adminStokvels routes', () => {
       mockGetServiceSupabase.mockReturnValue(client)
 
       client.__enqueue('stokvels.selectMaybeSingle', { data: { id: 's1' }, error: null }) // existing
+      client.__enqueue('stokvels.selectMaybeSingle', { data: null, error: null }) // dup name check
       client.__enqueue('stokvels.updateSelect', { data: [], error: null }) // update no rows
-      client.__enqueue('stokvels.selectMaybeSingle', { data: { id: 's1', status: 'pending' }, error: null }) // refetch mismatch
+      client.__enqueue('stokvels.selectMaybeSingle', { data: { id: 's1', name: 'Old' }, error: null }) // refetch mismatch
 
-      const req = makeReq({ params: { stokvelId: 's1' }, body: { status: 'active' } })
+      const req = makeReq({ params: { stokvelId: 's1' }, body: { name: 'Renamed' } })
       const res = makeRes()
 
       await handler(req, res)
@@ -703,19 +725,11 @@ describe('adminStokvels routes', () => {
       // existing group
       client.__enqueue('stokvels.selectMaybeSingle', { data: { id: 's1' }, error: null })
 
-      // update row returned immediately
-      client.__enqueue('stokvels.updateSelect', {
-        data: [{ id: 's1', name: 'Group A', status: 'active' }],
+      // pre-invite stokvel row (name for emails)
+      client.__enqueue('stokvels.selectMaybeSingle', {
+        data: { id: 's1', name: 'Group A', status: 'pending' },
         error: null,
       })
-
-      // getGroupAndCreatorContact
-      client.__enqueue('stokvels.selectMaybeSingle', { data: { id: 's1', name: 'Group A' }, error: null })
-      client.__enqueue('stokvel_members.selectMaybeSingle', {
-        data: { user_id: '22222222-2222-4222-8222-222222222222' },
-        error: null,
-      })
-      client.__enqueue('profiles.selectMaybeSingle', { data: { email: 'treasurer@site.com' }, error: null })
 
       // pending invites
       client.__enqueue('invitations.selectMany', {
@@ -738,6 +752,20 @@ describe('adminStokvels routes', () => {
       client.__enqueue('invitations.updateEq', { error: null })
       client.__enqueue('invitations.updateEq', { error: null })
 
+      // final refetch after activation
+      client.__enqueue('stokvels.selectMaybeSingle', {
+        data: { id: 's1', name: 'Group A', status: 'active' },
+        error: null,
+      })
+
+      // getGroupAndCreatorContact
+      client.__enqueue('stokvels.selectMaybeSingle', { data: { id: 's1', name: 'Group A' }, error: null })
+      client.__enqueue('stokvel_members.selectMaybeSingle', {
+        data: { user_id: '22222222-2222-4222-8222-222222222222' },
+        error: null,
+      })
+      client.__enqueue('profiles.selectMaybeSingle', { data: { email: 'treasurer@site.com' }, error: null })
+
       const req = makeReq({
         params: { stokvelId: 's1' },
         body: { status: 'active' },
@@ -746,6 +774,7 @@ describe('adminStokvels routes', () => {
 
       await handler(req, res)
 
+      expect(mockActivateStokvel).toHaveBeenCalledWith('s1', client)
       expect(mockSendGroupStatusEmail).toHaveBeenCalledWith({
         to: 'treasurer@site.com',
         groupName: 'Group A',

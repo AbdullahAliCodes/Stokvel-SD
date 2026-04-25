@@ -71,6 +71,12 @@ function createSupabaseMock() {
       in() {
         return chain
       },
+      is() {
+        return chain
+      },
+      limit() {
+        return Promise.resolve(pop(`${table}.selectLimit`, { data: [], error: null }))
+      },
       order() {
         return Promise.resolve(pop(`${table}.selectMany`, { data: [], error: null }))
       },
@@ -87,23 +93,32 @@ function createSupabaseMock() {
     return chain
   }
 
-  const makeInsertChain = (table) => ({
-    select() {
-      return {
-        single() {
-          return Promise.resolve(pop(`${table}.insertSingle`, { data: null, error: null }))
-        },
-      }
-    },
-  })
+  const makeInsertChain = (table) => {
+    const chain = {
+      select() {
+        return {
+          single() {
+            return Promise.resolve(pop(`${table}.insertSingle`, { data: null, error: null }))
+          },
+        }
+      },
+      then(resolve) {
+        resolve(pop(`${table}.insertDirect`, { data: null, error: null }))
+      },
+    }
+    return chain
+  }
 
   const makeUpdateChain = (table) => {
-    const chain = {
+    const inner = {
       eq() {
-        return chain
+        return inner
       },
       neq() {
-        return chain
+        return inner
+      },
+      is() {
+        return inner
       },
       select() {
         return {
@@ -118,7 +133,11 @@ function createSupabaseMock() {
         resolve(pop(`${table}.updateEq`, { error: null }))
       },
     }
-    return chain
+    return {
+      eq() {
+        return inner
+      },
+    }
   }
 
   const makeDeleteChain = (table) => {
@@ -208,6 +227,7 @@ describe('stokvels routes', () => {
   it('GET /:id returns full stokvel details with contributions and members', async () => {
     const client = createSupabaseMock()
     mockCreateClient.mockReturnValue(client)
+    mockGetServiceSupabase.mockReturnValue(client)
     client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'member' }, error: null })
     client.__push('stokvels.selectSingle', { data: { id: 's1', name: 'Group A' }, error: null })
     client.__push('stokvel_members.selectMany', {
@@ -215,7 +235,44 @@ describe('stokvels routes', () => {
       error: null,
     })
     client.__push('contributions.selectMany', {
-      data: [{ id: 'c1', amount: 100, user_id: 'u1', paid_at: '2026-04-01' }],
+      data: [
+        {
+          id: 'c1',
+          amount: 100,
+          user_id: 'u1',
+          paid_at: '2026-04-01',
+          target_month: '2026-04',
+          paystack_reference: 'ref-1',
+        },
+      ],
+      error: null,
+    })
+    client.__push('payouts.selectMany', {
+      data: [
+        {
+          id: 'p1',
+          stokvel_id: 's1',
+          user_id: 'u1',
+          target_month: '2026-04',
+          scheduled_payout_date: '2026-04-05',
+          cycle_index: 0,
+          created_at: '2026-01-01',
+        },
+      ],
+      error: null,
+    })
+    client.__push('missed_payments.selectMany', {
+      data: [
+        {
+          id: 'mp1',
+          stokvel_id: 's1',
+          user_id: 'u1',
+          target_month: '2026-03',
+          resolved_at: null,
+          flagged_by: '11111111-1111-4111-8111-111111111111',
+          created_at: '2026-01-02',
+        },
+      ],
       error: null,
     })
     client.__push('profiles.selectMany', {
@@ -229,6 +286,103 @@ describe('stokvels routes', () => {
     expect(res.body.success).toBe(true)
     expect(res.body.totalContribution).toBe(100)
     expect(res.body.contributions[0].profiles).toEqual({ first_name: 'A', last_name: 'B' })
+    expect(res.body.contributions[0].target_month).toBe('2026-04')
+    expect(res.body.contributions[0].paystack_reference).toBe('ref-1')
+    expect(res.body.currentCycle).toHaveProperty('targetMonth')
+    expect(res.body.currentCycle).toHaveProperty('inPaymentWindow')
+    expect(res.body.payouts).toHaveLength(1)
+    expect(res.body.missedPayments).toHaveLength(1)
+  })
+
+  it('POST /:id/missed-payments returns 403 when requester is not admin/treasurer', async () => {
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    mockGetServiceSupabase.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', {
+      data: { group_role: 'member' },
+      error: null,
+    })
+
+    const res = await request(makeApp())
+      .post('/api/stokvels/11111111-1111-1111-1111-111111111111/missed-payments')
+      .send({
+        user_id: '22222222-2222-4222-8222-222222222222',
+        target_month: '2026-03',
+      })
+
+    expect(res.status).toBe(403)
+  })
+
+  it('POST /:id/missed-payments returns 201 when insert succeeds', async () => {
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    mockGetServiceSupabase.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', {
+      data: { group_role: 'treasurer' },
+      error: null,
+    })
+    client.__push('stokvel_members.selectMaybeSingle', {
+      data: { user_id: '22222222-2222-4222-8222-222222222222' },
+      error: null,
+    })
+    client.__push('missed_payments.insertDirect', { data: [{ id: 'mp1' }], error: null })
+
+    const res = await request(makeApp())
+      .post('/api/stokvels/11111111-1111-1111-1111-111111111111/missed-payments')
+      .send({
+        user_id: '22222222-2222-4222-8222-222222222222',
+        target_month: '2026-03',
+      })
+
+    expect(res.status).toBe(201)
+    expect(res.body).toEqual({ success: true, alreadyFlagged: false })
+  })
+
+  it('POST /:id/missed-payments returns 200 alreadyFlagged on unique violation', async () => {
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    mockGetServiceSupabase.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', {
+      data: { group_role: 'admin' },
+      error: null,
+    })
+    client.__push('stokvel_members.selectMaybeSingle', {
+      data: { user_id: '22222222-2222-4222-8222-222222222222' },
+      error: null,
+    })
+    client.__push('missed_payments.insertDirect', {
+      data: null,
+      error: { code: '23505', message: 'duplicate key' },
+    })
+
+    const res = await request(makeApp())
+      .post('/api/stokvels/11111111-1111-1111-1111-111111111111/missed-payments')
+      .send({
+        user_id: '22222222-2222-4222-8222-222222222222',
+        target_month: '2026-03',
+      })
+
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ success: true, alreadyFlagged: true })
+  })
+
+  it('POST /:id/missed-payments returns 400 for invalid target_month', async () => {
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    mockGetServiceSupabase.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', {
+      data: { group_role: 'admin' },
+      error: null,
+    })
+
+    const res = await request(makeApp())
+      .post('/api/stokvels/11111111-1111-1111-1111-111111111111/missed-payments')
+      .send({
+        user_id: '22222222-2222-4222-8222-222222222222',
+        target_month: '2026-13',
+      })
+
+    expect(res.status).toBe(400)
   })
 
   it('GET /:id/meetings returns 404 when membership is missing', async () => {
@@ -420,12 +574,16 @@ describe('stokvels routes', () => {
   })
 
   it('POST /:id/payments/verify returns 502 when Paystack request fails', async () => {
+    const client = createSupabaseMock()
+    mockGetServiceSupabase.mockReturnValue(client)
+    client.__push('contributions.selectMaybeSingle', { data: null, error: null })
     mockAxiosGet.mockRejectedValue({
       response: { data: { message: 'Invalid key' } },
     })
 
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
     const res = await request(makeApp())
-      .post('/api/stokvels/s1/payments/verify')
+      .post(`/api/stokvels/${sid}/payments/verify`)
       .send({ reference: 'ref-1' })
 
     expect(res.status).toBe(502)
@@ -433,10 +591,14 @@ describe('stokvels routes', () => {
   })
 
   it('POST /:id/payments/verify returns 400 when payment status is not success', async () => {
+    const client = createSupabaseMock()
+    mockGetServiceSupabase.mockReturnValue(client)
+    client.__push('contributions.selectMaybeSingle', { data: null, error: null })
     mockAxiosGet.mockResolvedValue({ data: { data: { status: 'failed', amount: 10000 } } })
 
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
     const res = await request(makeApp())
-      .post('/api/stokvels/s1/payments/verify')
+      .post(`/api/stokvels/${sid}/payments/verify`)
       .send({ reference: 'ref-1' })
 
     expect(res.status).toBe(400)
@@ -446,14 +608,41 @@ describe('stokvels routes', () => {
   it('POST /:id/payments/verify inserts verified contribution on success', async () => {
     const client = createSupabaseMock()
     mockCreateClient.mockReturnValue(client)
-    mockAxiosGet.mockResolvedValue({ data: { data: { status: 'success', amount: 12345 } } })
-    client.__push('contributions.insertSingle', {
-      data: { id: 'c1', stokvel_id: 's1', user_id: '11111111-1111-4111-8111-111111111111', amount: 123.45 },
+    mockGetServiceSupabase.mockReturnValue(client)
+    mockAxiosGet.mockResolvedValue({
+      data: {
+        data: {
+          status: 'success',
+          amount: 12345,
+          paid_at: '2026-03-03T10:00:00.000Z',
+        },
+      },
+    })
+    client.__push('contributions.selectMaybeSingle', { data: null, error: null })
+    client.__push('stokvels.selectMaybeSingle', {
+      data: { id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', type: 'Fixed', status: 'active' },
       error: null,
     })
+    client.__push('stokvel_members.selectMaybeSingle', {
+      data: { user_id: '11111111-1111-4111-8111-111111111111' },
+      error: null,
+    })
+    client.__push('contributions.insertSingle', {
+      data: {
+        id: 'c1',
+        stokvel_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        user_id: '11111111-1111-4111-8111-111111111111',
+        amount: 123.45,
+        target_month: '2026-03',
+        paystack_reference: 'ref-1',
+      },
+      error: null,
+    })
+    client.__push('missed_payments.updateEq', { error: null })
 
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
     const res = await request(makeApp())
-      .post('/api/stokvels/s1/payments/verify')
+      .post(`/api/stokvels/${sid}/payments/verify`)
       .send({ reference: 'ref-1' })
 
     expect(res.status).toBe(200)
