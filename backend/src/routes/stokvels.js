@@ -136,6 +136,8 @@ function payoutHasHappened(payout, todayIso) {
   const scheduled = String(payout?.scheduled_payout_date ?? "").slice(0, 10);
   if (!scheduled) return false;
   return scheduled < todayIso;
+function isTreasurer(access) {
+  return String(access?.membership?.group_role || "").toLowerCase() === "treasurer";
 }
 router.get("/", requireAuth, async (req, res) => {
   try {
@@ -388,6 +390,174 @@ router.get("/:id", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("GET /api/stokvels/:id:", err);
     res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+/** Treasurer-only payout table for disbursement workflow. */
+router.get("/:id/payouts", requireAuth, async (req, res) => {
+  try {
+    const stokvelId = req.params.id;
+    if (!UUID_RE_STOKVEL_PARAM.test(String(stokvelId))) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    const userSupabase = userScopedSupabase(req);
+    const access = await resolveGroupAccess({ req, userSupabase, stokvelId });
+    if (access.error) {
+      if (access.error.message === "Not found") {
+        return res.status(404).json({ error: "Not found" });
+      }
+      return res.status(500).json({ error: access.error.message });
+    }
+    if (!isTreasurer(access)) {
+      return res.status(403).json({ error: "Only treasurers can access payouts." });
+    }
+
+    const svc = getServiceSupabase();
+    if (!svc) {
+      return res.status(500).json({
+        error:
+          "Server configuration error: cannot load payouts without service role access.",
+      });
+    }
+
+    const { data: payoutRows, error: payoutErr } = await svc
+      .from("payouts")
+      .select(
+        "id, stokvel_id, user_id, target_month, scheduled_payout_date, cycle_index, status, disbursed_at, disbursed_by, created_at",
+      )
+      .eq("stokvel_id", stokvelId);
+    if (payoutErr) {
+      console.error("GET /api/stokvels/:id/payouts:", payoutErr);
+      return res.status(500).json({ error: payoutErr.message });
+    }
+
+    const userIds = [...new Set((payoutRows ?? []).map((p) => p.user_id).filter(Boolean))];
+    let profileById = new Map();
+    if (userIds.length > 0) {
+      const { data: profiles, error: profileErr } = await svc
+        .from("profiles")
+        .select("id, first_name, last_name, email")
+        .in("id", userIds);
+      if (profileErr) {
+        console.error("GET /api/stokvels/:id/payouts profiles:", profileErr);
+        return res.status(500).json({ error: profileErr.message });
+      }
+      profileById = new Map((profiles ?? []).map((p) => [p.id, p]));
+    }
+
+    const payouts = (payoutRows ?? [])
+      .map((p) => ({
+        ...p,
+        status:
+          String(p.status || "").toLowerCase() === "completed" || p.disbursed_at
+            ? "completed"
+            : "pending",
+        profile: profileById.get(p.user_id) ?? null,
+      }))
+      .sort((a, b) => {
+        const da = String(a.scheduled_payout_date || "");
+        const db = String(b.scheduled_payout_date || "");
+        if (da !== db) return da < db ? -1 : da > db ? 1 : 0;
+        return (Number(a.cycle_index) || 0) - (Number(b.cycle_index) || 0);
+      });
+
+    return res.json({ success: true, payouts });
+  } catch (err) {
+    console.error("GET /api/stokvels/:id/payouts:", err);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+/** Treasurer triggers a payout once due and still pending. */
+router.post("/:id/payouts/:payoutId/disburse", requireAuth, async (req, res) => {
+  try {
+    const stokvelId = req.params.id;
+    const payoutId = req.params.payoutId;
+    if (!UUID_RE_STOKVEL_PARAM.test(String(stokvelId))) {
+      return res.status(404).json({ error: "Not found" });
+    }
+    if (!UUID_RE_STOKVEL_PARAM.test(String(payoutId))) {
+      return res.status(400).json({ error: "Invalid payout id." });
+    }
+
+    const userSupabase = userScopedSupabase(req);
+    const access = await resolveGroupAccess({ req, userSupabase, stokvelId });
+    if (access.error) {
+      if (access.error.message === "Not found") {
+        return res.status(404).json({ error: "Not found" });
+      }
+      return res.status(500).json({ error: access.error.message });
+    }
+    if (!isTreasurer(access)) {
+      return res.status(403).json({ error: "Only treasurers can disburse payouts." });
+    }
+
+    const svc = getServiceSupabase();
+    if (!svc) {
+      return res.status(500).json({
+        error:
+          "Server configuration error: cannot disburse payouts without service role access.",
+      });
+    }
+
+    const { data: payout, error: payoutErr } = await svc
+      .from("payouts")
+      .select(
+        "id, stokvel_id, user_id, target_month, scheduled_payout_date, status, disbursed_at, disbursed_by",
+      )
+      .eq("id", payoutId)
+      .eq("stokvel_id", stokvelId)
+      .maybeSingle();
+    if (payoutErr) {
+      console.error("POST /api/stokvels/:id/payouts/:payoutId/disburse lookup:", payoutErr);
+      return res.status(500).json({ error: payoutErr.message });
+    }
+    if (!payout?.id) {
+      return res.status(404).json({ error: "Payout not found." });
+    }
+
+    const status = String(payout.status || "").toLowerCase();
+    if (status === "completed" || payout.disbursed_at) {
+      return res.status(409).json({ error: "Payout has already been processed." });
+    }
+
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const payoutDate = String(payout.scheduled_payout_date || "").slice(0, 10);
+    if (!payoutDate) {
+      return res.status(400).json({ error: "Payout date is missing." });
+    }
+    if (todayIso < payoutDate) {
+      return res.status(400).json({ error: "Payout date has not been reached yet." });
+    }
+
+    // TODO: Integrate PSP transfer/disbursement call before marking completed.
+    const disbursedAt = new Date().toISOString();
+    const { data: updated, error: updateErr } = await svc
+      .from("payouts")
+      .update({
+        status: "completed",
+        disbursed_at: disbursedAt,
+        disbursed_by: req.user.id,
+      })
+      .eq("id", payoutId)
+      .eq("stokvel_id", stokvelId)
+      .select(
+        "id, stokvel_id, user_id, target_month, scheduled_payout_date, status, disbursed_at, disbursed_by",
+      )
+      .maybeSingle();
+    if (updateErr) {
+      console.error("POST /api/stokvels/:id/payouts/:payoutId/disburse update:", updateErr);
+      return res.status(500).json({ error: updateErr.message });
+    }
+    if (!updated?.id) {
+      return res.status(404).json({ error: "Payout not found." });
+    }
+
+    return res.json({ success: true, payout: updated });
+  } catch (err) {
+    console.error("POST /api/stokvels/:id/payouts/:payoutId/disburse:", err);
+    return res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
