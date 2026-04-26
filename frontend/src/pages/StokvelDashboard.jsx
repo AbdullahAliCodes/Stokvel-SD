@@ -181,7 +181,7 @@ export default function StokvelDashboard() {
 
   if (loading && !stokvel && !error) {
     return (
-      <div className="flex min-h-[200px] items-center justify-center text-sm text-stone-500">
+      <div className="flex min-h-[200px] items-center justify-center text-sm text-stone-500 dark:text-stone-400">
         Loading dashboard…
       </div>
     )
@@ -190,7 +190,7 @@ export default function StokvelDashboard() {
   if (error && !effectiveStokvel) {
     return (
       <div>
-        <h1 className="mb-2 text-2xl font-bold text-emerald-800">Dashboard</h1>
+        <h1 className="mb-2 text-2xl font-bold text-emerald-800 dark:text-emerald-300">Dashboard</h1>
         <p className={`${errorBox}`}>{error}</p>
         <Link to="/dashboard" className={`${btnPrimary} mt-4 inline-block`}>
           Back to gateway
@@ -204,11 +204,11 @@ export default function StokvelDashboard() {
 
   return (
     <div className="space-y-8">
-      <header className="flex flex-col gap-3 border-b border-stone-200 pb-6 sm:flex-row sm:items-start sm:justify-between">
+      <header className="flex flex-col gap-3 border-b border-stone-200 pb-6 dark:border-slate-700 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <LayoutDashboard className="h-7 w-7 shrink-0 text-emerald-700" aria-hidden />
-            <h1 className="text-2xl font-bold tracking-tight text-emerald-800 sm:text-3xl">
+            <h1 className="text-2xl font-bold tracking-tight text-emerald-800 dark:text-emerald-300 sm:text-3xl">
               {groupName}
             </h1>
             {isAdminAccess ? (
@@ -216,12 +216,12 @@ export default function StokvelDashboard() {
                 Admin
               </span>
             ) : (
-              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-emerald-800">
+              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-200">
                 {formatGroupRole(myGroupRole)}
               </span>
             )}
             {!isActiveStokvel && stokvelStatus ? (
-              <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-amber-900">
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-200">
                 {stokvelStatus}
               </span>
             ) : null}
@@ -247,35 +247,35 @@ export default function StokvelDashboard() {
         <h2 className="sr-only">Key figures</h2>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <div className={`${cardLight} border-t-4 border-emerald-600 p-4`}>
-            <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+            <p className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
               Contributions to date
             </p>
-            <p className="mt-2 text-2xl font-bold text-stone-800">{formatZAR(totalContribution)}</p>
-            <p className="mt-1 text-xs text-stone-500">Recorded payments for this group</p>
+            <p className="mt-2 text-2xl font-bold text-stone-800 dark:text-stone-100">{formatZAR(totalContribution)}</p>
+            <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">Recorded payments for this group</p>
           </div>
           <div className={`${cardLight} border-t-4 border-stone-300 p-4`}>
-            <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+            <p className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
               Expected payout (cycle)
             </p>
-            <p className="mt-2 text-2xl font-bold text-stone-800">{formatZAR(expectedPayout)}</p>
-            <p className="mt-1 text-xs text-stone-500">
+            <p className="mt-2 text-2xl font-bold text-stone-800 dark:text-stone-100">{formatZAR(expectedPayout)}</p>
+            <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
               Monthly × {memberCount} member{memberCount === 1 ? '' : 's'}
             </p>
           </div>
           <div className={`${cardLight} border-t-4 border-emerald-600/70 p-4`}>
-            <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+            <p className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
               Monthly contribution
             </p>
-            <p className="mt-2 text-2xl font-bold text-stone-800">{formatZAR(monthlyContribution)}</p>
-            <p className="mt-1 text-xs text-stone-500">Per member target</p>
+            <p className="mt-2 text-2xl font-bold text-stone-800 dark:text-stone-100">{formatZAR(monthlyContribution)}</p>
+            <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">Per member target</p>
           </div>
           <div className={`${cardLight} border-t-4 border-stone-300 p-4`}>
-            <p className="text-xs font-semibold uppercase tracking-wide text-stone-500">Members</p>
-            <p className="mt-2 flex items-center gap-2 text-2xl font-bold text-stone-800">
+            <p className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">Members</p>
+            <p className="mt-2 flex items-center gap-2 text-2xl font-bold text-stone-800 dark:text-stone-100">
               <Users className="h-6 w-6 text-emerald-700" aria-hidden />
               {memberCount}
             </p>
-            <p className="mt-1 text-xs text-stone-500">In this roster</p>
+            <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">In this roster</p>
           </div>
         </div>
       </section>
@@ -284,33 +284,33 @@ export default function StokvelDashboard() {
         <section className={`${cardLight} border-t-4 border-emerald-700 p-5`}>
           <div className="mb-4 flex items-center gap-2">
             <Calendar className="h-5 w-5 text-emerald-700" aria-hidden />
-            <h2 className="text-sm font-bold uppercase tracking-wide text-emerald-800">
+            <h2 className="text-sm font-bold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">
               Next meeting
             </h2>
           </div>
           {nextMeeting ? (
             <div className="space-y-3">
-              <p className="text-lg font-semibold text-stone-800">{nextMeeting.title ?? 'Meeting'}</p>
-              <p className="text-sm text-stone-600">{toDisplayDate(nextMeeting.meeting_date)}</p>
+              <p className="text-lg font-semibold text-stone-800 dark:text-stone-100">{nextMeeting.title ?? 'Meeting'}</p>
+              <p className="text-sm text-stone-600 dark:text-stone-300">{toDisplayDate(nextMeeting.meeting_date)}</p>
               <div>
-                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-stone-500">
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
                   Agenda
                 </p>
-                <p className="text-sm leading-relaxed text-stone-700">
+                <p className="text-sm leading-relaxed text-stone-700 dark:text-stone-300">
                   {nextMeeting.agenda || nextMeeting.notes || 'No agenda added yet.'}
                 </p>
               </div>
               <Link
                 to={`/group/${stokvel_id}/meetings`}
-                className="inline-block text-sm font-medium text-emerald-800 underline-offset-2 hover:underline"
+                className="inline-block text-sm font-medium text-emerald-800 underline-offset-2 hover:underline dark:text-emerald-300"
               >
                 All meetings
               </Link>
             </div>
           ) : (
-            <div className="rounded-xl border border-dashed border-stone-200 bg-stone-50/80 px-4 py-8 text-center">
-              <p className="text-sm text-stone-600">No upcoming meetings scheduled.</p>
-              <p className="mt-1 text-xs text-stone-500">
+            <div className="rounded-xl border border-dashed border-stone-200 bg-stone-50/80 px-4 py-8 text-center dark:border-slate-700 dark:bg-slate-800/60">
+              <p className="text-sm text-stone-600 dark:text-stone-300">No upcoming meetings scheduled.</p>
+              <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
                 When your treasurer adds one, it will show up here.
               </p>
             </div>
@@ -320,7 +320,7 @@ export default function StokvelDashboard() {
         <section className={`${cardLight} border-t-4 border-emerald-600/80 p-5`}>
           <div className="mb-4 flex items-center gap-2">
             <Users className="h-5 w-5 text-emerald-700" aria-hidden />
-            <h2 className="text-sm font-bold uppercase tracking-wide text-emerald-800">
+            <h2 className="text-sm font-bold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">
               Leadership
             </h2>
           </div>
@@ -347,7 +347,7 @@ export default function StokvelDashboard() {
         <section className={`${cardLight} border-t-4 border-stone-300 p-5`}>
           <div className="mb-4 flex items-center gap-2">
             <Wallet className="h-5 w-5 text-emerald-700" aria-hidden />
-            <h2 className="text-sm font-bold uppercase tracking-wide text-emerald-800">
+            <h2 className="text-sm font-bold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">
               Next payout
             </h2>
           </div>
@@ -379,11 +379,11 @@ export default function StokvelDashboard() {
         <section className={`${cardLight} border-t-4 border-stone-300 p-5`}>
           <div className="mb-4 flex items-center gap-2">
             <CreditCard className="h-5 w-5 text-emerald-700" aria-hidden />
-            <h2 className="text-sm font-bold uppercase tracking-wide text-emerald-800">
+            <h2 className="text-sm font-bold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">
               Quick pay
             </h2>
           </div>
-          <p className="mb-4 text-sm text-stone-600">
+          <p className="mb-4 text-sm text-stone-600 dark:text-stone-300">
             Pay your monthly contribution securely. Amount defaults to this group&apos;s monthly
             target.
           </p>
@@ -396,7 +396,7 @@ export default function StokvelDashboard() {
             Pay monthly contribution
           </button>
           {!isActiveStokvel ? (
-            <p className="mt-2 text-xs text-stone-500">Payments are available when the group is active.</p>
+            <p className="mt-2 text-xs text-stone-500 dark:text-stone-400">Payments are available when the group is active.</p>
           ) : null}
           {paymentDebug ? <p className="mt-2 text-xs text-stone-400">{paymentDebug}</p> : null}
         </section>

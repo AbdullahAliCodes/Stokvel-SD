@@ -137,19 +137,25 @@ describe('Invitations & Email Utilities', () => {
       it('sends an email with the provided role', async () => {
         await sendGroupAddedEmail({ to: 'user@test.com', groupName: 'Test Group', role: 'admin' })
 
-        expect(mockSendMailSafe).toHaveBeenCalledWith({
-          from: 'no-reply@stokgeld.com',
-          to: 'user@test.com',
-          subject: 'Added to Test Group',
-          text: expect.stringContaining('role of admin'),
-        })
+        expect(mockSendMailSafe).toHaveBeenCalledWith(
+          expect.objectContaining({
+            from: 'no-reply@stokgeld.com',
+            to: 'user@test.com',
+            subject: 'Added to Test Group',
+            text: expect.stringMatching(/role of admin[\s\S]*StokGeld management team/),
+            html: expect.stringContaining('cid:stokgeld-logo@stokgeld.app'),
+          }),
+        )
       })
 
       it('falls back to "member" role if none is provided', async () => {
         await sendGroupAddedEmail({ to: 'user@test.com', groupName: 'Test Group' })
 
         expect(mockSendMailSafe).toHaveBeenCalledWith(
-          expect.objectContaining({ text: expect.stringContaining('role of member') })
+          expect.objectContaining({
+            text: expect.stringMatching(/role of member[\s\S]*StokGeld management team/),
+            html: expect.stringContaining('StokGeld management team'),
+          }),
         )
       })
     })
@@ -163,7 +169,8 @@ describe('Invitations & Email Utilities', () => {
           expect.objectContaining({
             subject: 'Invitation to join Test Group',
             text: expect.stringContaining('https://prod.com/accept-invitation?token=my-token'),
-          })
+            html: expect.stringContaining('cid:stokgeld-logo@stokgeld.app'),
+          }),
         )
       })
 
@@ -209,8 +216,8 @@ describe('Invitations & Email Utilities', () => {
         expect(mockSendMailSafe).toHaveBeenCalledWith(
           expect.objectContaining({
             subject: 'Your group request was accepted',
-            text: expect.stringContaining('has been accepted.'),
-          })
+            text: expect.stringMatching(/has been accepted\.[\s\S]*\+27 11 234 5678/),
+          }),
         )
       })
 
@@ -220,8 +227,8 @@ describe('Invitations & Email Utilities', () => {
         expect(mockSendMailSafe).toHaveBeenCalledWith(
           expect.objectContaining({
             subject: 'Your group request was rejected',
-            text: expect.stringContaining('has been rejected.'),
-          })
+            text: expect.stringMatching(/has been rejected\.[\s\S]*StokGeld management team/),
+          }),
         )
       })
     })
@@ -237,12 +244,17 @@ describe('Invitations & Email Utilities', () => {
           agenda: '1. Finances\n2. New Members',
         })
 
-        expect(mockSendMailSafe).toHaveBeenCalledWith({
-          from: 'no-reply@stokgeld.com',
-          to: 'user@test.com',
-          subject: 'New meeting scheduled: Monthly Catchup',
-          text: expect.stringContaining('Link: https://zoom.us/j/123\n\nAgenda:\n1. Finances\n2. New Members'),
-        })
+        expect(mockSendMailSafe).toHaveBeenCalledWith(
+          expect.objectContaining({
+            from: 'no-reply@stokgeld.com',
+            to: 'user@test.com',
+            subject: 'New meeting scheduled: Monthly Catchup',
+            text: expect.stringMatching(
+              /Link: https:\/\/zoom\.us\/j\/123\n\nAgenda:\n1\. Finances\n2\. New Members[\s\S]*\+27 11 234 5678/,
+            ),
+            html: expect.stringContaining('StokGeld management team'),
+          }),
+        )
       })
 
       it('uses "Not provided." fallbacks for missing link and agenda', async () => {
@@ -256,8 +268,10 @@ describe('Invitations & Email Utilities', () => {
 
         expect(mockSendMailSafe).toHaveBeenCalledWith(
           expect.objectContaining({
-            text: expect.stringContaining('Link: Not provided.\n\nAgenda:\nNot provided.'),
-          })
+            text: expect.stringMatching(
+              /Link: Not provided\.\n\nAgenda:\nNot provided\.[\s\S]*StokGeld management team/,
+            ),
+          }),
         )
       })
     })

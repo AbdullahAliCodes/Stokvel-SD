@@ -12,6 +12,7 @@ import {
   getCurrentPaymentCycle,
   getTargetMonthForPaidAt,
   isPaidAtInWindowForTargetMonth,
+  zonedYmdParts,
 } from "../utils/dates.js";
 
 const router = Router();
@@ -124,6 +125,17 @@ function canManageMeetingsForGroup(membership) {
 function requireGroupRole(access, allowedRoles) {
   const role = String(access?.membership?.group_role || "").toLowerCase();
   return allowedRoles.includes(role);
+}
+
+function todayIsoSast() {
+  const { year, month, day } = zonedYmdParts(new Date());
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function payoutHasHappened(payout, todayIso) {
+  const scheduled = String(payout?.scheduled_payout_date ?? "").slice(0, 10);
+  if (!scheduled) return false;
+  return scheduled < todayIso;
 }
 router.get("/", requireAuth, async (req, res) => {
   try {
@@ -797,6 +809,122 @@ router.patch("/:id/treasurer", requireAuth, async (req, res) => {
     return res.json({ success: true, userId: targetUserId });
   } catch (err) {
     console.error("PATCH /api/stokvels/:id/treasurer:", err);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+router.patch("/:id/payout-order", requireAuth, async (req, res) => {
+  try {
+    const stokvelId = req.params.id;
+    if (!UUID_RE_STOKVEL_PARAM.test(String(stokvelId))) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    const orderedUpcomingPayoutIds = Array.isArray(req.body?.orderedUpcomingPayoutIds)
+      ? req.body.orderedUpcomingPayoutIds.filter((v) => typeof v === "string" && v.trim())
+      : null;
+    if (!orderedUpcomingPayoutIds) {
+      return res.status(400).json({ error: "orderedUpcomingPayoutIds must be a non-empty array." });
+    }
+
+    const userSupabase = userScopedSupabase(req);
+    const access = await resolveGroupAccess({ req, userSupabase, stokvelId });
+    if (access.error) {
+      if (access.error.message === "Not found") {
+        return res.status(404).json({ error: "Not found" });
+      }
+      return res.status(500).json({ error: access.error.message });
+    }
+    if (!requireGroupRole(access, ["admin", "treasurer"])) {
+      return res.status(403).json({
+        error: "Only an admin or treasurer can reorder payouts.",
+      });
+    }
+
+    const svc = getServiceSupabase();
+    if (!svc) {
+      return res.status(500).json({
+        error: "Server configuration error: cannot reorder payouts without service role access.",
+      });
+    }
+
+    const { data: payoutRows, error: payoutErr } = await svc
+      .from("payouts")
+      .select("id, stokvel_id, user_id, target_month, scheduled_payout_date, cycle_index, created_at")
+      .eq("stokvel_id", stokvelId);
+    if (payoutErr) {
+      return res.status(500).json({ error: payoutErr.message });
+    }
+
+    const sortedPayouts = (payoutRows ?? []).slice().sort((a, b) => {
+      const da = String(a.scheduled_payout_date ?? "");
+      const db = String(b.scheduled_payout_date ?? "");
+      if (da !== db) return da < db ? -1 : 1;
+      return (Number(a.cycle_index) || 0) - (Number(b.cycle_index) || 0);
+    });
+
+    const todayIso = todayIsoSast();
+    const upcoming = sortedPayouts.filter((p) => !payoutHasHappened(p, todayIso));
+    if (upcoming.length <= 1) {
+      return res.status(400).json({
+        error: "There are not enough upcoming payouts to reorder.",
+      });
+    }
+
+    const upcomingIds = upcoming.map((p) => String(p.id));
+    if (orderedUpcomingPayoutIds.length !== upcomingIds.length) {
+      return res.status(400).json({
+        error: "orderedUpcomingPayoutIds must include each upcoming payout exactly once.",
+      });
+    }
+    const expected = new Set(upcomingIds);
+    const proposed = new Set(orderedUpcomingPayoutIds);
+    if (proposed.size !== orderedUpcomingPayoutIds.length) {
+      return res.status(400).json({ error: "orderedUpcomingPayoutIds contains duplicates." });
+    }
+    for (const id of orderedUpcomingPayoutIds) {
+      if (!expected.has(String(id))) {
+        return res.status(400).json({
+          error: "orderedUpcomingPayoutIds contains payouts that are not upcoming.",
+        });
+      }
+    }
+
+    const upcomingById = new Map(upcoming.map((p) => [String(p.id), p]));
+    const reorderedUpcoming = orderedUpcomingPayoutIds.map((id) => upcomingById.get(String(id)));
+
+    for (let i = 0; i < upcoming.length; i += 1) {
+      const originalSlot = upcoming[i];
+      const incoming = reorderedUpcoming[i];
+      if (!originalSlot?.id || !incoming?.user_id) continue;
+      const { error: updErr } = await svc
+        .from("payouts")
+        .update({ user_id: incoming.user_id })
+        .eq("id", originalSlot.id)
+        .eq("stokvel_id", stokvelId);
+      if (updErr) {
+        return res.status(500).json({ error: updErr.message });
+      }
+    }
+
+    const { data: refreshedRows, error: refreshErr } = await svc
+      .from("payouts")
+      .select("id, stokvel_id, user_id, target_month, scheduled_payout_date, cycle_index, created_at")
+      .eq("stokvel_id", stokvelId);
+    if (refreshErr) {
+      return res.status(500).json({ error: refreshErr.message });
+    }
+
+    const payouts = (refreshedRows ?? []).slice().sort((a, b) => {
+      const da = String(a.scheduled_payout_date ?? "");
+      const db = String(b.scheduled_payout_date ?? "");
+      if (da !== db) return da < db ? -1 : 1;
+      return (Number(a.cycle_index) || 0) - (Number(b.cycle_index) || 0);
+    });
+
+    return res.json({ success: true, payouts });
+  } catch (err) {
+    console.error("PATCH /api/stokvels/:id/payout-order:", err);
     return res.status(500).json({ error: "Internal Server Error" });
   }
 });

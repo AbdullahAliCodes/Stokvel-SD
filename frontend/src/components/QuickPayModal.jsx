@@ -147,9 +147,9 @@ export default function QuickPayModal({
         onSubmit={handleSubmit}
         className={`${cardLight} w-full max-w-sm p-6`}
       >
-        <h2 className="mb-4 text-lg font-bold text-stone-800">Quick Pay</h2>
-        <p className="mb-4 text-sm text-stone-600">
-          Contributing to <strong className="text-stone-800">{groupName}</strong>
+        <h2 className="mb-4 text-lg font-bold text-stone-800 dark:text-stone-100">Quick Pay</h2>
+        <p className="mb-4 text-sm text-stone-600 dark:text-stone-300">
+          Contributing to <strong className="text-stone-800 dark:text-stone-100">{groupName}</strong>
         </p>
         <input
           type="number"
@@ -159,7 +159,7 @@ export default function QuickPayModal({
           onChange={(e) => setAmount(e.target.value)}
           className={`${inputLight} mb-4`}
         />
-        {error && <p className="mb-3 text-xs text-red-700">{error}</p>}
+        {error && <p className="mb-3 text-xs text-red-700 dark:text-red-300">{error}</p>}
         <div className="flex gap-3">
           <button
             type="submit"
