@@ -656,4 +656,75 @@ describe('stokvels routes', () => {
     expect(mockSearchProfilesForMemberInvite).toHaveBeenCalled()
     expect(res.body).toEqual({ success: true, users: [] })
   })
+
+  it('GET /:id/payouts allows treasurer and returns profile-enriched payout list', async () => {
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    mockGetServiceSupabase.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'treasurer' }, error: null })
+    client.__push('payouts.selectMany', {
+      data: [
+        {
+          id: 'p1',
+          stokvel_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+          user_id: 'u2',
+          target_month: '2026-04',
+          scheduled_payout_date: '2026-04-15',
+          cycle_index: 0,
+          status: 'pending',
+          disbursed_at: null,
+        },
+      ],
+      error: null,
+    })
+    client.__push('profiles.selectMany', {
+      data: [{ id: 'u2', first_name: 'Jane', last_name: 'Doe', email: 'jane@x.com' }],
+      error: null,
+    })
+
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const res = await request(makeApp()).get(`/api/stokvels/${sid}/payouts`)
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+    expect(res.body.payouts[0].profile.first_name).toBe('Jane')
+    expect(res.body.payouts[0].status).toBe('pending')
+  })
+
+  it('POST /:id/payouts/:payoutId/disburse marks due pending payout as completed for treasurer', async () => {
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    mockGetServiceSupabase.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'treasurer' }, error: null })
+    client.__push('payouts.selectMaybeSingle', {
+      data: {
+        id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        stokvel_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        user_id: 'u2',
+        target_month: '2026-04',
+        scheduled_payout_date: '2026-01-01',
+        status: 'pending',
+        disbursed_at: null,
+      },
+      error: null,
+    })
+    client.__push('payouts.updateSelectMaybeSingle', {
+      data: {
+        id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        stokvel_id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        user_id: 'u2',
+        target_month: '2026-04',
+        scheduled_payout_date: '2026-01-01',
+        status: 'completed',
+        disbursed_at: '2026-04-26T09:00:00.000Z',
+      },
+      error: null,
+    })
+
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const pid = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+    const res = await request(makeApp()).post(`/api/stokvels/${sid}/payouts/${pid}/disburse`)
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+    expect(res.body.payout.status).toBe('completed')
+  })
 })

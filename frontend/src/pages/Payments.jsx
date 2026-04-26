@@ -128,6 +128,11 @@ export default function Payments() {
   const [flaggingSubmitting, setFlaggingSubmitting] = useState(false)
   const [ledgerToast, setLedgerToast] = useState('')
   const ledgerToastTimer = useRef(null)
+  const [payoutsLoading, setPayoutsLoading] = useState(false)
+  const [treasurerPayoutRows, setTreasurerPayoutRows] = useState([])
+  const [payoutActionLoadingId, setPayoutActionLoadingId] = useState('')
+  const [payoutActionError, setPayoutActionError] = useState('')
+  const [payoutActionOk, setPayoutActionOk] = useState('')
 
   const showLedgerToast = useCallback((msg) => {
     if (ledgerToastTimer.current) clearTimeout(ledgerToastTimer.current)
@@ -298,6 +303,7 @@ export default function Payments() {
   ).toLowerCase()
   const canManageTreasurer = ['treasurer', 'admin'].includes(myRole)
   const canFlagMissed = ['treasurer', 'admin'].includes(myRole)
+  const isTreasurerRole = myRole === 'treasurer'
   const currentTreasurer = members.find((m) => m.group_role === 'treasurer') ?? null
   const currentTreasurerName = currentTreasurer ? memberDisplay(currentTreasurer.profiles) : 'Not assigned'
 
@@ -466,6 +472,57 @@ export default function Payments() {
     { label: 'Monthly contribution', value: formatZAR(monthlyContribution) },
     { label: 'Members', value: String(memberCount) },
   ]
+
+  const fetchTreasurerPayouts = useCallback(async () => {
+    if (!session?.access_token || !stokvel_id || !isTreasurerRole) {
+      setTreasurerPayoutRows([])
+      return
+    }
+    setPayoutsLoading(true)
+    setPayoutActionError('')
+    try {
+      const res = await fetch(apiUrl(`/api/stokvels/${stokvel_id}/payouts`), {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      const text = await res.text()
+      const json = text ? JSON.parse(text) : {}
+      if (!res.ok) throw new Error(json?.error || text || `HTTP ${res.status}`)
+      setTreasurerPayoutRows(Array.isArray(json.payouts) ? json.payouts : [])
+    } catch (e) {
+      setPayoutActionError(e.message ?? String(e))
+      setTreasurerPayoutRows([])
+    } finally {
+      setPayoutsLoading(false)
+    }
+  }, [session?.access_token, stokvel_id, isTreasurerRole])
+
+  useEffect(() => {
+    void fetchTreasurerPayouts()
+  }, [fetchTreasurerPayouts])
+
+  async function handleDisbursePayout(row) {
+    if (!session?.access_token || !stokvel_id || !row?.id) return
+    setPayoutActionLoadingId(row.id)
+    setPayoutActionError('')
+    setPayoutActionOk('')
+    try {
+      const res = await fetch(apiUrl(`/api/stokvels/${stokvel_id}/payouts/${row.id}/disburse`), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      })
+      const text = await res.text()
+      const json = text ? JSON.parse(text) : {}
+      if (!res.ok) throw new Error(json?.error || text || `HTTP ${res.status}`)
+      setPayoutActionOk('Payout marked as completed.')
+      await fetchTreasurerPayouts()
+    } catch (e) {
+      setPayoutActionError(e.message ?? String(e))
+    } finally {
+      setPayoutActionLoadingId('')
+    }
+  }
 
   if (!stokvel_id) {
     return null
@@ -728,6 +785,82 @@ export default function Payments() {
                   </div>
                 )}
               </section>
+
+              {isTreasurerRole ? (
+                <section className={`${cardLight} w-full p-4`}>
+                  <h3 className="mb-3 border-b border-stone-200 pb-2 text-lg font-bold text-emerald-800 dark:border-slate-700 dark:text-emerald-300">
+                    Payouts (Treasurer)
+                  </h3>
+                  {payoutActionError ? (
+                    <p className="mb-2 text-xs text-red-700 dark:text-red-300">{payoutActionError}</p>
+                  ) : null}
+                  {payoutActionOk ? (
+                    <p className="mb-2 text-xs text-emerald-800 dark:text-emerald-200">{payoutActionOk}</p>
+                  ) : null}
+                  <div className={tableWrap}>
+                    <table className="w-full min-w-[520px] table-fixed border-collapse text-left text-sm text-stone-800 dark:text-stone-100">
+                      <colgroup>
+                        <col className="w-[38%] min-w-0" />
+                        <col className="w-[24%]" />
+                        <col className="w-[12%]" />
+                        <col className="w-[26%]" />
+                      </colgroup>
+                      <thead>
+                        <tr className={tableHead}>
+                          <th className="p-3 text-left align-middle">Member name</th>
+                          <th className="p-3 text-left align-middle">Payout date</th>
+                          <th className="p-3 text-left align-middle">Status</th>
+                          <th className="p-3 text-right align-middle">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {payoutsLoading ? (
+                          <tr className={tableRow}>
+                            <td colSpan={4} className="p-6 text-center text-stone-500">
+                              Loading payouts…
+                            </td>
+                          </tr>
+                        ) : treasurerPayoutRows.length === 0 ? (
+                          <tr className={tableRow}>
+                            <td colSpan={4} className="p-6 text-center text-stone-500 italic">
+                              No payout records available.
+                            </td>
+                          </tr>
+                        ) : (
+                          treasurerPayoutRows.map((row) => {
+                            const fullName = memberDisplay(row.profile)
+                            const payoutDate = String(row.scheduled_payout_date || '').slice(0, 10)
+                            const todayIso = new Date().toISOString().slice(0, 10)
+                            const completed = String(row.status || '').toLowerCase() === 'completed'
+                            const isDisabled = completed || !payoutDate || todayIso < payoutDate
+                            return (
+                              <tr key={row.id} className={tableRow}>
+                                <td className="p-3 align-middle">{fullName}</td>
+                                <td className="p-3 text-left align-middle whitespace-nowrap">
+                                  {formatScheduleDate(row.scheduled_payout_date)}
+                                </td>
+                                <td className="p-3 text-left align-middle capitalize">
+                                  {completed ? 'completed' : 'pending'}
+                                </td>
+                                <td className="p-3 text-right align-middle">
+                                  <button
+                                    type="button"
+                                    disabled={isDisabled || payoutActionLoadingId === row.id}
+                                    onClick={() => void handleDisbursePayout(row)}
+                                    className={`${btnPrimary} px-3 py-1.5 text-xs disabled:opacity-40`}
+                                  >
+                                    {payoutActionLoadingId === row.id ? 'Processing…' : 'Payout'}
+                                  </button>
+                                </td>
+                              </tr>
+                            )
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              ) : null}
             </div>
 
             <div className="order-2">
