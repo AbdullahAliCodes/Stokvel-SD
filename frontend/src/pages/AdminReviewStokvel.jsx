@@ -101,11 +101,11 @@ export default function AdminReviewStokvel() {
     <div>
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-wide text-emerald-800 sm:text-3xl">
+          <h1 className="text-2xl font-bold tracking-wide text-emerald-800 dark:text-emerald-300 sm:text-3xl">
             Review Stokvel Application
           </h1>
           <p className={`mt-2 ${pageSubtitle}`}>
-            <Link to="/admin/groups" className="text-emerald-800 hover:underline">
+            <Link to="/admin/groups" className="text-emerald-800 hover:underline dark:text-emerald-300">
               ← Back to group config
             </Link>
           </p>
@@ -137,60 +137,60 @@ export default function AdminReviewStokvel() {
       ) : null}
 
       {loading ? (
-        <p className="text-sm text-stone-500">Loading…</p>
+        <p className="text-sm text-stone-500 dark:text-stone-400">Loading…</p>
       ) : !stokvel ? (
-        <p className="text-sm text-stone-500">Application not found.</p>
+        <p className="text-sm text-stone-500 dark:text-stone-400">Application not found.</p>
       ) : (
         <div className={`${cardLight} max-w-2xl space-y-4 p-6`}>
           <dl className="grid gap-4 sm:grid-cols-2">
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">Name</dt>
-              <dd className="mt-1 text-stone-800">{fmt(stokvel.name)}</dd>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">Name</dt>
+              <dd className="mt-1 text-stone-800 dark:text-stone-100">{fmt(stokvel.name)}</dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">Status</dt>
-              <dd className="mt-1 capitalize text-stone-800">{fmt(stokvel.status)}</dd>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">Status</dt>
+              <dd className="mt-1 capitalize text-stone-800 dark:text-stone-100">{fmt(stokvel.status)}</dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+              <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
                 Contribution amount
               </dt>
-              <dd className="mt-1 text-stone-800">
+              <dd className="mt-1 text-stone-800 dark:text-stone-100">
                 {stokvel.contribution_amount != null
                   ? `R ${stokvel.contribution_amount}`
                   : '—'}
               </dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">Type</dt>
-              <dd className="mt-1 text-stone-800">{fmt(stokvel.type)}</dd>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">Type</dt>
+              <dd className="mt-1 text-stone-800 dark:text-stone-100">{fmt(stokvel.type)}</dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+              <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
                 Payout strategy
               </dt>
-              <dd className="mt-1 text-stone-800">{fmt(stokvel.payout_strategy)}</dd>
+              <dd className="mt-1 text-stone-800 dark:text-stone-100">{fmt(stokvel.payout_strategy)}</dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+              <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
                 Cycle length
               </dt>
-              <dd className="mt-1 text-stone-800">{fmt(stokvel.cycle_length)}</dd>
+              <dd className="mt-1 text-stone-800 dark:text-stone-100">{fmt(stokvel.cycle_length)}</dd>
             </div>
             {stokvel.meeting_frequency != null && stokvel.meeting_frequency !== '' ? (
               <div className="sm:col-span-2">
-                <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
                   Meeting frequency
                 </dt>
-                <dd className="mt-1 text-stone-800">{fmt(stokvel.meeting_frequency)}</dd>
+                <dd className="mt-1 text-stone-800 dark:text-stone-100">{fmt(stokvel.meeting_frequency)}</dd>
               </div>
             ) : null}
             {stokvel.payout_order != null && stokvel.payout_order !== '' ? (
               <div className="sm:col-span-2">
-                <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
                   Payout order
                 </dt>
-                <dd className="mt-1 text-stone-800">{fmt(stokvel.payout_order)}</dd>
+                <dd className="mt-1 text-stone-800 dark:text-stone-100">{fmt(stokvel.payout_order)}</dd>
               </div>
             ) : null}
           </dl>

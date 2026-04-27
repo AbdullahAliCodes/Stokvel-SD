@@ -123,7 +123,7 @@ export default function Settings() {
 
   return (
     <div className="mx-auto w-full max-w-3xl">
-      <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm md:p-8">
+      <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900 md:p-8">
         <h1 className={pageTitle}>Group Settings</h1>
         <p className={`${pageSubtitle} mt-1 mb-6`}>
           Update your group configuration for members and public directory visibility.
@@ -141,7 +141,7 @@ export default function Settings() {
         ) : null}
         {saveSuccess ? (
           <p
-            className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
+            className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-200"
             role="status"
           >
             {saveSuccess}
@@ -149,7 +149,7 @@ export default function Settings() {
         ) : null}
 
         {loading ? (
-          <p className="text-sm text-stone-500">Loading group settings…</p>
+          <p className="text-sm text-stone-500 dark:text-stone-400">Loading group settings…</p>
         ) : (
           <form onSubmit={handleSave} className="space-y-4">
             <label className={labelLight}>
@@ -189,12 +189,12 @@ export default function Settings() {
               </select>
             </label>
 
-            <label className="flex items-center justify-between gap-3 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3">
+            <label className="flex items-center justify-between gap-3 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/60">
               <div>
-                <p className="text-sm font-semibold text-emerald-800">
+                <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
                   Public Directory Visibility
                 </p>
-                <p className="text-xs text-stone-500">
+                <p className="text-xs text-stone-500 dark:text-stone-400">
                   Allow this stokvel to appear in the public directory.
                 </p>
               </div>

@@ -389,7 +389,7 @@ export default function Meetings() {
 
   if (loading && !stokvel && !error) {
     return (
-      <div className="flex min-h-[200px] items-center justify-center text-sm text-stone-500">
+      <div className="flex min-h-[200px] items-center justify-center text-sm text-stone-500 dark:text-stone-400">
         Loading meetings…
       </div>
     );
@@ -398,11 +398,11 @@ export default function Meetings() {
   if (error && !effectiveStokvel) {
     return (
       <div>
-        <h1 className="mb-2 text-2xl font-bold text-emerald-800">Meetings</h1>
+        <h1 className="mb-2 text-2xl font-bold text-emerald-800 dark:text-emerald-300">Meetings</h1>
         <p className={errorBox}>{error}</p>
         <Link
           to="/dashboard"
-          className="mt-4 inline-block rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-50"
+          className="mt-4 inline-block rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-50 dark:border-slate-600 dark:bg-slate-800 dark:text-stone-100 dark:hover:bg-slate-700"
         >
           Back to dashboard
         </Link>
@@ -414,25 +414,25 @@ export default function Meetings() {
     return (
       <div
         key={meeting.id}
-        className={`${cardLight} space-y-3 border border-stone-200 bg-white p-4 shadow-sm`}
+        className={`${cardLight} space-y-3 border border-stone-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900`}
       >
-        <div className="flex flex-wrap items-start justify-between gap-2 border-b border-stone-100 pb-2">
+        <div className="flex flex-wrap items-start justify-between gap-2 border-b border-stone-100 pb-2 dark:border-slate-700">
           <div className="min-w-0 flex-1">
-            <p className="font-semibold text-stone-800">{meeting.title}</p>
-            <p className="text-xs text-stone-500">
+            <p className="font-semibold text-stone-800 dark:text-stone-100">{meeting.title}</p>
+            <p className="text-xs text-stone-500 dark:text-stone-400">
               {toDisplayDate(meeting.meeting_date)}
             </p>
           </div>
           <Link
             to={`${meetingBase}/${meeting.id}`}
-            className="shrink-0 text-xs font-medium text-emerald-800 underline-offset-2 hover:underline"
+            className="shrink-0 text-xs font-medium text-emerald-800 underline-offset-2 hover:underline dark:text-emerald-300"
           >
             Open detail
           </Link>
         </div>
 
         {editingMeetingId === meeting.id ? (
-          <div className="space-y-2 rounded-lg bg-stone-50/80 p-3">
+          <div className="space-y-2 rounded-lg bg-stone-50/80 p-3 dark:bg-slate-800/60">
             <input
               type="text"
               value={editDraft.title ?? ""}
@@ -474,7 +474,7 @@ export default function Meetings() {
               className={inputLight}
               placeholder="Agenda (Markdown supported)"
             />
-            <p className="text-[11px] text-stone-500">Markdown is supported for agenda and minutes.</p>
+            <p className="text-[11px] text-stone-500 dark:text-stone-400">Markdown is supported for agenda and minutes.</p>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
@@ -499,7 +499,7 @@ export default function Meetings() {
         ) : (
           <>
             <div>
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-stone-500">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
                 Agenda
               </p>
               <MarkdownBlock
@@ -508,7 +508,7 @@ export default function Meetings() {
               />
             </div>
             <div>
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-stone-500">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
                 Minutes
               </p>
               <MarkdownBlock text={meeting.minutes} emptyLabel="No minutes recorded yet." />
@@ -518,15 +518,15 @@ export default function Meetings() {
                 href={meeting.meeting_link}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex text-sm font-medium text-emerald-800 underline-offset-2 hover:underline"
+                className="inline-flex text-sm font-medium text-emerald-800 underline-offset-2 hover:underline dark:text-emerald-300"
               >
                 {isPast ? "Open meeting link" : "Join meeting"}
               </a>
             ) : (
-              <p className="text-xs text-stone-500">Meeting link not set.</p>
+              <p className="text-xs text-stone-500 dark:text-stone-400">Meeting link not set.</p>
             )}
             {canManageMeetings ? (
-              <div className="space-y-2 border-t border-stone-200 pt-3">
+              <div className="space-y-2 border-t border-stone-200 pt-3 dark:border-slate-700">
                 <button
                   type="button"
                   onClick={() => openEdit(meeting)}
@@ -537,12 +537,12 @@ export default function Meetings() {
                 <button
                   type="button"
                   onClick={() => handleDeleteMeeting(meeting.id)}
-                  className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-800 hover:bg-red-100"
+                  className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-800 hover:bg-red-100 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-900/50"
                   disabled={meetingSaving}
                 >
                   Delete meeting
                 </button>
-                <label className="block text-xs font-semibold uppercase text-stone-500">
+                <label className="block text-xs font-semibold uppercase text-stone-500 dark:text-stone-400">
                   Update minutes
                   <textarea
                     rows={3}
@@ -575,17 +575,17 @@ export default function Meetings() {
 
   return (
     <div className="space-y-8">
-      <header className="flex flex-col gap-3 border-b border-stone-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
+      <header className="flex flex-col gap-3 border-b border-stone-200 pb-4 dark:border-slate-700 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="mb-2 flex flex-wrap items-center gap-2 text-2xl font-bold tracking-tight text-emerald-800 sm:text-3xl">
+          <h1 className="mb-2 flex flex-wrap items-center gap-2 text-2xl font-bold tracking-tight text-emerald-800 dark:text-emerald-300 sm:text-3xl">
             <i
               className="fa-solid fa-calendar-days text-emerald-700"
               aria-hidden
             />
             Meetings
           </h1>
-          <p className={`${pageSubtitle} text-stone-600`}>
-            <span className="font-medium text-stone-800">{groupName}</span> —
+          <p className={`${pageSubtitle} text-stone-600 dark:text-stone-300`}>
+            <span className="font-medium text-stone-800 dark:text-stone-100">{groupName}</span> —
             upcoming and past sessions. Agenda and minutes render as Markdown on each card.
           </p>
         </div>
@@ -604,9 +604,9 @@ export default function Meetings() {
         ) : null}
       </header>
 
-      <div className={`${cardLight} overflow-hidden border border-stone-200`}>
+      <div className={`${cardLight} overflow-hidden border border-stone-200 dark:border-slate-700`}>
         <nav
-          className="flex border-b border-stone-200 bg-stone-50/90"
+          className="flex border-b border-stone-200 bg-stone-50/90 dark:border-slate-700 dark:bg-slate-800/70"
           aria-label="Meetings view"
         >
           <button
@@ -618,7 +618,7 @@ export default function Meetings() {
             className={`relative flex-1 px-3 py-3 text-sm font-medium transition-colors duration-200 sm:px-4 sm:text-base ${
               meetingsTab === "list"
                 ? "border-b-2 border-emerald-700 bg-emerald-50/70 text-emerald-800"
-                : "border-b-2 border-transparent text-stone-500 hover:bg-stone-100 hover:text-stone-800"
+                : "border-b-2 border-transparent text-stone-500 hover:bg-stone-100 hover:text-stone-800 dark:text-stone-400 dark:hover:bg-slate-800 dark:hover:text-stone-100"
             }`}
           >
             List
@@ -629,7 +629,7 @@ export default function Meetings() {
             className={`relative flex-1 px-3 py-3 text-sm font-medium transition-colors duration-200 sm:px-4 sm:text-base ${
               meetingsTab === "calendar"
                 ? "border-b-2 border-emerald-700 bg-emerald-50/70 text-emerald-800"
-                : "border-b-2 border-transparent text-stone-500 hover:bg-stone-100 hover:text-stone-800"
+                : "border-b-2 border-transparent text-stone-500 hover:bg-stone-100 hover:text-stone-800 dark:text-stone-400 dark:hover:bg-slate-800 dark:hover:text-stone-100"
             }`}
           >
             Calendar
@@ -648,12 +648,12 @@ export default function Meetings() {
           >
             <h2
               id="schedule-meeting-title"
-              className="mb-4 text-lg font-bold text-emerald-800"
+              className="mb-4 text-lg font-bold text-emerald-800 dark:text-emerald-300"
             >
               Schedule meeting
             </h2>
             <form className="space-y-3" onSubmit={handleCreateMeeting}>
-              <label className="block text-xs font-semibold uppercase text-stone-500">
+              <label className="block text-xs font-semibold uppercase text-stone-500 dark:text-stone-400">
                 Title *
                 <input
                   type="text"
@@ -666,7 +666,7 @@ export default function Meetings() {
                   placeholder="e.g. April check-in"
                 />
               </label>
-              <label className="block text-xs font-semibold uppercase text-stone-500">
+              <label className="block text-xs font-semibold uppercase text-stone-500 dark:text-stone-400">
                 Date &amp; time *
                 <input
                   type="datetime-local"
@@ -683,7 +683,7 @@ export default function Meetings() {
                   }`}
                 />
               </label>
-              <label className="block text-xs font-semibold uppercase text-stone-500">
+              <label className="block text-xs font-semibold uppercase text-stone-500 dark:text-stone-400">
                 Meeting link
                 <input
                   type="url"
@@ -695,7 +695,7 @@ export default function Meetings() {
                   placeholder="https://…"
                 />
               </label>
-              <label className="block text-xs font-semibold uppercase text-stone-500">
+              <label className="block text-xs font-semibold uppercase text-stone-500 dark:text-stone-400">
                 Agenda (optional, Markdown)
                 <textarea
                   rows={4}
@@ -741,7 +741,7 @@ export default function Meetings() {
         <p className={`text-sm ${errorBox}`}>{meetingActionError}</p>
       ) : null}
       {meetingActionOk ? (
-        <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+        <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-200">
           {meetingActionOk}
         </p>
       ) : null}
@@ -749,11 +749,11 @@ export default function Meetings() {
       {meetingsTab === "list" ? (
         <>
           <section>
-            <h2 className="mb-4 text-lg font-bold text-emerald-800">
+            <h2 className="mb-4 text-lg font-bold text-emerald-800 dark:text-emerald-300">
               Upcoming meetings
             </h2>
             {loading && meetings.length === 0 ? (
-              <p className="text-sm text-stone-500">Loading…</p>
+              <p className="text-sm text-stone-500 dark:text-stone-400">Loading…</p>
             ) : (
               <div className="grid gap-4 md:grid-cols-2">
                 {upcomingMeetings.map((m) =>
@@ -761,7 +761,7 @@ export default function Meetings() {
                 )}
                 {upcomingMeetings.length === 0 ? (
                   <div
-                    className={`${cardLight} border border-dashed border-stone-200 bg-stone-50/80 p-8 text-center text-sm text-stone-600`}
+                    className={`${cardLight} border border-dashed border-stone-200 bg-stone-50/80 p-8 text-center text-sm text-stone-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-stone-300`}
                   >
                     No upcoming meetings scheduled for this group.
                   </div>
@@ -771,14 +771,14 @@ export default function Meetings() {
           </section>
 
           <section>
-            <h2 className="mb-4 text-lg font-bold text-emerald-800">
+            <h2 className="mb-4 text-lg font-bold text-emerald-800 dark:text-emerald-300">
               Past meetings
             </h2>
             <div className="grid gap-4 md:grid-cols-2">
               {pastMeetings.map((m) => renderMeetingCard(m, { isPast: true }))}
               {pastMeetings.length === 0 ? (
                 <div
-                  className={`${cardLight} border border-dashed border-stone-200 bg-stone-50/80 p-8 text-center text-sm text-stone-600`}
+                  className={`${cardLight} border border-dashed border-stone-200 bg-stone-50/80 p-8 text-center text-sm text-stone-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-stone-300`}
                 >
                   No past meetings yet.
                 </div>
@@ -789,7 +789,7 @@ export default function Meetings() {
       ) : (
         <section aria-label="Meetings calendar">
           {loading && meetings.length === 0 ? (
-            <p className="text-sm text-stone-500">Loading calendar…</p>
+            <p className="text-sm text-stone-500 dark:text-stone-400">Loading calendar…</p>
           ) : (
             <MeetingCalendar
               meetings={meetings}

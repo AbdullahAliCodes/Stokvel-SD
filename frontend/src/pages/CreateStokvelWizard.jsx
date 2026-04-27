@@ -966,12 +966,12 @@ export function CreateStokvelWizard({ variant = "admin" }) {
 
   if (createdStokvel) {
     return (
-      <div className="mx-auto max-w-2xl space-y-6 text-stone-800">
+      <div className="mx-auto max-w-2xl space-y-6 text-stone-800 dark:text-stone-100">
         <section className={`${cardLight} p-6`}>
-          <h1 className="text-xl font-bold text-emerald-800">
+          <h1 className="text-xl font-bold text-emerald-800 dark:text-emerald-300">
             {isAdmin ? "Group created" : "Application submitted"}
           </h1>
-          <p className="mt-2 text-stone-600">
+          <p className="mt-2 text-stone-600 dark:text-stone-300">
             {isAdmin ? (
               <>
                 {createdStokvel.name} is live. Add members below or open the
@@ -1032,7 +1032,7 @@ export function CreateStokvelWizard({ variant = "admin" }) {
             <p className={`${errorBox} mt-3`}>{inviteError}</p>
           ) : null}
           {inviteOk ? (
-            <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-200">
               {inviteOk}
             </p>
           ) : null}
@@ -1049,8 +1049,8 @@ export function CreateStokvelWizard({ variant = "admin" }) {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-3 pb-10 text-stone-800 sm:px-0">
-      <h1 className="mb-6 border-b border-stone-200 pb-4 text-2xl font-bold tracking-wide text-emerald-800">
+    <div className="mx-auto max-w-2xl px-3 pb-10 text-stone-800 dark:text-stone-100 sm:px-0">
+      <h1 className="mb-6 border-b border-stone-200 pb-4 text-2xl font-bold tracking-wide text-emerald-800 dark:border-slate-700 dark:text-emerald-300">
         {isAdmin ? "Admin stokvel creation" : "Apply to stokvel"}
       </h1>
       {formError ? <p className={`${errorBox} mb-4`}>{formError}</p> : null}
@@ -1058,7 +1058,7 @@ export function CreateStokvelWizard({ variant = "admin" }) {
       <form className="flex flex-col gap-6" onSubmit={(e) => e.preventDefault()}>
         <div className={`${cardLight} overflow-hidden transition-shadow duration-200`}>
           <nav
-            className="flex border-b border-stone-200 bg-stone-50/90"
+            className="flex border-b border-stone-200 bg-stone-50/90 dark:border-slate-700 dark:bg-slate-800/70"
             aria-label="Form steps"
           >
             {[
@@ -1076,7 +1076,7 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                 className={`relative flex-1 px-3 py-3.5 text-sm font-medium transition-colors duration-200 sm:px-4 sm:text-base ${
                   activeTab === tab.id
                     ? "border-b-2 border-emerald-700 bg-emerald-50/70 text-emerald-800"
-                    : "border-b-2 border-transparent text-stone-500 hover:bg-stone-100 hover:text-stone-800"
+                    : "border-b-2 border-transparent text-stone-500 hover:bg-stone-100 hover:text-stone-800 dark:text-stone-400 dark:hover:bg-slate-800 dark:hover:text-stone-100"
                 }`}
               >
                 <span
@@ -1096,7 +1096,7 @@ export function CreateStokvelWizard({ variant = "admin" }) {
           <div className="p-5 sm:p-6">
             {activeTab === "details" ? (
               <div className="space-y-4">
-                <p className="text-sm text-stone-500">
+                <p className="text-sm text-stone-500 dark:text-stone-400">
                   Core stokvel settings. You can move to Members when ready.
                 </p>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -1146,7 +1146,7 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                     </select>
                   </label>
                   <div className="sm:col-span-2">
-                    <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-4 py-3 transition-colors hover:border-emerald-300 hover:bg-emerald-50">
+                    <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-4 py-3 transition-colors hover:border-emerald-300 hover:bg-emerald-50 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:hover:bg-emerald-900/30">
                       <input
                         type="checkbox"
                         checked={isPublic}
@@ -1154,10 +1154,10 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                         className="mt-0.5 h-4 w-4 rounded border-emerald-300 accent-emerald-600"
                       />
                       <span>
-                        <span className="block text-sm font-semibold text-emerald-900">
+                        <span className="block text-sm font-semibold text-emerald-900 dark:text-emerald-200">
                           Make this Stokvel Public
                         </span>
-                        <span className="mt-1 block text-xs text-stone-600">
+                        <span className="mt-1 block text-xs text-stone-600 dark:text-stone-300">
                           Anyone on the platform will be able to see and request to join this group.
                         </span>
                       </span>
@@ -1169,14 +1169,14 @@ export function CreateStokvelWizard({ variant = "admin" }) {
 
             {activeTab === "members" ? (
               <div className="space-y-5">
-                <p className="text-sm text-stone-500">
+                <p className="text-sm text-stone-500 dark:text-stone-400">
                   Search registered users.{" "}
-                  <span className="font-medium text-stone-800">Add new member</span>{" "}
+                  <span className="font-medium text-stone-800 dark:text-stone-100">Add new member</span>{" "}
                   enables when there are no matches. Max {MAX_GROUP_MEMBERS}{" "}
                   including you. Cycle length:{" "}
-                  <span className="font-medium text-stone-800">{cycleLength}</span>
+                  <span className="font-medium text-stone-800 dark:text-stone-100">{cycleLength}</span>
                   . Use{" "}
-                  <span className="font-medium text-stone-800">Add email</span> when
+                  <span className="font-medium text-stone-800 dark:text-stone-100">Add email</span> when
                   a profile has no address.
                 </p>
 
@@ -1202,9 +1202,9 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                       (searchLoading ||
                         searchResults.length > 0 ||
                         searchError) ? (
-                        <ul className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-stone-200 bg-white shadow-lg">
+                        <ul className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-stone-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
                           {searchLoading ? (
-                            <li className="px-3 py-2 text-xs text-stone-500">
+                            <li className="px-3 py-2 text-xs text-stone-500 dark:text-stone-400">
                               Searching...
                             </li>
                           ) : null}
@@ -1216,7 +1216,7 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                           {!searchLoading &&
                           !searchError &&
                           searchResults.length > 0 ? (
-                            <li className="sticky top-0 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)] gap-2 border-b border-stone-200 bg-stone-100 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-stone-600">
+                            <li className="sticky top-0 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)] gap-2 border-b border-stone-200 bg-stone-100 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-stone-600 dark:border-slate-700 dark:bg-slate-800 dark:text-stone-300">
                               <span>Username</span>
                               <span>Name</span>
                               <span>Email</span>
@@ -1238,12 +1238,12 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                               return (
                                 <li
                                   key={u.id}
-                                  className="border-b border-stone-100 last:border-0"
+                                  className="border-b border-stone-100 last:border-0 dark:border-slate-700"
                                 >
                                   <button
                                     type="button"
                                     disabled={atMemberCap}
-                                    className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)] gap-2 px-3 py-2 text-left text-xs text-stone-800 transition-colors hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+                                    className="grid w-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)] gap-2 px-3 py-2 text-left text-xs text-stone-800 transition-colors hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-50 dark:text-stone-100 dark:hover:bg-slate-800 sm:text-sm"
                                     onMouseDown={(ev) => {
                                       ev.preventDefault();
                                       selectUser(u);
@@ -1287,16 +1287,16 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                   </p>
                 ) : null}
                 {!myUserId ? (
-                  <p className="text-xs text-stone-500">
+                  <p className="text-xs text-stone-500 dark:text-stone-400">
                     Sign in to add members.
                   </p>
                 ) : null}
 
                 {/* Desktop table */}
-                <div className="hidden overflow-x-auto rounded-xl border border-stone-200 md:block">
+                <div className="hidden overflow-x-auto rounded-xl border border-stone-200 dark:border-slate-700 md:block">
                   <table className="w-full min-w-[560px] text-left text-sm">
                     <thead>
-                      <tr className="border-b border-stone-200 bg-stone-100 text-xs uppercase tracking-wide text-stone-600">
+                      <tr className="border-b border-stone-200 bg-stone-100 text-xs uppercase tracking-wide text-stone-600 dark:border-slate-700 dark:bg-slate-800 dark:text-stone-300">
                         <th className="px-4 py-3">#</th>
                         <th className="px-4 py-3">Username</th>
                         <th className="px-4 py-3">Name</th>
@@ -1309,12 +1309,12 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                       {selectedMembers.map((m, idx) => (
                         <tr
                           key={m.id}
-                          className="border-b border-stone-100 transition-colors last:border-0 hover:bg-stone-50"
+                          className="border-b border-stone-100 transition-colors last:border-0 hover:bg-stone-50 dark:border-slate-700 dark:hover:bg-slate-800/60"
                         >
-                          <td className="px-4 py-3 text-stone-500">
+                          <td className="px-4 py-3 text-stone-500 dark:text-stone-400">
                             {idx + 1}
                           </td>
-                          <td className="px-4 py-3 text-stone-800">
+                          <td className="px-4 py-3 text-stone-800 dark:text-stone-100">
                             <span
                               className="block max-w-32 truncate"
                               title={displayUsername(m)}
@@ -1322,7 +1322,7 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                               {displayUsername(m)}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-stone-800">
+                          <td className="px-4 py-3 text-stone-800 dark:text-stone-100">
                             <span
                               className="block max-w-40 truncate"
                               title={
@@ -1336,7 +1336,7 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                                 : displayName(m)}
                             </span>
                           </td>
-                          <td className="min-w-40 px-4 py-3 text-stone-800">
+                          <td className="min-w-40 px-4 py-3 text-stone-800 dark:text-stone-100">
                             {memberShowsEmailInput(m, creatorEmail) ? (
                               <button
                                 type="button"
@@ -1358,11 +1358,11 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                           <td className="px-4 py-3">
                             {!isAdmin ? (
                               m.isCreator ? (
-                                <span className="text-sm font-medium text-emerald-900">
+                                <span className="text-sm font-medium text-emerald-900 dark:text-emerald-300">
                                   Admin (Chairperson)
                                 </span>
                               ) : (
-                                <span className="text-sm text-stone-700">
+                                <span className="text-sm text-stone-700 dark:text-stone-300">
                                   Member
                                 </span>
                               )
@@ -1394,7 +1394,7 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                           </td>
                           <td className="px-2 py-3 text-right">
                             {m.isCreator || m.id === myUserId ? (
-                              <span className="text-xs text-stone-400">—</span>
+                              <span className="text-xs text-stone-400 dark:text-stone-500">—</span>
                             ) : (
                               <button
                                 type="button"
@@ -1417,11 +1417,11 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                   {selectedMembers.map((m, idx) => (
                     <li
                       key={m.id}
-                      className="rounded-xl border border-stone-200 bg-stone-50 p-4 transition-colors hover:bg-stone-100/80"
+                    className="rounded-xl border border-stone-200 bg-stone-50 p-4 transition-colors hover:bg-stone-100/80 dark:border-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800"
                     >
                       <div className="flex gap-3">
                         <div
-                          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-stone-200 bg-white text-lg font-semibold text-emerald-800"
+                          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-stone-200 bg-white text-lg font-semibold text-emerald-800 dark:border-slate-600 dark:bg-slate-900 dark:text-emerald-300"
                           aria-hidden
                         >
                           {memberAvatarLetter(m)}
@@ -1429,20 +1429,20 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">
                             <div>
-                              <p className="font-medium text-stone-900">
+                              <p className="font-medium text-stone-900 dark:text-stone-100">
                                 {m.isCreator && !isAdmin
                                   ? "Admin (Chairperson)"
                                   : displayName(m)}
                               </p>
-                              <p className="text-sm text-stone-600">
+                              <p className="text-sm text-stone-600 dark:text-stone-300">
                                 {displayUsername(m)}
                               </p>
-                              <p className="mt-1 text-xs text-stone-500">
+                              <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
                                 Row {idx + 1}
                                 {memberShowsEmailInput(m, creatorEmail) ? null : (
                                   <>
                                     {" · "}
-                                    <span className="text-stone-600">
+                                    <span className="text-stone-600 dark:text-stone-300">
                                       {displayEmailReadOnly(m, creatorEmail)}
                                     </span>
                                   </>
@@ -1513,20 +1513,20 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                 </ul>
 
                 {!isAdmin ? (
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900/50 dark:bg-emerald-950/30">
                     <label className={`${labelLight}`}>
                       Designated treasurer{" "}
                       <span className="text-red-700">*</span>
-                      <p className="mb-2 mt-1 text-xs font-normal text-stone-600">
+                      <p className="mb-2 mt-1 text-xs font-normal text-stone-600 dark:text-stone-300">
                         Required — must be another{" "}
-                        <span className="font-medium text-stone-800">
+                        <span className="font-medium text-stone-800 dark:text-stone-100">
                           registered
                         </span>{" "}
                         user (not an email-only invite). Email invites can still
                         join as regular members.
                       </p>
                       {regTreasurerOptions.length === 0 ? (
-                        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                        <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200">
                           You must add at least one registered user to act as the
                           Treasurer.
                         </p>
@@ -1551,18 +1551,18 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                   </div>
                 ) : null}
 
-                <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
-                  <p className="mb-1 text-sm font-medium text-stone-800">
+                <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                  <p className="mb-1 text-sm font-medium text-stone-800 dark:text-stone-100">
                     Payout order
                   </p>
-                  <p className="mb-3 text-xs font-normal text-stone-600">
+                  <p className="mb-3 text-xs font-normal text-stone-600 dark:text-stone-300">
                     Applies when an admin activates the group. Randomize shuffles
                     registered members; Manual lets you set the exact sequence
                     (registered users only — email-only invites are added after
                     they join).
                   </p>
                   <div className="flex flex-wrap gap-4">
-                    <label className="flex cursor-pointer items-center gap-2 text-sm text-stone-800">
+                    <label className="flex cursor-pointer items-center gap-2 text-sm text-stone-800 dark:text-stone-100">
                       <input
                         type="radio"
                         name="payoutOrderType"
@@ -1572,7 +1572,7 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                       />
                       Randomize at activation
                     </label>
-                    <label className="flex cursor-pointer items-center gap-2 text-sm text-stone-800">
+                    <label className="flex cursor-pointer items-center gap-2 text-sm text-stone-800 dark:text-stone-100">
                       <input
                         type="radio"
                         name="payoutOrderType"
@@ -1587,7 +1587,7 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                   {payoutOrderType === "manual" ? (
                     <div className="mt-4">
                       {proposedPayoutSequence.length === 0 ? (
-                        <p className="text-xs text-stone-500">
+                        <p className="text-xs text-stone-500 dark:text-stone-400">
                           Add registered members to set payout order.
                         </p>
                       ) : (
@@ -1597,7 +1597,7 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                               <ul
                                 ref={droppableProvided.innerRef}
                                 {...droppableProvided.droppableProps}
-                                className="flex flex-col gap-2 rounded-lg border border-stone-200 bg-stone-50/80 p-2"
+                                className="flex flex-col gap-2 rounded-lg border border-stone-200 bg-stone-50/80 p-2 dark:border-slate-700 dark:bg-slate-800/60"
                               >
                                 {proposedPayoutSequence.map((uid, index) => {
                                   const m = memberByUuid(selectedMembers, uid);
@@ -1617,7 +1617,7 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                                         <li
                                           ref={dragProvided.innerRef}
                                           {...dragProvided.draggableProps}
-                                          className={`flex items-center gap-3 rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm shadow-sm ${
+                                          className={`flex items-center gap-3 rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-900 ${
                                             snapshot.isDragging
                                               ? "ring-2 ring-emerald-500/40"
                                               : ""
@@ -1625,17 +1625,17 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                                         >
                                           <button
                                             type="button"
-                                            className="touch-none rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                                            className="touch-none rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700 dark:text-stone-500 dark:hover:bg-slate-800 dark:hover:text-stone-200"
                                             aria-label="Drag to reorder"
                                             {...dragProvided.dragHandleProps}
                                           >
                                             <GripVertical className="h-4 w-4" />
                                           </button>
                                           <div className="min-w-0 flex-1">
-                                            <p className="truncate font-medium text-stone-900">
+                                            <p className="truncate font-medium text-stone-900 dark:text-stone-100">
                                               {nameLabel}
                                             </p>
-                                            <p className="truncate text-xs text-stone-600">
+                                            <p className="truncate text-xs text-stone-600 dark:text-stone-300">
                                               {memberPayoutRowRoleLabel(m, isAdmin)}
                                               {m?.username
                                                 ? ` · @${m.username}`
@@ -1658,14 +1658,14 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                 </div>
 
                 {selectedMembers.length === 0 ? (
-                  <p className="text-xs text-stone-500">Loading your row…</p>
+                  <p className="text-xs text-stone-500 dark:text-stone-400">Loading your row…</p>
                 ) : null}
               </div>
             ) : null}
 
             {activeTab === "documents" ? (
               <div className="space-y-4">
-                <p className="text-sm text-stone-500">
+                <p className="text-sm text-stone-500 dark:text-stone-400">
                   Constitution PDFs only, max {PDF_MAX_BYTES / (1024 * 1024)}MB
                   each. Drag files here or click to browse.
                 </p>
@@ -1704,24 +1704,24 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                   className={`flex w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-12 text-center transition-all duration-200 ${
                     dropzoneActive
                       ? "border-emerald-600 bg-emerald-50/80"
-                      : "border-stone-400 bg-stone-50/50 hover:border-stone-500 hover:bg-stone-100/80"
+                      : "border-stone-400 bg-stone-50/50 hover:border-stone-500 hover:bg-stone-100/80 dark:border-slate-600 dark:bg-slate-800/60 dark:hover:border-slate-500 dark:hover:bg-slate-800"
                   }`}
                 >
                   <div
                     className={`rounded-full p-4 transition-colors duration-200 ${
-                      dropzoneActive ? "bg-emerald-100" : "bg-stone-100"
+                      dropzoneActive ? "bg-emerald-100 dark:bg-emerald-900/40" : "bg-stone-100 dark:bg-slate-700"
                     }`}
                   >
                     <Upload
-                      className={`h-8 w-8 ${dropzoneActive ? "text-emerald-700" : "text-stone-500"}`}
+                      className={`h-8 w-8 ${dropzoneActive ? "text-emerald-700 dark:text-emerald-300" : "text-stone-500 dark:text-stone-300"}`}
                       aria-hidden
                     />
                   </div>
                   <div>
-                    <p className="font-medium text-stone-800">
+                    <p className="font-medium text-stone-800 dark:text-stone-100">
                       Drop PDFs here or click to upload
                     </p>
-                    <p className="mt-1 text-sm text-stone-500">
+                    <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
                       Stokvel constitution · PDF only
                     </p>
                   </div>
@@ -1732,14 +1732,14 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                     {documentFiles.map((file, i) => (
                       <li
                         key={`${file.name}-${i}-${file.size}`}
-                        className="flex items-center gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3 shadow-sm transition-colors hover:bg-stone-50"
+                        className="flex items-center gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3 shadow-sm transition-colors hover:bg-stone-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
                       >
                         <FileText className="h-5 w-5 shrink-0 text-emerald-700" />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-stone-900">
+                          <p className="truncate text-sm font-medium text-stone-900 dark:text-stone-100">
                             {file.name}
                           </p>
-                          <p className="text-xs text-stone-500">
+                          <p className="text-xs text-stone-500 dark:text-stone-400">
                             {formatFileSize(file.size)}
                           </p>
                         </div>
@@ -1759,7 +1759,7 @@ export function CreateStokvelWizard({ variant = "admin" }) {
             ) : null}
 
             <div
-              className={`mt-8 flex flex-wrap items-center gap-3 border-t border-stone-200 pt-6 ${
+              className={`mt-8 flex flex-wrap items-center gap-3 border-t border-stone-200 pt-6 dark:border-slate-700 ${
                 activeTab === "details" ? "justify-end" : "justify-between"
               }`}
             >
@@ -1824,14 +1824,14 @@ export function CreateStokvelWizard({ variant = "admin" }) {
               <div>
                 <h2
                   id="email-popover-title"
-                  className="text-lg font-semibold text-stone-900"
+                  className="text-lg font-semibold text-stone-900 dark:text-stone-100"
                 >
                   {emailPopoverMember.isPending &&
                   emailPopoverMember.pendingUsername
                     ? "Add contact email (optional)"
                     : "Add email"}
                 </h2>
-                <p className="mt-1 text-sm text-stone-500">
+                <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
                   {displayName(emailPopoverMember)} ·{" "}
                   {displayUsername(emailPopoverMember)}
                 </p>
