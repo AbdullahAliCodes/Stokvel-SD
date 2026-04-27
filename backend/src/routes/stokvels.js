@@ -1146,6 +1146,8 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
   try {
     const { reference } = req.body ?? {};
     const user_id = req.user.id;
+    console.log("[VERIFY] === Payment verify started ===");
+    console.log("[VERIFY] reference:", reference, "user_id:", user_id, "stokvel_id:", req.params.id);
 
     if (!reference || typeof reference !== "string" || !reference.trim()) {
       return res.status(400).json({ error: "Payment reference is required." });
@@ -1203,8 +1205,10 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
         .json({ error: `Paystack verify failed: ${paystackMessage}` });
     }
     const { data } = paystackResponse;
+    console.log("[VERIFY] Paystack response status:", data?.data?.status, "amount:", data?.data?.amount);
 
     if (data?.data?.status !== "success") {
+      console.log("[VERIFY] REJECTED: Paystack status is not 'success'");
       return res.status(400).json({ error: "Payment not successful" });
     }
 
@@ -1225,7 +1229,9 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
     }
 
     const targetMonth = getTargetMonthForPaidAt(paidAt);
+    console.log("[VERIFY] paidAt:", paidAt.toISOString(), "targetMonth:", targetMonth);
     if (!targetMonth) {
+      console.log("[VERIFY] REJECTED: Could not derive target_month");
       return res.status(400).json({ error: "Could not derive contribution cycle (target_month)." });
     }
 
@@ -1259,6 +1265,7 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
     }
 
     const inWindow = isPaidAtInWindowForTargetMonth(paidAt, targetMonth);
+    console.log("[VERIFY] inPaymentWindow:", inWindow);
     if (!inWindow) {
       const { data: missedRows, error: missErr } = await svc
         .from("missed_payments")
@@ -1272,7 +1279,9 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
         console.error("POST payments/verify missed_payments:", missErr);
         return res.status(500).json({ error: missErr.message });
       }
+      console.log("[VERIFY] missedPayment flags found:", missedRows?.length ?? 0);
       if (!Array.isArray(missedRows) || missedRows.length === 0) {
+        console.log("[VERIFY] REJECTED: outside window and no missed-payment flag");
         return res.status(403).json({
           error: "Payment is outside the valid window for this cycle, and no open missed-payment flag was found.",
         });
@@ -1299,6 +1308,7 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
       }
     }
 
+    console.log("[VERIFY] Inserting contribution:", { stokvel_id, user_id, amount: verified_amount, paid_at: paidAt.toISOString(), target_month: targetMonth, paystack_reference: paystackRef });
     const { data: contribution, error: insErr } = await svc
       .from("contributions")
       .insert([
@@ -1318,12 +1328,14 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
 
     if (insErr) {
       const msg = String(insErr.message || insErr);
+      console.error("[VERIFY] INSERT FAILED:", insErr.code, msg);
       if (msg.includes("duplicate") || insErr.code === "23505") {
         return res.status(409).json({ error: "This payment reference was already recorded." });
       }
       console.error("POST payments/verify insert:", insErr);
       return res.status(500).json({ error: msg });
     }
+    console.log("[VERIFY] SUCCESS: contribution inserted, id:", contribution?.id);
 
     const { error: resolveErr } = await svc
       .from("missed_payments")
