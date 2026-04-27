@@ -77,7 +77,7 @@ function failText(text) {
   return { ok: false, text: async () => text };
 }
 
-function setupFetch({ detail, meetings, treasurerPatch }) {
+function setupFetch({ detail, meetings, treasurerPatch, approvalPatch }) {
   global.fetch = vi.fn(async (url, opts = {}) => {
     const method = opts.method ?? "GET";
     const u = String(url);
@@ -85,6 +85,9 @@ function setupFetch({ detail, meetings, treasurerPatch }) {
     if (u.endsWith("/api/stokvels/stok-1/meetings") && method === "GET") return meetings;
     if (u.endsWith("/api/stokvels/stok-1/treasurer") && method === "PATCH") return treasurerPatch;
     if (u.endsWith("/api/stokvels/stok-1/payout-order") && method === "PATCH") return okJson({ success: true });
+    if (u.includes("/contributions/") && u.endsWith("/treasurer-approval") && method === "PATCH") {
+      return approvalPatch ?? okJson({ success: true, contribution: {} });
+    }
     throw new Error(`Unhandled fetch ${method} ${u}`);
   });
 }
@@ -106,6 +109,7 @@ const detailBase = {
       paid_at: "2026-04-20",
       user_id: "u1",
       target_month: "2026-03",
+      treasurer_approval_status: "pending",
       profiles: { full_name: "Ada L" },
     },
   ],
@@ -159,8 +163,10 @@ describe("Payments", () => {
     expect(screen.getAllByText("john").length).toBeGreaterThan(0);
     expect(screen.getByTestId("rates-widget")).toHaveTextContent("Rates:500");
     expect(screen.getByText("Cycle ledger")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /approved/i })).toBeInTheDocument();
     expect(screen.getByText("Payout schedule")).toBeInTheDocument();
     expect(screen.getAllByText("Ada L").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Pending").length).toBeGreaterThan(0);
   });
 
   it("shows empty table messages when contributions and members are empty", async () => {
@@ -298,6 +304,85 @@ describe("Payments", () => {
       ([u, o]) => String(u).endsWith("/treasurer") && o?.method === "PATCH",
     );
     expect(patchCalls).toHaveLength(1);
+  });
+
+  it("treasurer sees approve buttons for paid pending contribution; member does not", async () => {
+    const detailTreasurer = {
+      ...detailBase,
+      membership: { ...detailBase.membership, group_role: "treasurer" },
+    };
+    const detailAfterApproval = {
+      ...detailTreasurer,
+      contributions: [{ ...detailTreasurer.contributions[0], treasurer_approval_status: "approved" }],
+    };
+    readViewCacheMock.mockReturnValue(null);
+    let approvalDone = false;
+    global.fetch = vi.fn(async (url, opts = {}) => {
+      const method = opts.method ?? "GET";
+      const u = String(url);
+      if (u.endsWith("/api/stokvels/stok-1") && method === "GET") {
+        return okJson(approvalDone ? detailAfterApproval : detailTreasurer);
+      }
+      if (u.endsWith("/api/stokvels/stok-1/meetings") && method === "GET") return okJson({ meetings: [] });
+      if (u.includes("/contributions/") && u.endsWith("/treasurer-approval") && method === "PATCH") {
+        approvalDone = true;
+        return okJson({ success: true, contribution: {} });
+      }
+      throw new Error(`Unhandled fetch ${method} ${u}`);
+    });
+
+    sessionState.current = { session: { access_token: "token-1", user: { id: "u2" } } };
+    renderPayments();
+    await screen.findByText("Cycle ledger");
+    const approveBtn = screen.getByRole("button", { name: /approve payment for ada l/i });
+    expect(approveBtn).toBeInTheDocument();
+    fireEvent.click(approveBtn);
+    expect(await screen.findByText("Payment marked as approved.")).toBeInTheDocument();
+
+    sessionState.current = { session: { access_token: "token-1", user: { id: "u1" } } };
+    readViewCacheMock.mockReturnValue(null);
+    setupFetch({ detail: okJson(detailBase), meetings: okJson({ meetings: [] }) });
+    renderPayments();
+    await screen.findByText("Cycle ledger");
+    expect(screen.queryByRole("button", { name: /approve payment/i })).not.toBeInTheDocument();
+  });
+
+  it("treasurer can reset an approved contribution to pending", async () => {
+    const detailTreasurer = {
+      ...detailBase,
+      membership: { ...detailBase.membership, group_role: "treasurer" },
+    };
+    const approvedDetail = {
+      ...detailTreasurer,
+      contributions: [{ ...detailTreasurer.contributions[0], treasurer_approval_status: "approved" }],
+    };
+    const pendingAgain = {
+      ...detailTreasurer,
+      contributions: [{ ...detailTreasurer.contributions[0], treasurer_approval_status: "pending" }],
+    };
+    readViewCacheMock.mockReturnValue(null);
+    let afterReset = false;
+    global.fetch = vi.fn(async (url, opts = {}) => {
+      const method = opts.method ?? "GET";
+      const u = String(url);
+      if (u.endsWith("/api/stokvels/stok-1") && method === "GET") {
+        return okJson(afterReset ? pendingAgain : approvedDetail);
+      }
+      if (u.endsWith("/api/stokvels/stok-1/meetings") && method === "GET") return okJson({ meetings: [] });
+      if (u.includes("/contributions/") && u.endsWith("/treasurer-approval") && method === "PATCH") {
+        const body = JSON.parse(String(opts.body || "{}"));
+        if (body.status === "pending") afterReset = true;
+        return okJson({ success: true, contribution: {} });
+      }
+      throw new Error(`Unhandled fetch ${method} ${u}`);
+    });
+
+    sessionState.current = { session: { access_token: "token-1", user: { id: "u2" } } };
+    renderPayments();
+    await screen.findByText("Cycle ledger");
+    expect(screen.getByText("Approved")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /reset approval to pending for ada l/i }));
+    expect(await screen.findByText(/Approval reset to pending/i)).toBeInTheDocument();
   });
 
   it("shows load error when detail request fails", async () => {
