@@ -191,7 +191,7 @@ export default function QuickPayModal({
           onChange={(e) => setAmount(e.target.value)}
           className={`${inputLight} mb-4`}
         />
-        {error && <p className="mb-3 text-xs text-red-700">{error}</p>}
+        {error && <p className="mb-3 text-xs text-red-700 dark:text-red-300">{error}</p>}
         <div className="flex gap-3">
           <button
             type="button"

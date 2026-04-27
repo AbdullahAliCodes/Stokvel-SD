@@ -74,8 +74,8 @@ export default function AcceptInvitation() {
   }
 
   return (
-    <div className={`${sectionContainer} py-8 text-emerald-950`}>
-      <h1 className="mb-2 text-2xl font-bold tracking-wide text-emerald-900">Accept Invitation</h1>
+    <div className={`${sectionContainer} py-8 text-emerald-950 dark:text-stone-100`}>
+      <h1 className="mb-2 text-2xl font-bold tracking-wide text-emerald-900 dark:text-emerald-300">Accept Invitation</h1>
       <p className={`mb-6 ${pageSubtitle}`}>Join a stokvel from your invitation email.</p>
 
       {error ? (
@@ -84,24 +84,24 @@ export default function AcceptInvitation() {
         </p>
       ) : null}
       {ok ? (
-        <p className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+        <p className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-200">
           {ok}
         </p>
       ) : null}
 
       {loading ? (
-        <p className="text-sm text-stone-500">Checking invitation…</p>
+        <p className="text-sm text-stone-500 dark:text-stone-400">Checking invitation…</p>
       ) : invitation ? (
         <div className={`${cardLight} max-w-xl space-y-4 p-6`}>
-          <p className="text-sm text-stone-700">
-            Invite for <strong className="text-emerald-950">{invitation.email}</strong> to join{' '}
-            <strong className="text-emerald-950">
+          <p className="text-sm text-stone-700 dark:text-stone-300">
+            Invite for <strong className="text-emerald-950 dark:text-emerald-200">{invitation.email}</strong> to join{' '}
+            <strong className="text-emerald-950 dark:text-emerald-200">
               {invitation.stokvel?.name ?? 'this stokvel'}
             </strong>
             .
           </p>
           {!session ? (
-            <p className="text-sm text-stone-600">Please sign in first, then return to this link.</p>
+            <p className="text-sm text-stone-600 dark:text-stone-400">Please sign in first, then return to this link.</p>
           ) : (
             <button type="button" onClick={acceptInvite} className={btnPrimary} disabled={accepting}>
               {accepting ? 'Accepting…' : 'Accept invitation'}
@@ -111,7 +111,7 @@ export default function AcceptInvitation() {
       ) : null}
 
       <div className="mt-6">
-        <Link to="/dashboard" className="text-sm font-medium text-emerald-800 hover:underline">
+        <Link to="/dashboard" className="text-sm font-medium text-emerald-800 hover:underline dark:text-emerald-300">
           Back to dashboard
         </Link>
       </div>

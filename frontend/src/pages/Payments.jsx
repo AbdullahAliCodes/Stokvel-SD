@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Loader2 } from 'lucide-react'
+import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd'
+import { GripVertical, Loader2 } from 'lucide-react'
 import { useSession } from '../context/SessionContext'
 import { apiUrl } from '../utils/api'
 import {
@@ -72,6 +73,17 @@ function formatScheduleDate(iso) {
   return t.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+function todayIsoLocal() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function payoutHasHappened(payout, todayIso) {
+  const scheduled = String(payout?.scheduled_payout_date ?? '').slice(0, 10)
+  if (!scheduled) return false
+  return scheduled < todayIso
+}
+
 function collectLedgerMonths({ contributions, missedPayments, payouts, capMonth }) {
   const set = new Set()
   for (const c of contributions ?? []) {
@@ -123,11 +135,20 @@ export default function Payments() {
   const [treasurerSaving, setTreasurerSaving] = useState(false)
   const [treasurerError, setTreasurerError] = useState('')
   const [treasurerOk, setTreasurerOk] = useState('')
+  const [payoutOrderSaving, setPayoutOrderSaving] = useState(false)
+  const [payoutOrderError, setPayoutOrderError] = useState('')
+  const [payoutOrderOk, setPayoutOrderOk] = useState('')
+  const [upcomingPayoutOrderIds, setUpcomingPayoutOrderIds] = useState([])
   const [paymentDebug, setPaymentDebug] = useState('')
   const [flaggingCandidate, setFlaggingCandidate] = useState(null)
   const [flaggingSubmitting, setFlaggingSubmitting] = useState(false)
   const [ledgerToast, setLedgerToast] = useState('')
   const ledgerToastTimer = useRef(null)
+  const [payoutsLoading, setPayoutsLoading] = useState(false)
+  const [treasurerPayoutRows, setTreasurerPayoutRows] = useState([])
+  const [payoutActionLoadingId, setPayoutActionLoadingId] = useState('')
+  const [payoutActionError, setPayoutActionError] = useState('')
+  const [payoutActionOk, setPayoutActionOk] = useState('')
 
   const showLedgerToast = useCallback((msg) => {
     if (ledgerToastTimer.current) clearTimeout(ledgerToastTimer.current)
@@ -298,6 +319,8 @@ export default function Payments() {
   ).toLowerCase()
   const canManageTreasurer = ['treasurer', 'admin'].includes(myRole)
   const canFlagMissed = ['treasurer', 'admin'].includes(myRole)
+  const canManagePayoutOrder = ['treasurer', 'admin'].includes(myRole)
+  const isTreasurerRole = myRole === 'treasurer'
   const currentTreasurer = members.find((m) => m.group_role === 'treasurer') ?? null
   const currentTreasurerName = currentTreasurer ? memberDisplay(currentTreasurer.profiles) : 'Not assigned'
 
@@ -368,6 +391,34 @@ export default function Payments() {
     )
   }, [members])
 
+  const todayIso = useMemo(() => todayIsoLocal(), [])
+
+  const { settledPayouts, upcomingPayouts } = useMemo(() => {
+    const settled = []
+    const upcoming = []
+    for (const payout of payouts ?? []) {
+      if (payoutHasHappened(payout, todayIso)) settled.push(payout)
+      else upcoming.push(payout)
+    }
+    return { settledPayouts: settled, upcomingPayouts: upcoming }
+  }, [payouts, todayIso])
+
+  useEffect(() => {
+    setUpcomingPayoutOrderIds(upcomingPayouts.map((p) => p.id).filter(Boolean))
+  }, [upcomingPayouts])
+
+  const upcomingPayoutsInUiOrder = useMemo(() => {
+    if (upcomingPayoutOrderIds.length === 0) return upcomingPayouts
+    const byId = new Map(upcomingPayouts.map((p) => [p.id, p]))
+    return upcomingPayoutOrderIds.map((id) => byId.get(id)).filter(Boolean)
+  }, [upcomingPayoutOrderIds, upcomingPayouts])
+
+  const payoutOrderChanged = useMemo(() => {
+    const current = upcomingPayouts.map((p) => p.id).filter(Boolean)
+    if (current.length !== upcomingPayoutOrderIds.length) return false
+    return current.some((id, i) => id !== upcomingPayoutOrderIds[i])
+  }, [upcomingPayoutOrderIds, upcomingPayouts])
+
   async function handleTreasurerSave() {
     if (!session?.access_token || !stokvel_id || !treasurerUserId) return
     if (!confirmAction('Save this treasurer change for the group?')) return
@@ -421,6 +472,47 @@ export default function Payments() {
     }
   }
 
+  function handleUpcomingPayoutDragEnd(result) {
+    if (!result?.destination) return
+    if (result.destination.index === result.source.index) return
+    setUpcomingPayoutOrderIds((items) => {
+      const next = Array.from(items)
+      const [removed] = next.splice(result.source.index, 1)
+      next.splice(result.destination.index, 0, removed)
+      return next
+    })
+  }
+
+  async function handlePayoutOrderSave() {
+    if (!session?.access_token || !stokvel_id || !canManagePayoutOrder) return
+    if (!confirmAction('Save payout order for upcoming disbursements?')) return
+    const payloadOrderIds =
+      upcomingPayoutOrderIds.length > 0
+        ? upcomingPayoutOrderIds
+        : upcomingPayouts.map((p) => p.id).filter(Boolean)
+    setPayoutOrderSaving(true)
+    setPayoutOrderError('')
+    setPayoutOrderOk('')
+    try {
+      const res = await fetch(apiUrl(`/api/stokvels/${stokvel_id}/payout-order`), {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ orderedUpcomingPayoutIds: payloadOrderIds }),
+      })
+      const text = await res.text()
+      if (!res.ok) throw new Error(parseApiError(text))
+      await silentReloadDetail()
+      setPayoutOrderOk('Upcoming payout order updated.')
+    } catch (err) {
+      setPayoutOrderError(err.message || 'Could not update payout order right now.')
+    } finally {
+      setPayoutOrderSaving(false)
+    }
+  }
+
   async function confirmFlagMissedPayment() {
     if (!flaggingCandidate || !session?.access_token || !stokvel_id) return
     setFlaggingSubmitting(true)
@@ -466,6 +558,57 @@ export default function Payments() {
     { label: 'Monthly contribution', value: formatZAR(monthlyContribution) },
     { label: 'Members', value: String(memberCount) },
   ]
+
+  const fetchTreasurerPayouts = useCallback(async () => {
+    if (!session?.access_token || !stokvel_id || !isTreasurerRole) {
+      setTreasurerPayoutRows([])
+      return
+    }
+    setPayoutsLoading(true)
+    setPayoutActionError('')
+    try {
+      const res = await fetch(apiUrl(`/api/stokvels/${stokvel_id}/payouts`), {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      const text = await res.text()
+      const json = text ? JSON.parse(text) : {}
+      if (!res.ok) throw new Error(json?.error || text || `HTTP ${res.status}`)
+      setTreasurerPayoutRows(Array.isArray(json.payouts) ? json.payouts : [])
+    } catch (e) {
+      setPayoutActionError(e.message ?? String(e))
+      setTreasurerPayoutRows([])
+    } finally {
+      setPayoutsLoading(false)
+    }
+  }, [session?.access_token, stokvel_id, isTreasurerRole])
+
+  useEffect(() => {
+    void fetchTreasurerPayouts()
+  }, [fetchTreasurerPayouts])
+
+  async function handleDisbursePayout(row) {
+    if (!session?.access_token || !stokvel_id || !row?.id) return
+    setPayoutActionLoadingId(row.id)
+    setPayoutActionError('')
+    setPayoutActionOk('')
+    try {
+      const res = await fetch(apiUrl(`/api/stokvels/${stokvel_id}/payouts/${row.id}/disburse`), {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      })
+      const text = await res.text()
+      const json = text ? JSON.parse(text) : {}
+      if (!res.ok) throw new Error(json?.error || text || `HTTP ${res.status}`)
+      setPayoutActionOk('Payout marked as completed.')
+      await fetchTreasurerPayouts()
+    } catch (e) {
+      setPayoutActionError(e.message ?? String(e))
+    } finally {
+      setPayoutActionLoadingId('')
+    }
+  }
 
   if (!stokvel_id) {
     return null
@@ -593,6 +736,11 @@ export default function Payments() {
                 <p className="mb-3 text-xs text-stone-500 dark:text-stone-400">
                   Scheduled payouts from the group roster (amount ≈ pool for that cycle).
                 </p>
+                {canManagePayoutOrder ? (
+                  <p className="mb-3 text-xs text-stone-600 dark:text-stone-300">
+                    Treasurers can reorder upcoming payouts only. Completed payouts are locked.
+                  </p>
+                ) : null}
                 <div className={tableWrap}>
                   <table className="w-full min-w-[280px] text-left text-sm text-stone-800 dark:text-stone-100">
                     <thead>
@@ -632,6 +780,88 @@ export default function Payments() {
                     </tbody>
                   </table>
                 </div>
+                {canManagePayoutOrder && upcomingPayouts.length > 1 ? (
+                  <div className="mt-4">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
+                      Reorder upcoming disbursements
+                    </p>
+                    <DragDropContext onDragEnd={handleUpcomingPayoutDragEnd}>
+                      <Droppable droppableId="payments-upcoming-payout-order">
+                        {(droppableProvided) => (
+                          <ul
+                            ref={droppableProvided.innerRef}
+                            {...droppableProvided.droppableProps}
+                            className="flex flex-col gap-2 rounded-lg border border-stone-200 bg-stone-50/80 p-2"
+                          >
+                            {upcomingPayoutsInUiOrder.map((payout, index) => {
+                              const prof =
+                                members.find((m) => m.user_id === payout.user_id)?.profiles ?? null
+                              return (
+                                <Draggable
+                                  key={payout.id}
+                                  draggableId={String(payout.id)}
+                                  index={index}
+                                >
+                                  {(dragProvided, snapshot) => (
+                                    <li
+                                      ref={dragProvided.innerRef}
+                                      {...dragProvided.draggableProps}
+                                      className={`flex items-center gap-3 rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm shadow-sm ${
+                                        snapshot.isDragging ? 'ring-2 ring-emerald-500/40' : ''
+                                      }`}
+                                    >
+                                      <button
+                                        type="button"
+                                        className="touch-none rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                                        aria-label="Drag payout to reorder"
+                                        {...dragProvided.dragHandleProps}
+                                      >
+                                        <GripVertical className="h-4 w-4" />
+                                      </button>
+                                      <div className="min-w-0 flex-1">
+                                        <p className="truncate font-medium text-stone-900 dark:text-stone-100">
+                                          {memberDisplay(prof)}
+                                        </p>
+                                        <p className="truncate text-xs text-stone-600 dark:text-stone-300">
+                                          {formatScheduleDate(payout.scheduled_payout_date)}
+                                        </p>
+                                      </div>
+                                    </li>
+                                  )}
+                                </Draggable>
+                              )
+                            })}
+                            {droppableProvided.placeholder}
+                          </ul>
+                        )}
+                      </Droppable>
+                    </DragDropContext>
+                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        className={`${btnPrimary} px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50`}
+                        disabled={payoutOrderSaving}
+                        onClick={() => void handlePayoutOrderSave()}
+                      >
+                        {payoutOrderSaving ? 'Saving order…' : 'Save upcoming payout order'}
+                      </button>
+                      {!payoutOrderChanged ? (
+                        <span className="text-xs text-stone-500 dark:text-stone-400">No changes yet.</span>
+                      ) : null}
+                    </div>
+                    {settledPayouts.length > 0 ? (
+                      <p className="mt-2 text-xs text-stone-500 dark:text-stone-400">
+                        {settledPayouts.length} completed payout{settledPayouts.length === 1 ? '' : 's'} locked.
+                      </p>
+                    ) : null}
+                    {payoutOrderError ? (
+                      <p className="mt-2 text-xs text-red-700 dark:text-red-300">{payoutOrderError}</p>
+                    ) : null}
+                    {payoutOrderOk ? (
+                      <p className="mt-2 text-xs text-emerald-800 dark:text-emerald-200">{payoutOrderOk}</p>
+                    ) : null}
+                  </div>
+                ) : null}
               </section>
             </div>
           </div>
@@ -727,6 +957,82 @@ export default function Payments() {
                   </div>
                 )}
               </section>
+
+              {isTreasurerRole ? (
+                <section className={`${cardLight} w-full p-4`}>
+                  <h3 className="mb-3 border-b border-stone-200 pb-2 text-lg font-bold text-emerald-800 dark:border-slate-700 dark:text-emerald-300">
+                    Payouts (Treasurer)
+                  </h3>
+                  {payoutActionError ? (
+                    <p className="mb-2 text-xs text-red-700 dark:text-red-300">{payoutActionError}</p>
+                  ) : null}
+                  {payoutActionOk ? (
+                    <p className="mb-2 text-xs text-emerald-800 dark:text-emerald-200">{payoutActionOk}</p>
+                  ) : null}
+                  <div className={tableWrap}>
+                    <table className="w-full min-w-[520px] table-fixed border-collapse text-left text-sm text-stone-800 dark:text-stone-100">
+                      <colgroup>
+                        <col className="w-[38%] min-w-0" />
+                        <col className="w-[24%]" />
+                        <col className="w-[12%]" />
+                        <col className="w-[26%]" />
+                      </colgroup>
+                      <thead>
+                        <tr className={tableHead}>
+                          <th className="p-3 text-left align-middle">Member name</th>
+                          <th className="p-3 text-left align-middle">Payout date</th>
+                          <th className="p-3 text-left align-middle">Status</th>
+                          <th className="p-3 text-right align-middle">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {payoutsLoading ? (
+                          <tr className={tableRow}>
+                            <td colSpan={4} className="p-6 text-center text-stone-500">
+                              Loading payouts…
+                            </td>
+                          </tr>
+                        ) : treasurerPayoutRows.length === 0 ? (
+                          <tr className={tableRow}>
+                            <td colSpan={4} className="p-6 text-center text-stone-500 italic">
+                              No payout records available.
+                            </td>
+                          </tr>
+                        ) : (
+                          treasurerPayoutRows.map((row) => {
+                            const fullName = memberDisplay(row.profile)
+                            const payoutDate = String(row.scheduled_payout_date || '').slice(0, 10)
+                            const todayIso = new Date().toISOString().slice(0, 10)
+                            const completed = String(row.status || '').toLowerCase() === 'completed'
+                            const isDisabled = completed || !payoutDate || todayIso < payoutDate
+                            return (
+                              <tr key={row.id} className={tableRow}>
+                                <td className="p-3 align-middle">{fullName}</td>
+                                <td className="p-3 text-left align-middle whitespace-nowrap">
+                                  {formatScheduleDate(row.scheduled_payout_date)}
+                                </td>
+                                <td className="p-3 text-left align-middle capitalize">
+                                  {completed ? 'completed' : 'pending'}
+                                </td>
+                                <td className="p-3 text-right align-middle">
+                                  <button
+                                    type="button"
+                                    disabled={isDisabled || payoutActionLoadingId === row.id}
+                                    onClick={() => void handleDisbursePayout(row)}
+                                    className={`${btnPrimary} px-3 py-1.5 text-xs disabled:opacity-40`}
+                                  >
+                                    {payoutActionLoadingId === row.id ? 'Processing…' : 'Payout'}
+                                  </button>
+                                </td>
+                              </tr>
+                            )
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              ) : null}
             </div>
 
             <div className="order-2">

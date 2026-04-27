@@ -62,8 +62,8 @@ export default function MarketRatesWidget({ memberMonthlyContribution = 0, class
   if (error) {
     return (
       <div className={`${cardLight} ${className} p-6`}>
-        <p className="text-sm font-bold text-emerald-800">SA reference rates</p>
-        <p className="mt-2 text-xs text-red-800">{error}</p>
+        <p className="text-sm font-bold text-emerald-800 dark:text-emerald-300">SA reference rates</p>
+        <p className="mt-2 text-xs text-red-800 dark:text-red-300">{error}</p>
       </div>
     )
   }
@@ -71,22 +71,22 @@ export default function MarketRatesWidget({ memberMonthlyContribution = 0, class
   if (!rates) {
     return (
       <div className={`${cardLight} ${className} p-6`}>
-        <p className="text-sm text-stone-500">Loading rates…</p>
+        <p className="text-sm text-stone-500 dark:text-stone-400">Loading rates…</p>
       </div>
     )
   }
 
   return (
     <div className={`${cardLight} ${className} flex flex-col gap-4 p-6`}>
-      <p className="text-sm font-bold text-emerald-800">SA reference rates</p>
-      <div className="flex flex-wrap gap-3 text-xs text-stone-700">
-        <span className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-emerald-800">
-          Repo: <strong className="text-emerald-900">{rates.repo_rate}%</strong>
+      <p className="text-sm font-bold text-emerald-800 dark:text-emerald-300">SA reference rates</p>
+      <div className="flex flex-wrap gap-3 text-xs text-stone-700 dark:text-stone-300">
+        <span className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">
+          Repo: <strong className="text-emerald-900 dark:text-emerald-100">{rates.repo_rate}%</strong>
         </span>
-        <span className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-emerald-800">
-          Prime: <strong className="text-emerald-900">{rates.prime_rate}%</strong>
+        <span className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">
+          Prime: <strong className="text-emerald-900 dark:text-emerald-100">{rates.prime_rate}%</strong>
         </span>
-        <span className="text-stone-500">
+        <span className="text-stone-500 dark:text-stone-400">
           Updated{' '}
           {rates.last_updated
             ? new Date(rates.last_updated).toLocaleString('en-ZA', {
@@ -97,11 +97,11 @@ export default function MarketRatesWidget({ memberMonthlyContribution = 0, class
         </span>
       </div>
       <div>
-        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-800">
+        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">
           Estimated savings growth
         </h4>
         {contribution <= 0 ? (
-          <p className="text-xs text-stone-500">
+          <p className="text-xs text-stone-500 dark:text-stone-400">
             Set a monthly contribution on this group to see a projection curve.
           </p>
         ) : (

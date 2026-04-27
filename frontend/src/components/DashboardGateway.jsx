@@ -97,7 +97,7 @@ export default function DashboardGateway() {
   }, [session, userRole, roleResolved, isAdmin, navigate])
 
   return (
-    <div className="flex h-dvh items-center justify-center overflow-hidden bg-[#F4F5F0] text-stone-600">
+    <div className="flex h-dvh items-center justify-center overflow-hidden bg-[#F4F5F0] text-stone-600 dark:bg-slate-950 dark:text-stone-300">
       <p className="text-sm tracking-wide">Finding your stokvel…</p>
     </div>
   )

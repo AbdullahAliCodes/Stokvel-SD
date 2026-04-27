@@ -84,6 +84,7 @@ function setupFetch({ detail, meetings, treasurerPatch }) {
     if (u.endsWith("/api/stokvels/stok-1") && method === "GET") return detail;
     if (u.endsWith("/api/stokvels/stok-1/meetings") && method === "GET") return meetings;
     if (u.endsWith("/api/stokvels/stok-1/treasurer") && method === "PATCH") return treasurerPatch;
+    if (u.endsWith("/api/stokvels/stok-1/payout-order") && method === "PATCH") return okJson({ success: true });
     throw new Error(`Unhandled fetch ${method} ${u}`);
   });
 }
@@ -308,5 +309,60 @@ describe("Payments", () => {
 
     renderPayments();
     expect(await screen.findByText("boom")).toBeInTheDocument();
+  });
+
+  it("allows treasurer to save reorder for upcoming payouts only", async () => {
+    const detail = {
+      ...detailBase,
+      membership: { ...detailBase.membership, group_role: "treasurer" },
+      members: [
+        { user_id: "u1", group_role: "treasurer", profiles: { full_name: "Treasurer One" } },
+        { user_id: "u2", group_role: "member", profiles: { full_name: "Member Two" } },
+        { user_id: "u3", group_role: "member", profiles: { full_name: "Member Three" } },
+      ],
+      payouts: [
+        {
+          id: "p1",
+          user_id: "u2",
+          target_month: "2026-01",
+          scheduled_payout_date: "2026-01-05",
+          cycle_index: 0,
+        },
+        {
+          id: "p2",
+          user_id: "u3",
+          target_month: "2099-12",
+          scheduled_payout_date: "2099-12-05",
+          cycle_index: 1,
+        },
+        {
+          id: "p3",
+          user_id: "u1",
+          target_month: "2100-01",
+          scheduled_payout_date: "2100-01-05",
+          cycle_index: 2,
+        },
+      ],
+    };
+    readViewCacheMock.mockReturnValue(null);
+    setupFetch({
+      detail: okJson(detail),
+      meetings: okJson({ meetings: [] }),
+      treasurerPatch: okJson({ ok: true }),
+    });
+
+    renderPayments();
+    await screen.findByText("Payout schedule");
+    expect(screen.getByText(/1 completed payout locked/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Save upcoming payout order/i }));
+    await screen.findByText("Upcoming payout order updated.");
+
+    const reorderCall = global.fetch.mock.calls.find(
+      ([u, o]) => String(u).endsWith("/payout-order") && o?.method === "PATCH",
+    );
+    expect(reorderCall).toBeTruthy();
+    const body = JSON.parse(reorderCall[1].body);
+    expect(body.orderedUpcomingPayoutIds).toEqual(["p2", "p3"]);
   });
 });

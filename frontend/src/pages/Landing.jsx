@@ -262,12 +262,12 @@ function Hero() {
                   alt=""
                   width={800}
                   height={600}
-                  className="absolute inset-0 h-full w-full object-cover object-center"
+                  className="absolute inset-0 h-full w-full object-cover object-center dark:brightness-75 dark:contrast-105 dark:saturate-75"
                   loading="lazy"
                   decoding="async"
                 />
                 <div
-                  className="pointer-events-none absolute inset-0 bg-gradient-to-t from-emerald-900/[0.07] to-transparent"
+                  className="pointer-events-none absolute inset-0 bg-gradient-to-t from-emerald-900/[0.07] to-transparent dark:from-slate-950/70 dark:via-slate-900/35 dark:to-slate-900/10"
                   aria-hidden
                 />
               </div>
@@ -313,12 +313,12 @@ function Testimonial() {
             alt=""
             width={480}
             height={480}
-            className="absolute inset-0 h-full w-full object-cover object-center"
+            className="absolute inset-0 h-full w-full object-cover object-center dark:brightness-75 dark:contrast-105 dark:saturate-75"
             loading="lazy"
             decoding="async"
           />
           <div
-            className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-emerald-900/10"
+            className="pointer-events-none absolute inset-0 rounded-2xl bg-transparent ring-1 ring-inset ring-emerald-900/10 dark:bg-slate-950/35 dark:ring-slate-700"
             aria-hidden
           />
         </div>
