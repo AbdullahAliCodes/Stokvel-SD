@@ -503,11 +503,10 @@ export default function Payments() {
       ) : null}
 
       <div
-        className={`mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between ${
-          isActiveStokvel
-            ? 'rounded-xl border-t-4 border-emerald-700 pt-4'
-            : 'rounded-xl border-t-4 border-stone-300 pt-4'
-        }`}
+        className={`mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between ${isActiveStokvel
+          ? 'rounded-xl border-t-4 border-emerald-700 pt-4'
+          : 'rounded-xl border-t-4 border-stone-300 pt-4'
+          }`}
       >
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-emerald-800 sm:text-3xl">
@@ -678,7 +677,7 @@ export default function Payments() {
                                     dotClass = 'bg-emerald-500'
                                   } else if (flagged) {
                                     statusKey = 'flagged'
-                                    statusLabel = 'Flagged'
+                                    statusLabel = 'Unpaid (Missed Deadline)'
                                     dotClass = 'bg-red-500'
                                   }
                                   const showFlag =
