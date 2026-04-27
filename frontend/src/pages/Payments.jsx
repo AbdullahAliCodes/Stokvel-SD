@@ -95,6 +95,45 @@ function memberPaidForMonth(contributions, userId, month) {
   )
 }
 
+/** Latest contribution row for a member × month (for approval / Paystack row identity). */
+function primaryContributionForMonth(contributions, userId, month) {
+  const matches = (contributions ?? []).filter(
+    (c) =>
+      c?.user_id === userId &&
+      c?.target_month === month &&
+      TARGET_MONTH_RE.test(String(month)),
+  )
+  if (matches.length === 0) return null
+  return matches.sort((a, b) => {
+    const ta = new Date(a.paid_at || 0).getTime()
+    const tb = new Date(b.paid_at || 0).getTime()
+    return tb - ta
+  })[0]
+}
+
+function treasurerApprovalStatus(contribution) {
+  if (!contribution) return null
+  const raw = String(contribution.treasurer_approval_status || 'pending').toLowerCase()
+  if (raw === 'approved' || raw === 'rejected' || raw === 'pending') return raw
+  return 'pending'
+}
+
+function treasurerApprovalColumnLabel(contribution) {
+  if (!contribution) return 'N/A'
+  const s = treasurerApprovalStatus(contribution)
+  if (s === 'approved') return 'Approved'
+  if (s === 'rejected') return 'Not approved'
+  return 'Pending'
+}
+
+function treasurerApprovalDotClass(contribution) {
+  if (!contribution) return 'bg-stone-300'
+  const s = treasurerApprovalStatus(contribution)
+  if (s === 'approved') return 'bg-emerald-500'
+  if (s === 'rejected') return 'bg-red-500'
+  return 'bg-amber-400'
+}
+
 function memberFlaggedForMonth(missedPayments, userId, month) {
   return (missedPayments ?? []).some(
     (r) =>
@@ -128,6 +167,8 @@ export default function Payments() {
   const [flaggingSubmitting, setFlaggingSubmitting] = useState(false)
   const [ledgerToast, setLedgerToast] = useState('')
   const ledgerToastTimer = useRef(null)
+  const [approvalSubmittingId, setApprovalSubmittingId] = useState(null)
+  const [approvalError, setApprovalError] = useState('')
 
   const showLedgerToast = useCallback((msg) => {
     if (ledgerToastTimer.current) clearTimeout(ledgerToastTimer.current)
@@ -421,6 +462,40 @@ export default function Payments() {
     }
   }
 
+  async function submitTreasurerApproval(contributionId, status) {
+    if (!session?.access_token || !stokvel_id || !contributionId) return
+    setApprovalError('')
+    setApprovalSubmittingId(contributionId)
+    try {
+      const res = await fetch(
+        apiUrl(`/api/stokvels/${stokvel_id}/contributions/${contributionId}/treasurer-approval`),
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ status }),
+        },
+      )
+      const text = await res.text()
+      if (!res.ok) throw new Error(parseApiError(text))
+      await silentReloadDetail()
+      const approvalToasts = {
+        approved: 'Payment marked as approved.',
+        rejected: 'Payment marked as not approved.',
+        pending: 'Approval reset to pending — needs review again.',
+      }
+      showLedgerToast(approvalToasts[status] ?? 'Payment approval updated.')
+    } catch (e) {
+      const msg = e.message ?? String(e)
+      setApprovalError(msg)
+      showLedgerToast('')
+    } finally {
+      setApprovalSubmittingId(null)
+    }
+  }
+
   async function confirmFlagMissedPayment() {
     if (!flaggingCandidate || !session?.access_token || !stokvel_id) return
     setFlaggingSubmitting(true)
@@ -643,6 +718,11 @@ export default function Payments() {
                 <h3 className="mb-4 border-b border-stone-200 pb-2 text-lg font-bold text-emerald-800 dark:border-slate-700 dark:text-emerald-300">
                   Cycle ledger
                 </h3>
+                {approvalError ? (
+                  <p className={`mb-4 text-sm ${errorBox}`} role="alert">
+                    {approvalError}
+                  </p>
+                ) : null}
                 {ledgerMonths.length === 0 ? (
                   <p className="text-sm italic text-stone-500 dark:text-stone-400">
                     No contribution cycles recorded yet.
@@ -662,12 +742,16 @@ export default function Payments() {
                                 <tr className={tableHead}>
                                   <th className="p-3">Member</th>
                                   <th className="p-3">Status</th>
-                                  {canFlagMissed ? <th className="w-28 p-3 text-right">Action</th> : null}
+                                  <th className="p-3">Approved?</th>
+                                  {canFlagMissed ? (
+                                    <th className="min-w-[10rem] p-3 text-right">Action</th>
+                                  ) : null}
                                 </tr>
                               </thead>
                               <tbody>
                                 {sortedMembers.map((m) => {
                                   const paid = memberPaidForMonth(contributions, m.user_id, month)
+                                  const contrib = primaryContributionForMonth(contributions, m.user_id, month)
                                   const flagged = memberFlaggedForMonth(missedPayments, m.user_id, month)
                                   let statusKey = 'unpaid'
                                   let statusLabel = 'Unpaid'
@@ -683,6 +767,12 @@ export default function Payments() {
                                   }
                                   const showFlag =
                                     canFlagMissed && isPastMonth && statusKey === 'unpaid' && m.user_id !== uid
+                                  const approvalState =
+                                    paid && contrib?.id ? treasurerApprovalStatus(contrib) : null
+                                  const showPaidApprovalControls =
+                                    canFlagMissed && paid && contrib?.id && approvalState
+                                  const busy = approvalSubmittingId === contrib?.id
+                                  const memberNm = memberDisplay(m.profiles)
                                   return (
                                     <tr key={`${month}-${m.user_id}`} className={tableRow}>
                                       <td className="p-3">{memberDisplay(m.profiles)}</td>
@@ -695,9 +785,93 @@ export default function Payments() {
                                           <span>{statusLabel}</span>
                                         </span>
                                       </td>
+                                      <td className="p-3">
+                                        <span className="inline-flex items-center gap-2">
+                                          <span
+                                            className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${treasurerApprovalDotClass(contrib)}`}
+                                            aria-hidden
+                                          />
+                                          <span>{treasurerApprovalColumnLabel(contrib)}</span>
+                                        </span>
+                                      </td>
                                       {canFlagMissed ? (
                                         <td className="p-3 text-right">
-                                          {showFlag ? (
+                                          {showPaidApprovalControls ? (
+                                            <span className="inline-flex max-w-[11rem] flex-wrap items-center justify-end gap-1 sm:max-w-none">
+                                              {approvalState === 'pending' ? (
+                                                <>
+                                                  <button
+                                                    type="button"
+                                                    disabled={busy}
+                                                    className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-base leading-none hover:bg-emerald-100 disabled:opacity-50 dark:border-emerald-800 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/50"
+                                                    title="Approve — funds received in bank"
+                                                    aria-label={`Approve payment for ${memberNm}`}
+                                                    onClick={() => submitTreasurerApproval(contrib.id, 'approved')}
+                                                  >
+                                                    ✅
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    disabled={busy}
+                                                    className="rounded border border-red-200 bg-red-50 px-2 py-1 text-base leading-none hover:bg-red-100 disabled:opacity-50 dark:border-red-900 dark:bg-red-950/40 dark:hover:bg-red-900/40"
+                                                    title="Not approved — did not reflect in bank"
+                                                    aria-label={`Reject payment confirmation for ${memberNm}`}
+                                                    onClick={() => submitTreasurerApproval(contrib.id, 'rejected')}
+                                                  >
+                                                    ❌
+                                                  </button>
+                                                </>
+                                              ) : null}
+                                              {approvalState === 'approved' ? (
+                                                <>
+                                                  <button
+                                                    type="button"
+                                                    disabled={busy}
+                                                    className="rounded border border-red-200 bg-red-50 px-2 py-1 text-base leading-none hover:bg-red-100 disabled:opacity-50 dark:border-red-900 dark:bg-red-950/40 dark:hover:bg-red-900/40"
+                                                    title="Mark as not approved — did not reflect in bank"
+                                                    aria-label={`Mark payment as not approved for ${memberNm}`}
+                                                    onClick={() => submitTreasurerApproval(contrib.id, 'rejected')}
+                                                  >
+                                                    ❌
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    disabled={busy}
+                                                    className="rounded border border-stone-300 bg-stone-100 px-2 py-1 text-sm font-medium leading-none text-stone-800 hover:bg-stone-200 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-stone-100 dark:hover:bg-slate-700"
+                                                    title="Reset to pending — needs another bank review"
+                                                    aria-label={`Reset approval to pending for ${memberNm}`}
+                                                    onClick={() => submitTreasurerApproval(contrib.id, 'pending')}
+                                                  >
+                                                    ↺
+                                                  </button>
+                                                </>
+                                              ) : null}
+                                              {approvalState === 'rejected' ? (
+                                                <>
+                                                  <button
+                                                    type="button"
+                                                    disabled={busy}
+                                                    className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-base leading-none hover:bg-emerald-100 disabled:opacity-50 dark:border-emerald-800 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/50"
+                                                    title="Approve — funds received in bank"
+                                                    aria-label={`Approve payment for ${memberNm}`}
+                                                    onClick={() => submitTreasurerApproval(contrib.id, 'approved')}
+                                                  >
+                                                    ✅
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    disabled={busy}
+                                                    className="rounded border border-stone-300 bg-stone-100 px-2 py-1 text-sm font-medium leading-none text-stone-800 hover:bg-stone-200 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-stone-100 dark:hover:bg-slate-700"
+                                                    title="Reset to pending — needs another bank review"
+                                                    aria-label={`Reset approval to pending for ${memberNm}`}
+                                                    onClick={() => submitTreasurerApproval(contrib.id, 'pending')}
+                                                  >
+                                                    ↺
+                                                  </button>
+                                                </>
+                                              ) : null}
+                                            </span>
+                                          ) : showFlag ? (
                                             <button
                                               type="button"
                                               className="text-xs font-semibold text-amber-800 underline-offset-2 hover:underline dark:text-amber-300"

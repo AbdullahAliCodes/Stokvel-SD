@@ -656,4 +656,150 @@ describe('stokvels routes', () => {
     expect(mockSearchProfilesForMemberInvite).toHaveBeenCalled()
     expect(res.body).toEqual({ success: true, users: [] })
   })
+
+  const sidTreasurer = '11111111-1111-1111-1111-111111111111'
+  const contribUuid = '33333333-3333-4333-8333-333333333333'
+
+  it('PATCH /:id/contributions/:contributionId/treasurer-approval returns 403 for member', async () => {
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    mockGetServiceSupabase.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', {
+      data: { group_role: 'member' },
+      error: null,
+    })
+
+    const res = await request(makeApp())
+      .patch(`/api/stokvels/${sidTreasurer}/contributions/${contribUuid}/treasurer-approval`)
+      .send({ status: 'approved' })
+
+    expect(res.status).toBe(403)
+    expect(res.body.error).toMatch(/treasurer/i)
+  })
+
+  it('PATCH /:id/contributions/:contributionId/treasurer-approval returns 400 for invalid status', async () => {
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    mockGetServiceSupabase.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', {
+      data: { group_role: 'treasurer' },
+      error: null,
+    })
+
+    const res = await request(makeApp())
+      .patch(`/api/stokvels/${sidTreasurer}/contributions/${contribUuid}/treasurer-approval`)
+      .send({ status: 'maybe' })
+
+    expect(res.status).toBe(400)
+  })
+
+  it('PATCH /:id/contributions/:contributionId/treasurer-approval returns 404 when contribution missing', async () => {
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    mockGetServiceSupabase.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', {
+      data: { group_role: 'treasurer' },
+      error: null,
+    })
+    client.__push('contributions.selectMaybeSingle', { data: null, error: null })
+
+    const res = await request(makeApp())
+      .patch(`/api/stokvels/${sidTreasurer}/contributions/${contribUuid}/treasurer-approval`)
+      .send({ status: 'approved' })
+
+    expect(res.status).toBe(404)
+  })
+
+  it('PATCH /:id/contributions/:contributionId/treasurer-approval updates when treasurer', async () => {
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    mockGetServiceSupabase.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', {
+      data: { group_role: 'treasurer' },
+      error: null,
+    })
+    client.__push('contributions.selectMaybeSingle', {
+      data: {
+        id: contribUuid,
+        stokvel_id: sidTreasurer,
+        user_id: '44444444-4444-4444-8444-444444444444',
+        target_month: '2026-04',
+        paid_at: '2026-04-01T10:00:00.000Z',
+      },
+      error: null,
+    })
+    client.__push('contributions.updateSelectMaybeSingle', {
+      data: {
+        id: contribUuid,
+        amount: 500,
+        paid_at: '2026-04-01T10:00:00.000Z',
+        user_id: '44444444-4444-4444-8444-444444444444',
+        target_month: '2026-04',
+        paystack_reference: 'ref-x',
+        treasurer_approval_status: 'approved',
+        treasurer_approved_at: '2026-04-02T10:00:00.000Z',
+        treasurer_approved_by: '11111111-1111-4111-8111-111111111111',
+      },
+      error: null,
+    })
+    client.__push('profiles.selectMaybeSingle', {
+      data: { id: '44444444-4444-4444-8444-444444444444', first_name: 'A', last_name: 'B' },
+      error: null,
+    })
+
+    const res = await request(makeApp())
+      .patch(`/api/stokvels/${sidTreasurer}/contributions/${contribUuid}/treasurer-approval`)
+      .send({ status: 'approved' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+    expect(res.body.contribution.treasurer_approval_status).toBe('approved')
+    expect(res.body.contribution.profiles.last_name).toBe('B')
+  })
+
+  it('PATCH /:id/contributions/:contributionId/treasurer-approval sets pending and clears audit fields', async () => {
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    mockGetServiceSupabase.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', {
+      data: { group_role: 'treasurer' },
+      error: null,
+    })
+    client.__push('contributions.selectMaybeSingle', {
+      data: {
+        id: contribUuid,
+        stokvel_id: sidTreasurer,
+        user_id: '44444444-4444-4444-8444-444444444444',
+        target_month: '2026-04',
+        paid_at: '2026-04-01T10:00:00.000Z',
+      },
+      error: null,
+    })
+    client.__push('contributions.updateSelectMaybeSingle', {
+      data: {
+        id: contribUuid,
+        amount: 500,
+        paid_at: '2026-04-01T10:00:00.000Z',
+        user_id: '44444444-4444-4444-8444-444444444444',
+        target_month: '2026-04',
+        paystack_reference: 'ref-x',
+        treasurer_approval_status: 'pending',
+        treasurer_approved_at: null,
+        treasurer_approved_by: null,
+      },
+      error: null,
+    })
+    client.__push('profiles.selectMaybeSingle', {
+      data: { id: '44444444-4444-4444-8444-444444444444', first_name: 'A', last_name: 'B' },
+      error: null,
+    })
+
+    const res = await request(makeApp())
+      .patch(`/api/stokvels/${sidTreasurer}/contributions/${contribUuid}/treasurer-approval`)
+      .send({ status: 'pending' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.contribution.treasurer_approval_status).toBe('pending')
+    expect(res.body.contribution.treasurer_approved_at).toBeNull()
+  })
 })

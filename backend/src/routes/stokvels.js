@@ -280,7 +280,9 @@ router.get("/:id", requireAuth, async (req, res) => {
     const { data: contributions, error: contributionsError } =
       await access.reader
         .from("contributions")
-        .select("id, amount, paid_at, user_id, target_month, paystack_reference")
+        .select(
+          "id, amount, paid_at, user_id, target_month, paystack_reference, treasurer_approval_status, treasurer_approved_at, treasurer_approved_by",
+        )
         .eq("stokvel_id", stokvelId)
         .order("paid_at", { ascending: false });
 
@@ -1014,7 +1016,7 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
         },
       ])
       .select(
-        "id, stokvel_id, user_id, amount, paid_at, target_month, paystack_reference",
+        "id, stokvel_id, user_id, amount, paid_at, target_month, paystack_reference, treasurer_approval_status, treasurer_approved_at, treasurer_approved_by",
       )
       .single();
 
@@ -1045,5 +1047,125 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Verification failed" });
   }
 });
+
+/** Treasurer / group admin confirms or rejects a recorded payment after bank check. */
+router.patch(
+  "/:id/contributions/:contributionId/treasurer-approval",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const stokvelId = req.params.id;
+      const contributionId = req.params.contributionId;
+      if (
+        !UUID_RE_STOKVEL_PARAM.test(String(stokvelId)) ||
+        !UUID_RE_MEMBER.test(String(contributionId).trim().toLowerCase())
+      ) {
+        return res.status(404).json({ error: "Not found" });
+      }
+      const cid = String(contributionId).trim().toLowerCase();
+
+      const statusRaw =
+        typeof req.body?.status === "string" ? req.body.status.trim().toLowerCase() : "";
+      if (
+        statusRaw !== "approved" &&
+        statusRaw !== "rejected" &&
+        statusRaw !== "pending"
+      ) {
+        return res.status(400).json({
+          error: 'status must be "approved", "rejected", or "pending".',
+        });
+      }
+
+      const userSupabase = userScopedSupabase(req);
+      const access = await resolveGroupAccess({ req, userSupabase, stokvelId });
+      if (access.error) {
+        if (access.error.message === "Not found") {
+          return res.status(404).json({ error: "Not found" });
+        }
+        console.error("PATCH treasurer-approval membership:", access.error);
+        return res.status(500).json({ error: access.error.message });
+      }
+      if (!requireGroupRole(access, ["admin", "treasurer"])) {
+        return res.status(403).json({
+          error: "Only group admin or treasurer can confirm payments.",
+        });
+      }
+
+      const writer = access.writer;
+      const { data: row, error: fetchErr } = await writer
+        .from("contributions")
+        .select("id, stokvel_id, user_id, target_month, paid_at")
+        .eq("id", cid)
+        .eq("stokvel_id", stokvelId)
+        .maybeSingle();
+
+      if (fetchErr) {
+        console.error("PATCH treasurer-approval fetch:", fetchErr);
+        return res.status(500).json({ error: fetchErr.message });
+      }
+      if (!row?.id) {
+        return res.status(404).json({ error: "Contribution not found." });
+      }
+      if (!row.paid_at) {
+        return res
+          .status(400)
+          .json({ error: "Only recorded payments can be confirmed." });
+      }
+
+      const nowIso = new Date().toISOString();
+      const approvalPatch =
+        statusRaw === "pending"
+          ? {
+              treasurer_approval_status: "pending",
+              treasurer_approved_at: null,
+              treasurer_approved_by: null,
+            }
+          : {
+              treasurer_approval_status: statusRaw,
+              treasurer_approved_at: nowIso,
+              treasurer_approved_by: req.user.id,
+            };
+
+      const { data: updated, error: updErr } = await writer
+        .from("contributions")
+        .update(approvalPatch)
+        .eq("id", cid)
+        .eq("stokvel_id", stokvelId)
+        .select(
+          "id, amount, paid_at, user_id, target_month, paystack_reference, treasurer_approval_status, treasurer_approved_at, treasurer_approved_by",
+        )
+        .maybeSingle();
+
+      if (updErr) {
+        console.error("PATCH treasurer-approval update:", updErr);
+        return res.status(500).json({ error: updErr.message });
+      }
+      if (!updated?.id) {
+        return res.status(404).json({ error: "Contribution not found." });
+      }
+
+      let profiles = null;
+      if (updated.user_id) {
+        const { data: prof } = await access.reader
+          .from("profiles")
+          .select("id, first_name, last_name")
+          .eq("id", updated.user_id)
+          .maybeSingle();
+        if (prof) profiles = prof;
+      }
+
+      return res.json({
+        success: true,
+        contribution: { ...updated, profiles },
+      });
+    } catch (err) {
+      console.error(
+        "PATCH /api/stokvels/:id/contributions/:contributionId/treasurer-approval:",
+        err,
+      );
+      return res.status(500).json({ error: "Internal Server Error" });
+    }
+  },
+);
 
 export default router;
