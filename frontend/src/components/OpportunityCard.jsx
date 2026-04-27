@@ -54,13 +54,13 @@ export default function OpportunityCard({
       <div className={opportunityMetricsRow}>
         {m1 ? (
           <div className={opportunityMetricCell}>
-            <p className="text-sm font-semibold text-emerald-900">{m1.value}</p>
+            <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">{m1.value}</p>
             <p className={`mt-0.5 ${captionMuted}`}>{m1.label}</p>
           </div>
         ) : null}
         {m2 ? (
           <div className={opportunityMetricCell}>
-            <p className="text-sm font-semibold text-emerald-900">{m2.value}</p>
+            <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">{m2.value}</p>
             <p className={`mt-0.5 ${captionMuted}`}>{m2.label}</p>
           </div>
         ) : null}

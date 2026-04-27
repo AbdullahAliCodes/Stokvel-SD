@@ -30,16 +30,16 @@ function statusMatches(g, target) {
 
 function GroupsTable({ title, groups, action, embedded }) {
   const tableShell = embedded
-    ? 'overflow-hidden rounded-xl border border-stone-200 bg-white'
+    ? 'overflow-hidden rounded-xl border border-stone-200 bg-white dark:border-slate-700 dark:bg-slate-900'
     : tableWrap
 
   return (
     <div className={title ? 'mb-10' : ''}>
       {title ? (
-        <h2 className="mb-3 text-lg font-bold text-stone-900">{title}</h2>
+        <h2 className="mb-3 text-lg font-bold text-stone-900 dark:text-stone-100">{title}</h2>
       ) : null}
       <div className={tableShell}>
-        <table className="w-full min-w-[640px] text-left text-sm text-stone-800">
+        <table className="w-full min-w-[640px] text-left text-sm text-stone-800 dark:text-stone-100">
           <thead>
             <tr className={tableHead}>
               <th className="p-3">Name</th>
@@ -53,27 +53,27 @@ function GroupsTable({ title, groups, action, embedded }) {
           <tbody>
             {groups.length === 0 ? (
               <tr className={tableRow}>
-                <td colSpan={6} className="p-6 text-center text-stone-500 italic">
+                <td colSpan={6} className="p-6 text-center text-stone-500 italic dark:text-stone-400">
                   No groups in this list.
                 </td>
               </tr>
             ) : (
               groups.map((s) => (
                 <tr key={s.id} className={tableRow}>
-                  <td className="p-3 font-medium text-stone-900">
+                  <td className="p-3 font-medium text-stone-900 dark:text-stone-100">
                     <Link
                       to={`/group/${s.id}/dashboard`}
-                      className="text-emerald-800 underline-offset-2 hover:text-emerald-900 hover:underline"
+                      className="text-emerald-800 underline-offset-2 hover:text-emerald-900 hover:underline dark:text-emerald-300 dark:hover:text-emerald-200"
                     >
                       {s.name}
                     </Link>
                   </td>
-                  <td className="p-3 text-stone-600">{s.type ?? '—'}</td>
-                  <td className="p-3 capitalize text-stone-600">{s.status ?? '—'}</td>
-                  <td className="p-3 text-stone-600">
+                  <td className="p-3 text-stone-600 dark:text-stone-300">{s.type ?? '—'}</td>
+                  <td className="p-3 capitalize text-stone-600 dark:text-stone-300">{s.status ?? '—'}</td>
+                  <td className="p-3 text-stone-600 dark:text-stone-300">
                     {s.contribution_amount != null ? `R ${s.contribution_amount}` : '—'}
                   </td>
-                  <td className="p-3 text-stone-600">{s.cycle_length ?? '—'}</td>
+                  <td className="p-3 text-stone-600 dark:text-stone-300">{s.cycle_length ?? '—'}</td>
                   <td className="p-3">{action(s)}</td>
                 </tr>
               ))
@@ -156,11 +156,11 @@ export default function AdminGroups() {
       ) : null}
 
       {rows === null ? (
-        <p className="text-sm text-stone-500">Loading…</p>
+        <p className="text-sm text-stone-500 dark:text-stone-400">Loading…</p>
       ) : (
         <div className={`${cardLight} overflow-hidden transition-shadow duration-200`}>
           <nav
-            className="flex border-b border-stone-200 bg-stone-50/90"
+            className="flex border-b border-stone-200 bg-stone-50/90 dark:border-slate-700 dark:bg-slate-800/70"
             aria-label="Group status"
           >
             {GROUP_TABS.map((tab) => {
@@ -178,11 +178,11 @@ export default function AdminGroups() {
                   className={`relative flex-1 px-3 py-3.5 text-sm font-medium transition-colors duration-200 sm:px-4 sm:text-base ${
                     groupsTab === tab.id
                       ? 'border-b-2 border-emerald-700 bg-emerald-50/70 text-emerald-800'
-                      : 'border-b-2 border-transparent text-stone-500 hover:bg-stone-100 hover:text-stone-800'
+                      : 'border-b-2 border-transparent text-stone-500 hover:bg-stone-100 hover:text-stone-800 dark:text-stone-400 dark:hover:bg-slate-800 dark:hover:text-stone-100'
                   }`}
                 >
                   {tab.label}
-                  <span className="ml-1 font-normal text-stone-500">({count})</span>
+                  <span className="ml-1 font-normal text-stone-500 dark:text-stone-400">({count})</span>
                 </button>
               )
             })}
@@ -211,7 +211,7 @@ export default function AdminGroups() {
                 action={(s) => (
                   <Link
                     to={`/admin/groups/${s.id}/review`}
-                    className="inline-flex rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-900 transition hover:bg-blue-100"
+                    className="inline-flex rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-900 transition hover:bg-blue-100 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-200 dark:hover:bg-blue-900/50"
                   >
                     View application
                   </Link>
