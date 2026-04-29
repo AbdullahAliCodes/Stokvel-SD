@@ -39,7 +39,7 @@ function GroupsTable({ title, groups, action, embedded }) {
         <h2 className="mb-3 text-lg font-bold text-stone-900 dark:text-stone-100">{title}</h2>
       ) : null}
       <div className={tableShell}>
-        <table className="w-full min-w-[640px] text-left text-sm text-stone-800 dark:text-stone-100">
+        <table className="hidden w-full min-w-[640px] text-left text-sm text-stone-800 dark:text-stone-100 md:table">
           <thead>
             <tr className={tableHead}>
               <th className="p-3">Name</th>
@@ -80,6 +80,38 @@ function GroupsTable({ title, groups, action, embedded }) {
             )}
           </tbody>
         </table>
+        <div className="divide-y divide-stone-200 dark:divide-slate-700 md:hidden">
+          {groups.length === 0 ? (
+            <p className="p-6 text-center text-sm italic text-stone-500 dark:text-stone-400">
+              No groups in this list.
+            </p>
+          ) : (
+            groups.map((s) => (
+              <article key={s.id} className="space-y-3 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <Link
+                    to={`/group/${s.id}/dashboard`}
+                    className="text-sm font-semibold text-emerald-800 underline-offset-2 hover:text-emerald-900 hover:underline dark:text-emerald-300 dark:hover:text-emerald-200"
+                  >
+                    {s.name}
+                  </Link>
+                  <span className="rounded-full bg-stone-100 px-2 py-1 text-[11px] capitalize text-stone-700 dark:bg-slate-800 dark:text-stone-300">
+                    {s.status ?? '—'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs text-stone-600 dark:text-stone-300">
+                  <p>Type: {s.type ?? '—'}</p>
+                  <p>Cycle: {s.cycle_length ?? '—'}</p>
+                  <p className="col-span-2">
+                    Contribution:{' '}
+                    {s.contribution_amount != null ? `R ${s.contribution_amount}` : '—'}
+                  </p>
+                </div>
+                <div>{action(s)}</div>
+              </article>
+            ))
+          )}
+        </div>
       </div>
     </div>
   )

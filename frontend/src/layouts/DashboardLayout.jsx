@@ -223,7 +223,7 @@ export default function DashboardLayout() {
   }
 
   return (
-    <div className="box-border flex h-dvh min-h-0 w-full flex-col gap-3 overflow-hidden bg-[#F4F5F0] p-3 text-stone-800 dark:bg-slate-950 dark:text-stone-100 md:flex-row md:gap-4 md:p-4">
+    <div className="box-border flex min-h-dvh w-full flex-col gap-3 overflow-y-auto bg-[#F4F5F0] p-3 text-stone-800 dark:bg-slate-950 dark:text-stone-100 md:h-dvh md:min-h-0 md:flex-row md:gap-4 md:overflow-hidden md:p-4">
       <aside className="flex w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900 md:h-full md:w-[220px] md:min-w-[220px] md:max-w-[220px]">
         <div className="shrink-0 border-b border-stone-200 p-3 dark:border-slate-700">
           <label
@@ -373,7 +373,7 @@ export default function DashboardLayout() {
           </button>
         </div>
       </aside>
-      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain rounded-2xl border border-stone-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-stone-100 md:p-8">
+      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain rounded-2xl border border-stone-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-stone-100 sm:p-6 md:p-8">
         {blockOutlet ? null : <Outlet />}
       </main>
     </div>
