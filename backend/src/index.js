@@ -21,6 +21,7 @@ import cron from 'node-cron'
 import { fetchRepoRateFromFred } from './jobs/fetchRates.js'
 import marketRatesRouter from './routes/marketRates.js'
 import { searchProfilesForMemberInvite } from './utils/profileUserSearch.js'
+import { fileURLToPath } from 'url'
 
 const app = express()
 const PORT = Number(process.env.PORT) || 5000
@@ -77,7 +78,7 @@ function clearDashboardCacheForUser(userId) {
   dashboardCache.delete(cacheKey('my-meetings', userId))
 }
 
-function normalizeMembersCount(raw) {
+export function normalizeMembersCount(raw) {
   const n = Number(raw)
   if (!Number.isInteger(n) || n < 1 || n > 500) return null
   return n
@@ -86,7 +87,7 @@ function normalizeMembersCount(raw) {
 const UUID_RE_MEMBER_DETAILS =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
-function normalizeMemberDetails(raw, limit = 500) {
+export function normalizeMemberDetails(raw, limit = 500) {
   if (!Array.isArray(raw)) return []
   return raw
     .map((m) => {
@@ -104,7 +105,7 @@ function normalizeMemberDetails(raw, limit = 500) {
     .slice(0, limit)
 }
 
-function normalizeDocuments(raw, limit = 50) {
+export function normalizeDocuments(raw, limit = 50) {
   if (!Array.isArray(raw)) return []
   return raw
     .map((d) => (typeof d === 'string' ? d.trim() : ''))
@@ -112,13 +113,13 @@ function normalizeDocuments(raw, limit = 50) {
     .slice(0, limit)
 }
 
-function normalizeTreasurerUserIdMember(raw) {
+export function normalizeTreasurerUserIdMember(raw) {
   if (typeof raw !== 'string') return ''
   const v = raw.trim().toLowerCase()
   return UUID_RE_MEMBER_DETAILS.test(v) ? v : ''
 }
 
-function normalizeInitialMemberIds(raw) {
+export function normalizeInitialMemberIds(raw) {
   if (!Array.isArray(raw)) return []
   const out = []
   const seen = new Set()
@@ -134,7 +135,7 @@ function normalizeInitialMemberIds(raw) {
   return out
 }
 
-function collectUuidsFromMemberDetails(details) {
+export function collectUuidsFromMemberDetails(details) {
   const out = []
   const seen = new Set()
   for (const row of details ?? []) {
@@ -728,24 +729,29 @@ app.post('/api/stokvels/:id/join', requireAuth, async (req, res) => {
 // GET /api/stokvels (list), GET /api/stokvels/:id, POST /api/stokvels/:id/contributions
 app.use('/api/stokvels', stokvelsRouter)
 
-app.listen(PORT, () => {
-  console.log(`Stokvel API listening on port ${PORT}`)
+const entryPath = process.argv[1]
+const currentFilePath = fileURLToPath(import.meta.url)
 
-  if (process.env.FRED_API_KEY?.trim()) {
-    cron.schedule(
-      '0 6 * * *',
-      () => {
-        void fetchRepoRateFromFred()
-      },
-      { timezone: 'Africa/Johannesburg' },
-    )
-    console.log(
-      '[FRED] Scheduled daily SA policy rate sync (06:00 Africa/Johannesburg)',
-    )
-    void fetchRepoRateFromFred()
-  } else {
-    console.warn(
-      '[FRED] FRED_API_KEY not set; market_data will not auto-sync (set key in .env)',
-    )
-  }
-})
+if (entryPath && entryPath === currentFilePath) {
+  app.listen(PORT, () => {
+    console.log(`Stokvel API listening on port ${PORT}`)
+
+    if (process.env.FRED_API_KEY?.trim()) {
+      cron.schedule(
+        '0 6 * * *',
+        () => {
+          void fetchRepoRateFromFred()
+        },
+        { timezone: 'Africa/Johannesburg' },
+      )
+      console.log(
+        '[FRED] Scheduled daily SA policy rate sync (06:00 Africa/Johannesburg)',
+      )
+      void fetchRepoRateFromFred()
+    } else {
+      console.warn(
+        '[FRED] FRED_API_KEY not set; market_data will not auto-sync (set key in .env)',
+      )
+    }
+  })
+}
