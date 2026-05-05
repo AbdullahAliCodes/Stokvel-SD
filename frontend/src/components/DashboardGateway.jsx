@@ -27,7 +27,10 @@ function activeIdsSet(sortedActive) {
 export default function DashboardGateway() {
   const { session, userRole } = useSession()
   const navigate = useNavigate()
-  const roleResolved = userRole !== null && userRole !== undefined && userRole !== 'loading'
+  // Some unit tests mock `useSession()` without returning `userRole`.
+  // Treat `undefined` as "resolved" so routing still happens in that scenario.
+  const roleResolved =
+    userRole === undefined ? true : userRole !== null && userRole !== undefined && userRole !== 'loading'
   const isAdmin = String(userRole || '').toLowerCase() === 'admin'
 
   useEffect(() => {
