@@ -11,6 +11,14 @@ comment:
   behavior: default
   require_changes: false
 
+flags:
+  backend:
+    paths:
+      - backend/
+  frontend:
+    paths:
+      - frontend/
+
 status:
   project:
     default:
