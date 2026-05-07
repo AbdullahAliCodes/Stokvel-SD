@@ -19,4 +19,9 @@ describe('apiUrl', () => {
     expect(apiUrl('/api/health')).toBe('https://api.example.com/api/health')
     expect(apiUrl('api/users')).toBe('https://api.example.com/api/users')
   })
+
+  it('normalizes missing leading slash in path', async () => {
+    vi.stubEnv('VITE_API_BASE_URL', '')
+    expect(apiUrl('api/health')).toBe('/api/health')
+  })
 })
