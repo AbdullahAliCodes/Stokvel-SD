@@ -80,7 +80,9 @@ async function resolveGroupAccess({ req, userSupabase, stokvelId }) {
   const platformAdmin = isPlatformAdmin(req);
   const service = getServiceSupabase();
   const reader = platformAdmin ? (service ?? userSupabase) : userSupabase;
-  const writer = platformAdmin ? (service ?? userSupabase) : (service ?? userSupabase);
+  const writer = platformAdmin
+    ? (service ?? userSupabase)
+    : (service ?? userSupabase);
 
   if (platformAdmin) {
     return {
@@ -97,7 +99,8 @@ async function resolveGroupAccess({ req, userSupabase, stokvelId }) {
     stokvelId,
     req.user.id,
   );
-  if (error) return { error, reader, writer, membership: null, platformAdmin: false };
+  if (error)
+    return { error, reader, writer, membership: null, platformAdmin: false };
   if (!membership) {
     return {
       error: new Error("Not found"),
@@ -139,7 +142,9 @@ function payoutHasHappened(payout, todayIso) {
 }
 
 function isTreasurer(access) {
-  return String(access?.membership?.group_role || "").toLowerCase() === "treasurer";
+  return (
+    String(access?.membership?.group_role || "").toLowerCase() === "treasurer"
+  );
 }
 router.get("/", requireAuth, async (req, res) => {
   try {
@@ -173,7 +178,8 @@ router.post("/:id/missed-payments", requireAuth, async (req, res) => {
       return res.status(404).json({ error: "Not found" });
     }
 
-    const { user_id: bodyUserId, target_month: targetMonthRaw } = req.body ?? {};
+    const { user_id: bodyUserId, target_month: targetMonthRaw } =
+      req.body ?? {};
     const targetMonth =
       typeof targetMonthRaw === "string" ? targetMonthRaw.trim() : "";
     if (!TARGET_MONTH_RE.test(targetMonth)) {
@@ -239,9 +245,7 @@ router.post("/:id/missed-payments", requireAuth, async (req, res) => {
 
     if (insErr) {
       if (insErr.code === "23505") {
-        return res
-          .status(200)
-          .json({ success: true, alreadyFlagged: true });
+        return res.status(200).json({ success: true, alreadyFlagged: true });
       }
       console.error("POST missed-payments insert:", insErr);
       return res.status(500).json({ error: insErr.message });
@@ -414,7 +418,9 @@ router.get("/:id/payouts", requireAuth, async (req, res) => {
       return res.status(500).json({ error: access.error.message });
     }
     if (!isTreasurer(access)) {
-      return res.status(403).json({ error: "Only treasurers can access payouts." });
+      return res
+        .status(403)
+        .json({ error: "Only treasurers can access payouts." });
     }
 
     const svc = getServiceSupabase();
@@ -436,7 +442,9 @@ router.get("/:id/payouts", requireAuth, async (req, res) => {
       return res.status(500).json({ error: payoutErr.message });
     }
 
-    const userIds = [...new Set((payoutRows ?? []).map((p) => p.user_id).filter(Boolean))];
+    const userIds = [
+      ...new Set((payoutRows ?? []).map((p) => p.user_id).filter(Boolean)),
+    ];
     let profileById = new Map();
     if (userIds.length > 0) {
       const { data: profiles, error: profileErr } = await svc
@@ -474,96 +482,115 @@ router.get("/:id/payouts", requireAuth, async (req, res) => {
 });
 
 /** Treasurer triggers a payout once due and still pending. */
-router.post("/:id/payouts/:payoutId/disburse", requireAuth, async (req, res) => {
-  try {
-    const stokvelId = req.params.id;
-    const payoutId = req.params.payoutId;
-    if (!UUID_RE_STOKVEL_PARAM.test(String(stokvelId))) {
-      return res.status(404).json({ error: "Not found" });
-    }
-    if (!UUID_RE_STOKVEL_PARAM.test(String(payoutId))) {
-      return res.status(400).json({ error: "Invalid payout id." });
-    }
-
-    const userSupabase = userScopedSupabase(req);
-    const access = await resolveGroupAccess({ req, userSupabase, stokvelId });
-    if (access.error) {
-      if (access.error.message === "Not found") {
+router.post(
+  "/:id/payouts/:payoutId/disburse",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const stokvelId = req.params.id;
+      const payoutId = req.params.payoutId;
+      if (!UUID_RE_STOKVEL_PARAM.test(String(stokvelId))) {
         return res.status(404).json({ error: "Not found" });
       }
-      return res.status(500).json({ error: access.error.message });
-    }
-    if (!isTreasurer(access)) {
-      return res.status(403).json({ error: "Only treasurers can disburse payouts." });
-    }
+      if (!UUID_RE_STOKVEL_PARAM.test(String(payoutId))) {
+        return res.status(400).json({ error: "Invalid payout id." });
+      }
 
-    const svc = getServiceSupabase();
-    if (!svc) {
-      return res.status(500).json({
-        error:
-          "Server configuration error: cannot disburse payouts without service role access.",
-      });
-    }
+      const userSupabase = userScopedSupabase(req);
+      const access = await resolveGroupAccess({ req, userSupabase, stokvelId });
+      if (access.error) {
+        if (access.error.message === "Not found") {
+          return res.status(404).json({ error: "Not found" });
+        }
+        return res.status(500).json({ error: access.error.message });
+      }
+      if (!isTreasurer(access)) {
+        return res
+          .status(403)
+          .json({ error: "Only treasurers can disburse payouts." });
+      }
 
-    const { data: payout, error: payoutErr } = await svc
-      .from("payouts")
-      .select(
-        "id, stokvel_id, user_id, target_month, scheduled_payout_date, status, disbursed_at, disbursed_by",
-      )
-      .eq("id", payoutId)
-      .eq("stokvel_id", stokvelId)
-      .maybeSingle();
-    if (payoutErr) {
-      console.error("POST /api/stokvels/:id/payouts/:payoutId/disburse lookup:", payoutErr);
-      return res.status(500).json({ error: payoutErr.message });
-    }
-    if (!payout?.id) {
-      return res.status(404).json({ error: "Payout not found." });
-    }
+      const svc = getServiceSupabase();
+      if (!svc) {
+        return res.status(500).json({
+          error:
+            "Server configuration error: cannot disburse payouts without service role access.",
+        });
+      }
 
-    const status = String(payout.status || "").toLowerCase();
-    if (status === "completed" || payout.disbursed_at) {
-      return res.status(409).json({ error: "Payout has already been processed." });
-    }
+      const { data: payout, error: payoutErr } = await svc
+        .from("payouts")
+        .select(
+          "id, stokvel_id, user_id, target_month, scheduled_payout_date, status, disbursed_at, disbursed_by",
+        )
+        .eq("id", payoutId)
+        .eq("stokvel_id", stokvelId)
+        .maybeSingle();
+      if (payoutErr) {
+        console.error(
+          "POST /api/stokvels/:id/payouts/:payoutId/disburse lookup:",
+          payoutErr,
+        );
+        return res.status(500).json({ error: payoutErr.message });
+      }
+      if (!payout?.id) {
+        return res.status(404).json({ error: "Payout not found." });
+      }
 
-    const todayIso = new Date().toISOString().slice(0, 10);
-    const payoutDate = String(payout.scheduled_payout_date || "").slice(0, 10);
-    if (!payoutDate) {
-      return res.status(400).json({ error: "Payout date is missing." });
-    }
-    if (todayIso < payoutDate) {
-      return res.status(400).json({ error: "Payout date has not been reached yet." });
-    }
+      const status = String(payout.status || "").toLowerCase();
+      if (status === "completed" || payout.disbursed_at) {
+        return res
+          .status(409)
+          .json({ error: "Payout has already been processed." });
+      }
 
-    // TODO: Integrate PSP transfer/disbursement call before marking completed.
-    const disbursedAt = new Date().toISOString();
-    const { data: updated, error: updateErr } = await svc
-      .from("payouts")
-      .update({
-        status: "completed",
-        disbursed_at: disbursedAt,
-        disbursed_by: req.user.id,
-      })
-      .eq("id", payoutId)
-      .eq("stokvel_id", stokvelId)
-      .select(
-        "id, stokvel_id, user_id, target_month, scheduled_payout_date, status, disbursed_at, disbursed_by",
-      )
-      .maybeSingle();
-    if (updateErr) {
-      console.error("POST /api/stokvels/:id/payouts/:payoutId/disburse update:", updateErr);
-      return res.status(500).json({ error: updateErr.message });
-    }
-    if (!updated?.id) {
-      return res.status(404).json({ error: "Payout not found." });
-    }
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const payoutDate = String(payout.scheduled_payout_date || "").slice(
+        0,
+        10,
+      );
+      if (!payoutDate) {
+        return res.status(400).json({ error: "Payout date is missing." });
+      }
+      if (todayIso < payoutDate) {
+        return res
+          .status(400)
+          .json({ error: "Payout date has not been reached yet." });
+      }
 
-    return res.json({ success: true, payout: updated });
-  } catch (err) {
-    console.error("POST /api/stokvels/:id/payouts/:payoutId/disburse:", err);
-    return res.status(500).json({ error: "Internal Server Error" });
-  }
-});
+      // TODO: Integrate PSP transfer/disbursement call before marking completed.
+      const disbursedAt = new Date().toISOString();
+      const { data: updated, error: updateErr } = await svc
+        .from("payouts")
+        .update({
+          status: "completed",
+          disbursed_at: disbursedAt,
+          disbursed_by: req.user.id,
+        })
+        .eq("id", payoutId)
+        .eq("stokvel_id", stokvelId)
+        .select(
+          "id, stokvel_id, user_id, target_month, scheduled_payout_date, status, disbursed_at, disbursed_by",
+        )
+        .maybeSingle();
+      if (updateErr) {
+        console.error(
+          "POST /api/stokvels/:id/payouts/:payoutId/disburse update:",
+          updateErr,
+        );
+        return res.status(500).json({ error: updateErr.message });
+      }
+      if (!updated?.id) {
+        return res.status(404).json({ error: "Payout not found." });
+      }
+
+      return res.json({ success: true, payout: updated });
+    } catch (err) {
+      console.error("POST /api/stokvels/:id/payouts/:payoutId/disburse:", err);
+      return res.status(500).json({ error: "Internal Server Error" });
+    }
+  },
+);
 
 router.patch("/:id", requireAuth, async (req, res) => {
   try {
@@ -606,9 +633,9 @@ router.patch("/:id", requireAuth, async (req, res) => {
     if (contributionAmountRaw !== undefined) {
       const parsed = Number(contributionAmountRaw);
       if (!Number.isFinite(parsed) || parsed <= 0) {
-        return res
-          .status(400)
-          .json({ error: "contribution_amount must be a number greater than 0." });
+        return res.status(400).json({
+          error: "contribution_amount must be a number greater than 0.",
+        });
       }
       patch.contribution_amount = parsed;
     }
@@ -994,11 +1021,17 @@ router.patch("/:id/payout-order", requireAuth, async (req, res) => {
       return res.status(404).json({ error: "Not found" });
     }
 
-    const orderedUpcomingPayoutIds = Array.isArray(req.body?.orderedUpcomingPayoutIds)
-      ? req.body.orderedUpcomingPayoutIds.filter((v) => typeof v === "string" && v.trim())
+    const orderedUpcomingPayoutIds = Array.isArray(
+      req.body?.orderedUpcomingPayoutIds,
+    )
+      ? req.body.orderedUpcomingPayoutIds.filter(
+          (v) => typeof v === "string" && v.trim(),
+        )
       : null;
     if (!orderedUpcomingPayoutIds) {
-      return res.status(400).json({ error: "orderedUpcomingPayoutIds must be a non-empty array." });
+      return res
+        .status(400)
+        .json({ error: "orderedUpcomingPayoutIds must be a non-empty array." });
     }
 
     const userSupabase = userScopedSupabase(req);
@@ -1018,13 +1051,16 @@ router.patch("/:id/payout-order", requireAuth, async (req, res) => {
     const svc = getServiceSupabase();
     if (!svc) {
       return res.status(500).json({
-        error: "Server configuration error: cannot reorder payouts without service role access.",
+        error:
+          "Server configuration error: cannot reorder payouts without service role access.",
       });
     }
 
     const { data: payoutRows, error: payoutErr } = await svc
       .from("payouts")
-      .select("id, stokvel_id, user_id, target_month, scheduled_payout_date, cycle_index, created_at")
+      .select(
+        "id, stokvel_id, user_id, target_month, scheduled_payout_date, cycle_index, created_at",
+      )
       .eq("stokvel_id", stokvelId);
     if (payoutErr) {
       return res.status(500).json({ error: payoutErr.message });
@@ -1038,7 +1074,9 @@ router.patch("/:id/payout-order", requireAuth, async (req, res) => {
     });
 
     const todayIso = todayIsoSast();
-    const upcoming = sortedPayouts.filter((p) => !payoutHasHappened(p, todayIso));
+    const upcoming = sortedPayouts.filter(
+      (p) => !payoutHasHappened(p, todayIso),
+    );
     if (upcoming.length <= 1) {
       return res.status(400).json({
         error: "There are not enough upcoming payouts to reorder.",
@@ -1048,24 +1086,30 @@ router.patch("/:id/payout-order", requireAuth, async (req, res) => {
     const upcomingIds = upcoming.map((p) => String(p.id));
     if (orderedUpcomingPayoutIds.length !== upcomingIds.length) {
       return res.status(400).json({
-        error: "orderedUpcomingPayoutIds must include each upcoming payout exactly once.",
+        error:
+          "orderedUpcomingPayoutIds must include each upcoming payout exactly once.",
       });
     }
     const expected = new Set(upcomingIds);
     const proposed = new Set(orderedUpcomingPayoutIds);
     if (proposed.size !== orderedUpcomingPayoutIds.length) {
-      return res.status(400).json({ error: "orderedUpcomingPayoutIds contains duplicates." });
+      return res
+        .status(400)
+        .json({ error: "orderedUpcomingPayoutIds contains duplicates." });
     }
     for (const id of orderedUpcomingPayoutIds) {
       if (!expected.has(String(id))) {
         return res.status(400).json({
-          error: "orderedUpcomingPayoutIds contains payouts that are not upcoming.",
+          error:
+            "orderedUpcomingPayoutIds contains payouts that are not upcoming.",
         });
       }
     }
 
     const upcomingById = new Map(upcoming.map((p) => [String(p.id), p]));
-    const reorderedUpcoming = orderedUpcomingPayoutIds.map((id) => upcomingById.get(String(id)));
+    const reorderedUpcoming = orderedUpcomingPayoutIds.map((id) =>
+      upcomingById.get(String(id)),
+    );
 
     for (let i = 0; i < upcoming.length; i += 1) {
       const originalSlot = upcoming[i];
@@ -1083,7 +1127,9 @@ router.patch("/:id/payout-order", requireAuth, async (req, res) => {
 
     const { data: refreshedRows, error: refreshErr } = await svc
       .from("payouts")
-      .select("id, stokvel_id, user_id, target_month, scheduled_payout_date, cycle_index, created_at")
+      .select(
+        "id, stokvel_id, user_id, target_month, scheduled_payout_date, cycle_index, created_at",
+      )
       .eq("stokvel_id", stokvelId);
     if (refreshErr) {
       return res.status(500).json({ error: refreshErr.message });
@@ -1151,14 +1197,24 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
     const { reference } = req.body ?? {};
     const user_id = req.user.id;
     console.log("[VERIFY] === Payment verify started ===");
-    console.log("[VERIFY] reference:", reference, "user_id:", user_id, "stokvel_id:", req.params.id);
+    console.log(
+      "[VERIFY] reference:",
+      reference,
+      "user_id:",
+      user_id,
+      "stokvel_id:",
+      req.params.id,
+    );
 
     if (!reference || typeof reference !== "string" || !reference.trim()) {
       return res.status(400).json({ error: "Payment reference is required." });
     }
 
-    const rawId = typeof req.params?.id === "string" ? req.params.id.trim() : "";
-    const stokvel_id = UUID_RE_STOKVEL_PARAM.test(rawId) ? rawId.toLowerCase() : null;
+    const rawId =
+      typeof req.params?.id === "string" ? req.params.id.trim() : "";
+    const stokvel_id = UUID_RE_STOKVEL_PARAM.test(rawId)
+      ? rawId.toLowerCase()
+      : null;
 
     if (!stokvel_id) {
       return res.status(400).json({ error: "Invalid stokvel id." });
@@ -1185,7 +1241,9 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
       return res.status(500).json({ error: dupLookupErr.message });
     }
     if (existingRef?.id) {
-      return res.status(409).json({ error: "This payment reference was already recorded." });
+      return res
+        .status(409)
+        .json({ error: "This payment reference was already recorded." });
     }
 
     let paystackResponse;
@@ -1209,7 +1267,12 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
         .json({ error: `Paystack verify failed: ${paystackMessage}` });
     }
     const { data } = paystackResponse;
-    console.log("[VERIFY] Paystack response status:", data?.data?.status, "amount:", data?.data?.amount);
+    console.log(
+      "[VERIFY] Paystack response status:",
+      data?.data?.status,
+      "amount:",
+      data?.data?.amount,
+    );
 
     if (data?.data?.status !== "success") {
       console.log("[VERIFY] REJECTED: Paystack status is not 'success'");
@@ -1229,14 +1292,23 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
       paidAt = new Date(paidRaw);
     }
     if (Number.isNaN(paidAt.getTime())) {
-      return res.status(502).json({ error: "Paystack response missing a valid paid_at timestamp." });
+      return res.status(502).json({
+        error: "Paystack response missing a valid paid_at timestamp.",
+      });
     }
 
     const targetMonth = getTargetMonthForPaidAt(paidAt);
-    console.log("[VERIFY] paidAt:", paidAt.toISOString(), "targetMonth:", targetMonth);
+    console.log(
+      "[VERIFY] paidAt:",
+      paidAt.toISOString(),
+      "targetMonth:",
+      targetMonth,
+    );
     if (!targetMonth) {
       console.log("[VERIFY] REJECTED: Could not derive target_month");
-      return res.status(400).json({ error: "Could not derive contribution cycle (target_month)." });
+      return res
+        .status(400)
+        .json({ error: "Could not derive contribution cycle (target_month)." });
     }
 
     const { data: stokvel, error: stErr } = await svc
@@ -1250,7 +1322,9 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
       return res.status(500).json({ error: stErr.message });
     }
     if (!stokvel?.id || stokvel.status !== "active") {
-      return res.status(400).json({ error: "Stokvel is not active or was not found." });
+      return res
+        .status(400)
+        .json({ error: "Stokvel is not active or was not found." });
     }
 
     const { data: membership, error: memErr } = await svc
@@ -1283,11 +1357,17 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
         console.error("POST payments/verify missed_payments:", missErr);
         return res.status(500).json({ error: missErr.message });
       }
-      console.log("[VERIFY] missedPayment flags found:", missedRows?.length ?? 0);
+      console.log(
+        "[VERIFY] missedPayment flags found:",
+        missedRows?.length ?? 0,
+      );
       if (!Array.isArray(missedRows) || missedRows.length === 0) {
-        console.log("[VERIFY] REJECTED: outside window and no missed-payment flag");
+        console.log(
+          "[VERIFY] REJECTED: outside window and no missed-payment flag",
+        );
         return res.status(403).json({
-          error: "Payment is outside the valid window for this cycle, and no open missed-payment flag was found.",
+          error:
+            "Payment is outside the valid window for this cycle, and no open missed-payment flag was found.",
         });
       }
     }
@@ -1307,12 +1387,20 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
       }
       if (recvRow?.id) {
         return res.status(403).json({
-          error: "You are the scheduled payout receiver for this cycle and cannot record a contribution for it.",
+          error:
+            "You are the scheduled payout receiver for this cycle and cannot record a contribution for it.",
         });
       }
     }
 
-    console.log("[VERIFY] Inserting contribution:", { stokvel_id, user_id, amount: verified_amount, paid_at: paidAt.toISOString(), target_month: targetMonth, paystack_reference: paystackRef });
+    console.log("[VERIFY] Inserting contribution:", {
+      stokvel_id,
+      user_id,
+      amount: verified_amount,
+      paid_at: paidAt.toISOString(),
+      target_month: targetMonth,
+      paystack_reference: paystackRef,
+    });
     const { data: contribution, error: insErr } = await svc
       .from("contributions")
       .insert([
@@ -1334,12 +1422,17 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
       const msg = String(insErr.message || insErr);
       console.error("[VERIFY] INSERT FAILED:", insErr.code, msg);
       if (msg.includes("duplicate") || insErr.code === "23505") {
-        return res.status(409).json({ error: "This payment reference was already recorded." });
+        return res
+          .status(409)
+          .json({ error: "This payment reference was already recorded." });
       }
       console.error("POST payments/verify insert:", insErr);
       return res.status(500).json({ error: msg });
     }
-    console.log("[VERIFY] SUCCESS: contribution inserted, id:", contribution?.id);
+    console.log(
+      "[VERIFY] SUCCESS: contribution inserted, id:",
+      contribution?.id,
+    );
 
     const { error: resolveErr } = await svc
       .from("missed_payments")
@@ -1350,7 +1443,10 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
       .is("resolved_at", null);
 
     if (resolveErr) {
-      console.error("POST payments/verify missed_payments resolve:", resolveErr);
+      console.error(
+        "POST payments/verify missed_payments resolve:",
+        resolveErr,
+      );
     }
 
     return res.json({ success: true, contribution });
@@ -1377,7 +1473,9 @@ router.patch(
       const cid = String(contributionId).trim().toLowerCase();
 
       const statusRaw =
-        typeof req.body?.status === "string" ? req.body.status.trim().toLowerCase() : "";
+        typeof req.body?.status === "string"
+          ? req.body.status.trim().toLowerCase()
+          : "";
       if (
         statusRaw !== "approved" &&
         statusRaw !== "rejected" &&

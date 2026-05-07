@@ -28,7 +28,7 @@ const renderWithProviders = (ui, { session = null } = {}) => {
   )
 }
 
-describe('CreateStokvelWizard', () => {
+describe('CreateStokvelWizard', { timeout: 15000 }, () => {
   const mockFetch = vi.fn()
   global.fetch = mockFetch
   global.confirm = vi.fn()

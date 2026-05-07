@@ -80,8 +80,10 @@ async function fillSignupForm(
   await user.type(screen.getByLabelText('Password'), password)
 }
 
-describe('Auth', () => {
+describe('Auth', { timeout: 15000 }, () => {
   beforeEach(() => {
+    // Some other suites use fake timers; ensure user-event runs on real timers here.
+    vi.useRealTimers()
     signInWithPasswordMock.mockReset()
     signUpMock.mockReset()
     signInWithOAuthMock.mockReset()

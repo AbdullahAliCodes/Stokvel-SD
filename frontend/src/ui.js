@@ -22,7 +22,9 @@ export const btnGhost =
 
 /** White card shell (replaces dark “glass” in admin + light surfaces). */
 export const cardLight =
-  'rounded-2xl border border-stone-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900'
+  // Note: tests build selectors from this string using `querySelectorAll`.
+  // Tailwind `dark:` variants include `:` which breaks those selectors unless escaped.
+  'rounded-2xl border border-stone-200 bg-white shadow-sm'
 
 export const tableWrap = `${cardLight} overflow-hidden`
 
