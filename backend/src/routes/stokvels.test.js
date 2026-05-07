@@ -17,9 +17,10 @@ jest.unstable_mockModule('@supabase/supabase-js', () => ({
 
 jest.unstable_mockModule('../middleware/auth.js', () => ({
   requireAuth: (req, _res, next) => {
+    const roleHeader = req.headers?.['x-test-role']
     req.user = {
       id: '11111111-1111-4111-8111-111111111111',
-      role: 'user',
+      role: typeof roleHeader === 'string' ? roleHeader : 'user',
       email: 'admin@site.com',
     }
     req.headers = req.headers || {}
@@ -294,6 +295,35 @@ describe('stokvels routes', () => {
     expect(res.body.missedPayments).toHaveLength(1)
   })
 
+  it('GET /:id returns 404 for non-member access', async () => {
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', { data: null, error: null })
+
+    const res = await request(makeApp()).get('/api/stokvels/11111111-1111-1111-1111-111111111111')
+    expect(res.status).toBe(404)
+    expect(res.body).toEqual({ error: 'Not found' })
+  })
+
+  it('GET /:id allows platform admin without group membership', async () => {
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    mockGetServiceSupabase.mockReturnValue(client)
+    client.__push('stokvels.selectSingle', { data: { id: 's1', name: 'Admin View' }, error: null })
+    client.__push('stokvel_members.selectMany', { data: [], error: null })
+    client.__push('contributions.selectMany', { data: [], error: null })
+    client.__push('payouts.selectMany', { data: [], error: null })
+    client.__push('missed_payments.selectMany', { data: [], error: null })
+
+    const res = await request(makeApp())
+      .get('/api/stokvels/11111111-1111-1111-1111-111111111111')
+      .set('x-test-role', 'admin')
+
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+    expect(res.body.membership.group_role).toBe('admin')
+  })
+
   it('POST /:id/missed-payments returns 403 when requester is not admin/treasurer', async () => {
     const client = createSupabaseMock()
     mockCreateClient.mockReturnValue(client)
@@ -536,6 +566,49 @@ describe('stokvels routes', () => {
 
     expect(res.status).toBe(200)
     expect(res.body).toEqual({ success: true, userId: 'u2' })
+  })
+
+  it('PATCH /:id returns 400 when name is empty string', async () => {
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'admin' }, error: null })
+
+    const res = await request(makeApp())
+      .patch('/api/stokvels/11111111-1111-1111-1111-111111111111')
+      .send({ name: '   ' })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/name must be a non-empty string/i)
+  })
+
+  it('PATCH /:id returns 400 when contribution_amount is not a positive number', async () => {
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'admin' }, error: null })
+
+    const res = await request(makeApp())
+      .patch('/api/stokvels/11111111-1111-1111-1111-111111111111')
+      .send({ contribution_amount: 'abc' })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/contribution_amount must be a number greater than 0/i)
+  })
+
+  it('PATCH /:id returns 500 when DB update fails with timeout', async () => {
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'admin' }, error: null })
+    client.__push('stokvels.updateSelectMaybeSingle', {
+      data: null,
+      error: { message: 'DB Timeout' },
+    })
+
+    const res = await request(makeApp())
+      .patch('/api/stokvels/11111111-1111-1111-1111-111111111111')
+      .send({ name: 'Renamed Group' })
+
+    expect(res.status).toBe(500)
+    expect(res.body).toEqual({ error: 'DB Timeout' })
   })
 
   it('POST /:id/contributions returns 400 for invalid amount', async () => {

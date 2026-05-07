@@ -795,6 +795,63 @@ describe('adminStokvels routes', () => {
         stokvel: { id: 's1', name: 'Group A', status: 'active' },
       })
     })
+
+    it('handles approving an already-approved stokvel gracefully', async () => {
+      const handler = getHandler('patch', '/stokvels/:stokvelId')
+      const client = createSupabaseMock()
+      mockGetServiceSupabase.mockReturnValue(client)
+      mockActivateStokvel.mockResolvedValue({ ok: true, skipped: true, payoutCount: 6 })
+
+      client.__enqueue('stokvels.selectMaybeSingle', { data: { id: 's1' }, error: null })
+      client.__enqueue('stokvels.selectMaybeSingle', {
+        data: { id: 's1', name: 'Group A', status: 'active' },
+        error: null,
+      })
+      client.__enqueue('invitations.selectMany', { data: [], error: null })
+      client.__enqueue('stokvels.selectMaybeSingle', {
+        data: { id: 's1', name: 'Group A', status: 'active' },
+        error: null,
+      })
+      client.__enqueue('stokvels.selectMaybeSingle', {
+        data: { id: 's1', name: 'Group A' },
+        error: null,
+      })
+      client.__enqueue('stokvel_members.selectMaybeSingle', { data: null, error: null })
+
+      const req = makeReq({ params: { stokvelId: 's1' }, body: { status: 'active' } })
+      const res = makeRes()
+
+      await handler(req, res)
+
+      expect(mockActivateStokvel).toHaveBeenCalledWith('s1', client)
+      expect(res.json).toHaveBeenCalledWith({
+        success: true,
+        stokvel: { id: 's1', name: 'Group A', status: 'active' },
+      })
+    })
+
+    it('returns 500 when update operation fails', async () => {
+      const handler = getHandler('patch', '/stokvels/:stokvelId')
+      const client = createSupabaseMock()
+      mockGetServiceSupabase.mockReturnValue(client)
+
+      client.__enqueue('stokvels.selectMaybeSingle', { data: { id: 's1' }, error: null })
+      client.__enqueue('stokvels.selectMaybeSingle', { data: null, error: null }) // dup check
+      client.__enqueue('stokvels.updateSelect', {
+        data: null,
+        error: { message: 'update failed hard' },
+      })
+
+      const req = makeReq({
+        params: { stokvelId: 's1' },
+        body: { name: 'Updated Name' },
+      })
+      const res = makeRes()
+
+      await handler(req, res)
+      expect(res.status).toHaveBeenCalledWith(500)
+      expect(res.json).toHaveBeenCalledWith({ error: 'update failed hard' })
+    })
   })
 
   describe('DELETE /stokvels/:stokvelId', () => {

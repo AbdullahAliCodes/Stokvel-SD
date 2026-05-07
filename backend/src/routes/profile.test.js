@@ -56,7 +56,9 @@ function makeChain(overrides = {}) {
       return { data: null, error: null }
     }),
     insert: jest.fn().mockImplementation(async () => state.insertResult),
-    update: jest.fn().mockReturnThis(),
+    update: jest.fn().mockImplementation(() => ({
+      eq: jest.fn().mockImplementation(async () => state.updateResult),
+    })),
   }
 
   const client = {
@@ -222,6 +224,16 @@ describe('Profile Router', () => {
         },
       })
       expect(normalizeUsername).toHaveBeenCalledWith('jane_smith')
+    })
+
+    it('returns 500 when profile update fails after successful auth and lookup', async () => {
+      mockClient._state.maybeSingleQueue.push({ data: { id: 'test-user-id' }, error: null })
+      mockClient._state.updateResult = { error: { message: 'profiles update failed' } }
+
+      const res = await request(app).patch('/api/profile/me').send({ firstName: 'Jane' })
+
+      expect(res.status).toBe(500)
+      expect(res.body).toEqual({ error: 'profiles update failed' })
     })
   })
 })
