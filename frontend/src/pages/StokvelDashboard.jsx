@@ -1,182 +1,206 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Calendar, CreditCard, LayoutDashboard, Users, Wallet } from 'lucide-react'
-import { useSession } from '../context/SessionContext'
-import { apiUrl } from '../utils/api'
-import { btnPrimary, cardLight, errorBox, pageSubtitle } from '../ui'
-import { readViewCache, writeViewCache } from '../utils/viewCache'
-import QuickPayModal from '../components/QuickPayModal'
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import {
+  Calendar,
+  CreditCard,
+  LayoutDashboard,
+  Users,
+  Wallet,
+} from "lucide-react";
+import { useSession } from "../context/SessionContext";
+import { apiUrl } from "../utils/api";
+import { btnPrimary, cardLight, errorBox, pageSubtitle } from "../ui";
+import { readViewCache, writeViewCache } from "../utils/viewCache";
+import QuickPayModal from "../components/QuickPayModal";
 
 function formatZAR(n) {
-  const num = Number(n)
-  if (Number.isNaN(num)) return 'R 0'
-  return `R ${Math.round(num).toLocaleString('en-ZA')}`
+  const num = Number(n);
+  if (Number.isNaN(num)) return "R 0";
+  return `R ${Math.round(num).toLocaleString("en-ZA")}`;
 }
 
 function formatGroupRole(role) {
-  if (!role) return 'Member'
-  return String(role).charAt(0).toUpperCase() + String(role).slice(1).toLowerCase()
+  if (!role) return "Member";
+  return (
+    String(role).charAt(0).toUpperCase() + String(role).slice(1).toLowerCase()
+  );
 }
 
 function parseApiError(text) {
   try {
-    const json = JSON.parse(text)
-    return json.error || text || 'Request failed'
+    const json = JSON.parse(text);
+    return json.error || text || "Request failed";
   } catch {
-    return text || 'Request failed'
+    return text || "Request failed";
   }
 }
 
 function toDisplayDate(value) {
-  if (!value) return '—'
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return value
-  return d.toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' })
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
 }
 
 function memberProfilesForUser(members, userId) {
-  return members.find((m) => m.user_id === userId)?.profiles ?? null
+  return members.find((m) => m.user_id === userId)?.profiles ?? null;
 }
 
 function memberDisplay(p) {
-  const first = p?.first_name?.trim()
-  const last = p?.last_name?.trim()
-  if (first || last) return [first, last].filter(Boolean).join(' ')
-  if (p?.full_name) return p.full_name
-  if (p?.email) return p.email.split('@')[0]
-  return 'Member'
+  const first = p?.first_name?.trim();
+  const last = p?.last_name?.trim();
+  if (first || last) return [first, last].filter(Boolean).join(" ");
+  if (p?.full_name) return p.full_name;
+  if (p?.email) return p.email.split("@")[0];
+  return "Member";
 }
 
 export default function StokvelDashboard() {
-  const { stokvel_id } = useParams()
-  const navigate = useNavigate()
-  const { session, userRole } = useSession()
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [meetingsError, setMeetingsError] = useState('')
-  const [stokvel, setStokvel] = useState(null)
-  const [membership, setMembership] = useState(null)
-  const [members, setMembers] = useState([])
-  const [totalContribution, setTotalContribution] = useState(0)
-  const [meetings, setMeetings] = useState([])
-  const [quickPayOpen, setQuickPayOpen] = useState(false)
-  const [paymentDebug, setPaymentDebug] = useState('')
+  const { stokvel_id } = useParams();
+  const navigate = useNavigate();
+  const { session, userRole } = useSession();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [meetingsError, setMeetingsError] = useState("");
+  const [stokvel, setStokvel] = useState(null);
+  const [membership, setMembership] = useState(null);
+  const [members, setMembers] = useState([]);
+  const [totalContribution, setTotalContribution] = useState(0);
+  const [meetings, setMeetings] = useState([]);
+  const [quickPayOpen, setQuickPayOpen] = useState(false);
+  const [paymentDebug, setPaymentDebug] = useState("");
 
   useEffect(() => {
     if (!stokvel_id) {
-      navigate('/dashboard', { replace: true })
-      return
+      navigate("/dashboard", { replace: true });
+      return;
     }
     if (!session?.access_token || !session?.user?.id) {
-      setLoading(false)
-      return
+      setLoading(false);
+      return;
     }
 
-    let cancelled = false
-    const id = stokvel_id
-    const cacheKey = `stokvel_detail:${session.user.id}:${id}`
+    let cancelled = false;
+    const id = stokvel_id;
+    const cacheKey = `stokvel_detail:${session.user.id}:${id}`;
 
     async function load() {
-      setLoading(true)
-      setError(null)
-      setMeetingsError('')
+      setLoading(true);
+      setError(null);
+      setMeetingsError("");
 
-      const cached = readViewCache(cacheKey, 120000)
+      const cached = readViewCache(cacheKey, 120000);
       if (cached && !cancelled) {
-        setMembership(cached.membership ?? null)
-        setStokvel(cached.stokvel ?? null)
-        setMembers(Array.isArray(cached.members) ? cached.members : [])
-        setTotalContribution(Number(cached.totalContribution ?? 0))
-        setMeetings(Array.isArray(cached.meetings) ? cached.meetings : [])
-        setLoading(false)
+        setMembership(cached.membership ?? null);
+        setStokvel(cached.stokvel ?? null);
+        setMembers(Array.isArray(cached.members) ? cached.members : []);
+        setTotalContribution(Number(cached.totalContribution ?? 0));
+        setMeetings(Array.isArray(cached.meetings) ? cached.meetings : []);
+        setLoading(false);
       }
 
       try {
         const res = await fetch(apiUrl(`/api/stokvels/${id}`), {
           headers: { Authorization: `Bearer ${session.access_token}` },
-        })
-        const text = await res.text()
-        if (!res.ok) throw new Error(parseApiError(text))
-        const json = JSON.parse(text)
-        if (cancelled) return
-        setMembership(json.membership ?? null)
-        setStokvel(json.stokvel ?? null)
-        const nextMembers = Array.isArray(json.members) ? json.members : []
-        setMembers(nextMembers)
-        setTotalContribution(Number(json.totalContribution ?? 0))
-        setMeetingsError('')
-        let nextMeetings = []
+        });
+        const text = await res.text();
+        if (!res.ok) throw new Error(parseApiError(text));
+        const json = JSON.parse(text);
+        if (cancelled) return;
+        setMembership(json.membership ?? null);
+        setStokvel(json.stokvel ?? null);
+        const nextMembers = Array.isArray(json.members) ? json.members : [];
+        setMembers(nextMembers);
+        setTotalContribution(Number(json.totalContribution ?? 0));
+        setMeetingsError("");
+        let nextMeetings = [];
         try {
-          const meetingsRes = await fetch(apiUrl(`/api/stokvels/${id}/meetings`), {
-            headers: { Authorization: `Bearer ${session.access_token}` },
-          })
-          const meetingsText = await meetingsRes.text()
-          if (!meetingsRes.ok) throw new Error(parseApiError(meetingsText))
-          const meetingsJson = JSON.parse(meetingsText)
-          nextMeetings = Array.isArray(meetingsJson.meetings) ? meetingsJson.meetings : []
+          const meetingsRes = await fetch(
+            apiUrl(`/api/stokvels/${id}/meetings`),
+            {
+              headers: { Authorization: `Bearer ${session.access_token}` },
+            },
+          );
+          const meetingsText = await meetingsRes.text();
+          if (!meetingsRes.ok) throw new Error(parseApiError(meetingsText));
+          const meetingsJson = JSON.parse(meetingsText);
+          nextMeetings = Array.isArray(meetingsJson.meetings)
+            ? meetingsJson.meetings
+            : [];
         } catch (meErr) {
           if (!cancelled) {
-            setMeetingsError(meErr.message ?? String(meErr))
-            nextMeetings = []
+            setMeetingsError(meErr.message ?? String(meErr));
+            nextMeetings = [];
           }
         }
-        if (cancelled) return
-        setMeetings(nextMeetings)
+        if (cancelled) return;
+        setMeetings(nextMeetings);
         writeViewCache(cacheKey, {
           membership: json.membership ?? null,
           stokvel: json.stokvel ?? null,
           members: nextMembers,
           totalContribution: Number(json.totalContribution ?? 0),
-          contributions: Array.isArray(json.contributions) ? json.contributions : [],
+          contributions: Array.isArray(json.contributions)
+            ? json.contributions
+            : [],
           meetings: nextMeetings,
-        })
+        });
       } catch (e) {
         if (!cancelled) {
-          setError(e.message ?? String(e))
-          setMeetingsError('')
-          setStokvel(null)
-          setMembership(null)
-          setMembers([])
-          setMeetings([])
+          setError(e.message ?? String(e));
+          setMeetingsError("");
+          setStokvel(null);
+          setMembership(null);
+          setMembers([]);
+          setMeetings([]);
         }
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) setLoading(false);
       }
     }
 
-    load()
+    load();
     return () => {
-      cancelled = true
-    }
-  }, [session, stokvel_id, navigate])
+      cancelled = true;
+    };
+  }, [session, stokvel_id, navigate]);
 
-  const effectiveStokvel = stokvel ?? membership?.stokvels ?? null
-  const groupName = effectiveStokvel?.name ?? 'Stokvel'
-  const monthlyContribution = Number(effectiveStokvel?.contribution_amount) || 0
-  const memberCount = members.length
-  const expectedPayout = monthlyContribution * memberCount
+  const effectiveStokvel = stokvel ?? membership?.stokvels ?? null;
+  const groupName = effectiveStokvel?.name ?? "Stokvel";
+  const monthlyContribution =
+    Number(effectiveStokvel?.contribution_amount) || 0;
+  const memberCount = members.length;
+  const expectedPayout = monthlyContribution * memberCount;
   const myGroupRole =
-    members.find((m) => m.user_id === session?.user?.id)?.group_role || membership?.group_role
+    members.find((m) => m.user_id === session?.user?.id)?.group_role ||
+    membership?.group_role;
   const isAdminAccess =
     String(userRole || "").toLowerCase() === "admin" ||
-    String(myGroupRole || "").toLowerCase() === "admin"
+    String(myGroupRole || "").toLowerCase() === "admin";
 
   const nextMeeting = useMemo(() => {
-    const nowTs = Date.now()
-    const upcoming = meetings.filter((m) => new Date(m.meeting_date).getTime() >= nowTs)
+    const nowTs = Date.now();
+    const upcoming = meetings.filter(
+      (m) => new Date(m.meeting_date).getTime() >= nowTs,
+    );
     upcoming.sort(
-      (a, b) => new Date(a.meeting_date).getTime() - new Date(b.meeting_date).getTime(),
-    )
-    return upcoming[0] ?? null
-  }, [meetings])
+      (a, b) =>
+        new Date(a.meeting_date).getTime() - new Date(b.meeting_date).getTime(),
+    );
+    return upcoming[0] ?? null;
+  }, [meetings]);
 
-  const paymentsPath = `/group/${stokvel_id}/payments`
-  const adminMember = members.find((m) => String(m.group_role).toLowerCase() === 'admin')
-  const treasurerMember = members.find((m) => String(m.group_role).toLowerCase() === 'treasurer')
-  const firstRosterMember = members[0] ?? null
+  const paymentsPath = `/group/${stokvel_id}/payments`;
+  const adminMember = members.find(
+    (m) => String(m.group_role).toLowerCase() === "admin",
+  );
+  const treasurerMember = members.find(
+    (m) => String(m.group_role).toLowerCase() === "treasurer",
+  );
+  const firstRosterMember = members[0] ?? null;
 
   if (!stokvel_id) {
-    return null
+    return null;
   }
 
   if (loading && !stokvel && !error) {
@@ -184,30 +208,35 @@ export default function StokvelDashboard() {
       <div className="flex min-h-[200px] items-center justify-center text-sm text-stone-500 dark:text-stone-400">
         Loading dashboard…
       </div>
-    )
+    );
   }
 
   if (error && !effectiveStokvel) {
     return (
       <div>
-        <h1 className="mb-2 text-2xl font-bold text-emerald-800 dark:text-emerald-300">Dashboard</h1>
+        <h1 className="mb-2 text-2xl font-bold text-emerald-800 dark:text-emerald-300">
+          Dashboard
+        </h1>
         <p className={`${errorBox}`}>{error}</p>
         <Link to="/dashboard" className={`${btnPrimary} mt-4 inline-block`}>
           Back to gateway
         </Link>
       </div>
-    )
+    );
   }
 
-  const stokvelStatus = String(effectiveStokvel?.status ?? '').toLowerCase()
-  const isActiveStokvel = stokvelStatus === 'active'
+  const stokvelStatus = String(effectiveStokvel?.status ?? "").toLowerCase();
+  const isActiveStokvel = stokvelStatus === "active";
 
   return (
     <div className="space-y-8">
       <header className="flex flex-col gap-3 border-b border-stone-200 pb-6 dark:border-slate-700 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            <LayoutDashboard className="h-7 w-7 shrink-0 text-emerald-700" aria-hidden />
+            <LayoutDashboard
+              className="h-7 w-7 shrink-0 text-emerald-700"
+              aria-hidden
+            />
             <h1 className="text-2xl font-bold tracking-tight text-emerald-800 dark:text-emerald-300 sm:text-3xl">
               {groupName}
             </h1>
@@ -227,8 +256,8 @@ export default function StokvelDashboard() {
             ) : null}
           </div>
           <p className={pageSubtitle}>
-            Summary for this group. Meetings live on the Meetings tab; contributions, rates, and
-            payout roster are on Payments.
+            Summary for this group. Meetings live on the Meetings tab;
+            contributions, rates, and payout roster are on Payments.
           </p>
         </div>
         <Link
@@ -240,7 +269,9 @@ export default function StokvelDashboard() {
       </header>
 
       {meetingsError ? (
-        <p className={`text-sm ${errorBox}`}>Meetings could not be loaded: {meetingsError}</p>
+        <p className={`text-sm ${errorBox}`}>
+          Meetings could not be loaded: {meetingsError}
+        </p>
       ) : null}
 
       <section>
@@ -250,32 +281,46 @@ export default function StokvelDashboard() {
             <p className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
               Contributions to date
             </p>
-            <p className="mt-2 text-2xl font-bold text-stone-800 dark:text-stone-100">{formatZAR(totalContribution)}</p>
-            <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">Recorded payments for this group</p>
+            <p className="mt-2 text-2xl font-bold text-stone-800 dark:text-stone-100">
+              {formatZAR(totalContribution)}
+            </p>
+            <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+              Recorded payments for this group
+            </p>
           </div>
           <div className={`${cardLight} border-t-4 border-stone-300 p-4`}>
             <p className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
               Expected payout (cycle)
             </p>
-            <p className="mt-2 text-2xl font-bold text-stone-800 dark:text-stone-100">{formatZAR(expectedPayout)}</p>
+            <p className="mt-2 text-2xl font-bold text-stone-800 dark:text-stone-100">
+              {formatZAR(expectedPayout)}
+            </p>
             <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
-              Monthly × {memberCount} member{memberCount === 1 ? '' : 's'}
+              Monthly × {memberCount} member{memberCount === 1 ? "" : "s"}
             </p>
           </div>
           <div className={`${cardLight} border-t-4 border-emerald-600/70 p-4`}>
             <p className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
               Monthly contribution
             </p>
-            <p className="mt-2 text-2xl font-bold text-stone-800 dark:text-stone-100">{formatZAR(monthlyContribution)}</p>
-            <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">Per member target</p>
+            <p className="mt-2 text-2xl font-bold text-stone-800 dark:text-stone-100">
+              {formatZAR(monthlyContribution)}
+            </p>
+            <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+              Per member target
+            </p>
           </div>
           <div className={`${cardLight} border-t-4 border-stone-300 p-4`}>
-            <p className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">Members</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
+              Members
+            </p>
             <p className="mt-2 flex items-center gap-2 text-2xl font-bold text-stone-800 dark:text-stone-100">
               <Users className="h-6 w-6 text-emerald-700" aria-hidden />
               {memberCount}
             </p>
-            <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">In this roster</p>
+            <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+              In this roster
+            </p>
           </div>
         </div>
       </section>
@@ -290,14 +335,20 @@ export default function StokvelDashboard() {
           </div>
           {nextMeeting ? (
             <div className="space-y-3">
-              <p className="text-lg font-semibold text-stone-800 dark:text-stone-100">{nextMeeting.title ?? 'Meeting'}</p>
-              <p className="text-sm text-stone-600 dark:text-stone-300">{toDisplayDate(nextMeeting.meeting_date)}</p>
+              <p className="text-lg font-semibold text-stone-800 dark:text-stone-100">
+                {nextMeeting.title ?? "Meeting"}
+              </p>
+              <p className="text-sm text-stone-600 dark:text-stone-300">
+                {toDisplayDate(nextMeeting.meeting_date)}
+              </p>
               <div>
                 <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
                   Agenda
                 </p>
                 <p className="text-sm leading-relaxed text-stone-700 dark:text-stone-300">
-                  {nextMeeting.agenda || nextMeeting.notes || 'No agenda added yet.'}
+                  {nextMeeting.agenda ||
+                    nextMeeting.notes ||
+                    "No agenda added yet."}
                 </p>
               </div>
               <Link
@@ -309,7 +360,9 @@ export default function StokvelDashboard() {
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-stone-200 bg-stone-50/80 px-4 py-8 text-center dark:border-slate-700 dark:bg-slate-800/60">
-              <p className="text-sm text-stone-600 dark:text-stone-300">No upcoming meetings scheduled.</p>
+              <p className="text-sm text-stone-600 dark:text-stone-300">
+                No upcoming meetings scheduled.
+              </p>
               <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
                 When your treasurer adds one, it will show up here.
               </p>
@@ -317,7 +370,9 @@ export default function StokvelDashboard() {
           )}
         </section>
 
-        <section className={`${cardLight} border-t-4 border-emerald-600/80 p-5`}>
+        <section
+          className={`${cardLight} border-t-4 border-emerald-600/80 p-5`}
+        >
           <div className="mb-4 flex items-center gap-2">
             <Users className="h-5 w-5 text-emerald-700" aria-hidden />
             <h2 className="text-sm font-bold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">
@@ -330,7 +385,7 @@ export default function StokvelDashboard() {
                 Admin
               </dt>
               <dd className="font-medium text-stone-800 dark:text-stone-100">
-                {adminMember ? memberDisplay(adminMember.profiles) : '—'}
+                {adminMember ? memberDisplay(adminMember.profiles) : "—"}
               </dd>
             </div>
             <div>
@@ -338,7 +393,9 @@ export default function StokvelDashboard() {
                 Treasurer
               </dt>
               <dd className="font-medium text-stone-800 dark:text-stone-100">
-                {treasurerMember ? memberDisplay(treasurerMember.profiles) : 'Not assigned'}
+                {treasurerMember
+                  ? memberDisplay(treasurerMember.profiles)
+                  : "Not assigned"}
               </dd>
             </div>
           </dl>
@@ -354,17 +411,19 @@ export default function StokvelDashboard() {
           <p className="text-sm text-stone-600 dark:text-stone-400">
             {firstRosterMember && monthlyContribution > 0 ? (
               <>
-                Next in line on the roster (informational):{' '}
+                Next in line on the roster (informational):{" "}
                 <span className="font-medium text-stone-800 dark:text-stone-100">
                   {memberDisplay(firstRosterMember.profiles)}
-                </span>{' '}
-                — expected amount {formatZAR(monthlyContribution)} per turn. The app does not store
-                confirmed payout dates yet; check with your treasurer.
+                </span>{" "}
+                — expected amount {formatZAR(monthlyContribution)} per turn. The
+                app does not store confirmed payout dates yet; check with your
+                treasurer.
               </>
             ) : (
               <>
-                Payout order follows your group&apos;s roster on the Payments page. Dates are not
-                stored in the app yet—confirm timing with your treasurer.
+                Payout order follows your group&apos;s roster on the Payments
+                page. Dates are not stored in the app yet—confirm timing with
+                your treasurer.
               </>
             )}
           </p>
@@ -384,8 +443,8 @@ export default function StokvelDashboard() {
             </h2>
           </div>
           <p className="mb-4 text-sm text-stone-600 dark:text-stone-300">
-            Pay your monthly contribution securely. Amount defaults to this group&apos;s monthly
-            target.
+            Pay your monthly contribution securely. Amount defaults to this
+            group&apos;s monthly target.
           </p>
           <button
             type="button"
@@ -396,9 +455,13 @@ export default function StokvelDashboard() {
             Pay monthly contribution
           </button>
           {!isActiveStokvel ? (
-            <p className="mt-2 text-xs text-stone-500 dark:text-stone-400">Payments are available when the group is active.</p>
+            <p className="mt-2 text-xs text-stone-500 dark:text-stone-400">
+              Payments are available when the group is active.
+            </p>
           ) : null}
-          {paymentDebug ? <p className="mt-2 text-xs text-stone-400">{paymentDebug}</p> : null}
+          {paymentDebug ? (
+            <p className="mt-2 text-xs text-stone-400">{paymentDebug}</p>
+          ) : null}
         </section>
       </div>
 
@@ -411,21 +474,30 @@ export default function StokvelDashboard() {
           onClose={() => setQuickPayOpen(false)}
           onDebugStep={setPaymentDebug}
           onRecordError={(message) => {
-            setError(`Payment succeeded, but contribution was not recorded: ${message}`)
+            setError(
+              `Payment succeeded, but contribution was not recorded: ${message}`,
+            );
           }}
           onSuccess={(paidAmount, contribution) => {
-            setPaymentDebug('Contribution recorded')
-            setQuickPayOpen(false)
-            const effectiveAmount = Number(contribution?.amount ?? paidAmount) || 0
-            setTotalContribution((prev) => prev + effectiveAmount)
-            const cacheKey = `stokvel_detail:${session.user.id}:${stokvel_id}`
-            const cached = readViewCache(cacheKey, 120000)
-            if (cached && typeof cached === 'object') {
-              const prevContrib = Array.isArray(cached.contributions) ? cached.contributions : []
-              const myProfile = memberProfilesForUser(members, session?.user?.id)
+            setPaymentDebug("Contribution recorded");
+            setQuickPayOpen(false);
+            const effectiveAmount =
+              Number(contribution?.amount ?? paidAmount) || 0;
+            setTotalContribution((prev) => prev + effectiveAmount);
+            const cacheKey = `stokvel_detail:${session.user.id}:${stokvel_id}`;
+            const cached = readViewCache(cacheKey, 120000);
+            if (cached && typeof cached === "object") {
+              const prevContrib = Array.isArray(cached.contributions)
+                ? cached.contributions
+                : [];
+              const myProfile = memberProfilesForUser(
+                members,
+                session?.user?.id,
+              );
               writeViewCache(cacheKey, {
                 ...cached,
-                totalContribution: Number(cached.totalContribution ?? 0) + effectiveAmount,
+                totalContribution:
+                  Number(cached.totalContribution ?? 0) + effectiveAmount,
                 contributions: [
                   {
                     id: contribution?.id ?? `local-${Date.now()}`,
@@ -436,11 +508,11 @@ export default function StokvelDashboard() {
                   },
                   ...prevContrib,
                 ],
-              })
+              });
             }
           }}
         />
       ) : null}
     </div>
-  )
+  );
 }

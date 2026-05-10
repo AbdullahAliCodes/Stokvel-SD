@@ -9,6 +9,7 @@ import { getServiceSupabase } from "../utils/supabaseAdmin.js";
 import axios from "axios";
 import { searchProfilesForMemberInvite } from "../utils/profileUserSearch.js";
 import {
+  applyDemoWindowOverride,
   getCurrentPaymentCycle,
   getTargetMonthForPaidAt,
   isPaidAtInWindowForTargetMonth,
@@ -311,7 +312,12 @@ router.get("/:id", requireAuth, async (req, res) => {
       return res.status(500).json({ error: contributionsError.message });
     }
 
-    const currentCycle = getCurrentPaymentCycle(new Date());
+    let currentCycle = getCurrentPaymentCycle(new Date());
+    currentCycle = applyDemoWindowOverride(
+      currentCycle,
+      { id: stokvel.id, name: stokvel.name },
+      new Date(),
+    );
 
     const svc = getServiceSupabase();
     let payouts = [];
@@ -1313,7 +1319,7 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
 
     const { data: stokvel, error: stErr } = await svc
       .from("stokvels")
-      .select("id, type, status")
+      .select("id, type, status, name")
       .eq("id", stokvel_id)
       .maybeSingle();
 
@@ -1342,7 +1348,22 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
       return res.status(403).json({ error: "Not a member of this stokvel." });
     }
 
-    const inWindow = isPaidAtInWindowForTargetMonth(paidAt, targetMonth);
+    let inWindow = isPaidAtInWindowForTargetMonth(paidAt, targetMonth);
+    if (!inWindow) {
+      const demoCycle = applyDemoWindowOverride(
+        getCurrentPaymentCycle(paidAt),
+        { id: stokvel.id, name: stokvel.name },
+        paidAt,
+      );
+      if (
+        demoCycle &&
+        demoCycle.isDemoOverride &&
+        demoCycle.inPaymentWindow &&
+        demoCycle.targetMonth === targetMonth
+      ) {
+        inWindow = true;
+      }
+    }
     console.log("[VERIFY] inPaymentWindow:", inWindow);
     if (!inWindow) {
       const { data: missedRows, error: missErr } = await svc

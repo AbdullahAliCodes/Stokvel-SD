@@ -41,7 +41,13 @@ vi.mock("../components/MarketRatesWidget", () => ({
 }));
 
 vi.mock("../components/QuickPayModal", () => ({
-  default: ({ onClose, onDebugStep, onSuccess, onRecordError, monthlyContribution }) => (
+  default: ({
+    onClose,
+    onDebugStep,
+    onSuccess,
+    onRecordError,
+    monthlyContribution,
+  }) => (
     <div data-testid="quickpay-modal">
       <button type="button" onClick={() => onDebugStep("modal-debug")}>
         debug
@@ -82,10 +88,17 @@ function setupFetch({ detail, meetings, treasurerPatch, approvalPatch }) {
     const method = opts.method ?? "GET";
     const u = String(url);
     if (u.endsWith("/api/stokvels/stok-1") && method === "GET") return detail;
-    if (u.endsWith("/api/stokvels/stok-1/meetings") && method === "GET") return meetings;
-    if (u.endsWith("/api/stokvels/stok-1/treasurer") && method === "PATCH") return treasurerPatch;
-    if (u.endsWith("/api/stokvels/stok-1/payout-order") && method === "PATCH") return okJson({ success: true });
-    if (u.includes("/contributions/") && u.endsWith("/treasurer-approval") && method === "PATCH") {
+    if (u.endsWith("/api/stokvels/stok-1/meetings") && method === "GET")
+      return meetings;
+    if (u.endsWith("/api/stokvels/stok-1/treasurer") && method === "PATCH")
+      return treasurerPatch;
+    if (u.endsWith("/api/stokvels/stok-1/payout-order") && method === "PATCH")
+      return okJson({ success: true });
+    if (
+      u.includes("/contributions/") &&
+      u.endsWith("/treasurer-approval") &&
+      method === "PATCH"
+    ) {
       return approvalPatch ?? okJson({ success: true, contribution: {} });
     }
     throw new Error(`Unhandled fetch ${method} ${u}`);
@@ -93,13 +106,27 @@ function setupFetch({ detail, meetings, treasurerPatch, approvalPatch }) {
 }
 
 const members = [
-  { user_id: "u1", group_role: "member", profiles: { first_name: "Ada", last_name: "L" } },
-  { user_id: "u2", group_role: "treasurer", profiles: { email: "john@example.com" } },
+  {
+    user_id: "u1",
+    group_role: "member",
+    profiles: { first_name: "Ada", last_name: "L" },
+  },
+  {
+    user_id: "u2",
+    group_role: "treasurer",
+    profiles: { email: "john@example.com" },
+  },
 ];
 
 const detailBase = {
   membership: { group_role: "member", stokvels: { name: "Fallback Group" } },
-  stokvel: { id: "stok-1", name: "Main Group", status: "active", contribution_amount: 500, type: "Fixed" },
+  stokvel: {
+    id: "stok-1",
+    name: "Main Group",
+    status: "active",
+    contribution_amount: 500,
+    type: "Fixed",
+  },
   members,
   totalContribution: 2000,
   contributions: [
@@ -125,7 +152,9 @@ function renderPayments() {
 describe("Payments", () => {
   beforeEach(() => {
     routerState.params = { stokvel_id: "stok-1" };
-    sessionState.current = { session: { access_token: "token-1", user: { id: "u1" } } };
+    sessionState.current = {
+      session: { access_token: "token-1", user: { id: "u1" } },
+    };
     readViewCacheMock.mockReset();
     writeViewCacheMock.mockReset();
     vi.spyOn(window, "confirm").mockReturnValue(true);
@@ -137,7 +166,10 @@ describe("Payments", () => {
 
   it("returns null when stokvel_id is missing", () => {
     routerState.params = {};
-    setupFetch({ detail: okJson(detailBase), meetings: okJson({ meetings: [] }) });
+    setupFetch({
+      detail: okJson(detailBase),
+      meetings: okJson({ meetings: [] }),
+    });
 
     const { container } = renderPayments();
     expect(container.firstChild).toBeNull();
@@ -145,15 +177,23 @@ describe("Payments", () => {
 
   it("shows sign-in message when session is missing", () => {
     sessionState.current = { session: null };
-    setupFetch({ detail: okJson(detailBase), meetings: okJson({ meetings: [] }) });
+    setupFetch({
+      detail: okJson(detailBase),
+      meetings: okJson({ meetings: [] }),
+    });
 
     renderPayments();
-    expect(screen.getByText("Sign in to view this stokvel.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Sign in to view this stokvel."),
+    ).toBeInTheDocument();
   });
 
   it("renders loaded finance dashboard with stats, tables and widgets", async () => {
     readViewCacheMock.mockReturnValue(null);
-    setupFetch({ detail: okJson(detailBase), meetings: okJson({ meetings: [{ id: "m1" }] }) });
+    setupFetch({
+      detail: okJson(detailBase),
+      meetings: okJson({ meetings: [{ id: "m1" }] }),
+    });
 
     renderPayments();
 
@@ -163,7 +203,9 @@ describe("Payments", () => {
     expect(screen.getAllByText("john").length).toBeGreaterThan(0);
     expect(screen.getByTestId("rates-widget")).toHaveTextContent("Rates:500");
     expect(screen.getByText("Cycle ledger")).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: /approved/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: /approved/i }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Payout schedule")).toBeInTheDocument();
     expect(screen.getAllByText("Ada L").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Pending").length).toBeGreaterThan(0);
@@ -200,17 +242,24 @@ describe("Payments", () => {
       meetings: okJson({ meetings: [] }),
     });
     renderPayments();
-    expect(await screen.findByText("Application rejected.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Application rejected."),
+    ).toBeInTheDocument();
   });
 
   it("opens quick pay modal, handles debug/success/close, and updates contributions", async () => {
     readViewCacheMock.mockReturnValue(null);
-    setupFetch({ detail: okJson(detailBase), meetings: okJson({ meetings: [] }) });
+    setupFetch({
+      detail: okJson(detailBase),
+      meetings: okJson({ meetings: [] }),
+    });
 
     renderPayments();
     await screen.findByText("Payments & finances");
 
-    fireEvent.click(screen.getByRole("button", { name: /Pay monthly contribution/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Pay monthly contribution/i }),
+    );
     expect(screen.getByTestId("quickpay-modal")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "debug" }));
@@ -220,19 +269,30 @@ describe("Payments", () => {
     await waitFor(() =>
       expect(screen.queryByTestId("quickpay-modal")).not.toBeInTheDocument(),
     );
-    expect(await screen.findByText(/Payment debug: Ledger refreshed from server/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Payment debug: Ledger refreshed from server/),
+    ).toBeInTheDocument();
   });
 
   it("shows record error from quick pay callback", async () => {
     readViewCacheMock.mockReturnValue(null);
-    setupFetch({ detail: okJson(detailBase), meetings: okJson({ meetings: [] }) });
+    setupFetch({
+      detail: okJson(detailBase),
+      meetings: okJson({ meetings: [] }),
+    });
 
     renderPayments();
     await screen.findByText("Payments & finances");
-    fireEvent.click(screen.getByRole("button", { name: /Pay monthly contribution/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Pay monthly contribution/i }),
+    );
     fireEvent.click(screen.getByRole("button", { name: "record-error" }));
 
-    expect(await screen.findByText(/Payment succeeded, but contribution was not recorded/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(
+        /Payment succeeded, but contribution was not recorded/,
+      ),
+    ).toBeInTheDocument();
   });
 
   it("disables quick pay when stokvel is not active", async () => {
@@ -246,7 +306,9 @@ describe("Payments", () => {
     });
 
     renderPayments();
-    const quickPayBtn = await screen.findByRole("button", { name: /Pay monthly contribution/i });
+    const quickPayBtn = await screen.findByRole("button", {
+      name: /Pay monthly contribution/i,
+    });
     expect(quickPayBtn).toBeDisabled();
   });
 
@@ -255,8 +317,16 @@ describe("Payments", () => {
       ...detailBase,
       membership: { ...detailBase.membership, group_role: "admin" },
       members: [
-        { user_id: "u1", group_role: "admin", profiles: { full_name: "Admin One" } },
-        { user_id: "u2", group_role: "member", profiles: { full_name: "Member Two" } },
+        {
+          user_id: "u1",
+          group_role: "admin",
+          profiles: { full_name: "Admin One" },
+        },
+        {
+          user_id: "u2",
+          group_role: "member",
+          profiles: { full_name: "Member Two" },
+        },
       ],
     };
     readViewCacheMock.mockReturnValue(null);
@@ -269,7 +339,9 @@ describe("Payments", () => {
     renderPayments();
     await screen.findByText("Assign treasurer");
 
-    fireEvent.change(screen.getByLabelText("Treasurer member"), { target: { value: "u2" } });
+    fireEvent.change(screen.getByLabelText("Treasurer member"), {
+      target: { value: "u2" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Save treasurer" }));
 
     expect(await screen.findByText("Treasurer updated.")).toBeInTheDocument();
@@ -280,8 +352,16 @@ describe("Payments", () => {
       ...detailBase,
       membership: { ...detailBase.membership, group_role: "admin" },
       members: [
-        { user_id: "u1", group_role: "admin", profiles: { full_name: "Admin One" } },
-        { user_id: "u2", group_role: "member", profiles: { full_name: "Member Two" } },
+        {
+          user_id: "u1",
+          group_role: "admin",
+          profiles: { full_name: "Admin One" },
+        },
+        {
+          user_id: "u2",
+          group_role: "member",
+          profiles: { full_name: "Member Two" },
+        },
       ],
     };
     readViewCacheMock.mockReturnValue(null);
@@ -294,7 +374,9 @@ describe("Payments", () => {
     renderPayments();
     await screen.findByText("Assign treasurer");
 
-    fireEvent.change(screen.getByLabelText("Treasurer member"), { target: { value: "u2" } });
+    fireEvent.change(screen.getByLabelText("Treasurer member"), {
+      target: { value: "u2" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Save treasurer" }));
     expect(await screen.findByText("Patch failed")).toBeInTheDocument();
 
@@ -313,7 +395,12 @@ describe("Payments", () => {
     };
     const detailAfterApproval = {
       ...detailTreasurer,
-      contributions: [{ ...detailTreasurer.contributions[0], treasurer_approval_status: "approved" }],
+      contributions: [
+        {
+          ...detailTreasurer.contributions[0],
+          treasurer_approval_status: "approved",
+        },
+      ],
     };
     readViewCacheMock.mockReturnValue(null);
     let approvalDone = false;
@@ -323,28 +410,46 @@ describe("Payments", () => {
       if (u.endsWith("/api/stokvels/stok-1") && method === "GET") {
         return okJson(approvalDone ? detailAfterApproval : detailTreasurer);
       }
-      if (u.endsWith("/api/stokvels/stok-1/meetings") && method === "GET") return okJson({ meetings: [] });
-      if (u.includes("/contributions/") && u.endsWith("/treasurer-approval") && method === "PATCH") {
+      if (u.endsWith("/api/stokvels/stok-1/meetings") && method === "GET")
+        return okJson({ meetings: [] });
+      if (
+        u.includes("/contributions/") &&
+        u.endsWith("/treasurer-approval") &&
+        method === "PATCH"
+      ) {
         approvalDone = true;
         return okJson({ success: true, contribution: {} });
       }
       throw new Error(`Unhandled fetch ${method} ${u}`);
     });
 
-    sessionState.current = { session: { access_token: "token-1", user: { id: "u2" } } };
+    sessionState.current = {
+      session: { access_token: "token-1", user: { id: "u2" } },
+    };
     renderPayments();
     await screen.findByText("Cycle ledger");
-    const approveBtn = screen.getByRole("button", { name: /approve payment for ada l/i });
+    const approveBtn = screen.getByRole("button", {
+      name: /approve payment for ada l/i,
+    });
     expect(approveBtn).toBeInTheDocument();
     fireEvent.click(approveBtn);
-    expect(await screen.findByText("Payment marked as approved.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Payment marked as approved."),
+    ).toBeInTheDocument();
 
-    sessionState.current = { session: { access_token: "token-1", user: { id: "u1" } } };
+    sessionState.current = {
+      session: { access_token: "token-1", user: { id: "u1" } },
+    };
     readViewCacheMock.mockReturnValue(null);
-    setupFetch({ detail: okJson(detailBase), meetings: okJson({ meetings: [] }) });
+    setupFetch({
+      detail: okJson(detailBase),
+      meetings: okJson({ meetings: [] }),
+    });
     renderPayments();
     await screen.findByText("Cycle ledger");
-    expect(screen.queryByRole("button", { name: /approve payment/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /approve payment/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("treasurer can reset an approved contribution to pending", async () => {
@@ -354,11 +459,21 @@ describe("Payments", () => {
     };
     const approvedDetail = {
       ...detailTreasurer,
-      contributions: [{ ...detailTreasurer.contributions[0], treasurer_approval_status: "approved" }],
+      contributions: [
+        {
+          ...detailTreasurer.contributions[0],
+          treasurer_approval_status: "approved",
+        },
+      ],
     };
     const pendingAgain = {
       ...detailTreasurer,
-      contributions: [{ ...detailTreasurer.contributions[0], treasurer_approval_status: "pending" }],
+      contributions: [
+        {
+          ...detailTreasurer.contributions[0],
+          treasurer_approval_status: "pending",
+        },
+      ],
     };
     readViewCacheMock.mockReturnValue(null);
     let afterReset = false;
@@ -368,8 +483,13 @@ describe("Payments", () => {
       if (u.endsWith("/api/stokvels/stok-1") && method === "GET") {
         return okJson(afterReset ? pendingAgain : approvedDetail);
       }
-      if (u.endsWith("/api/stokvels/stok-1/meetings") && method === "GET") return okJson({ meetings: [] });
-      if (u.includes("/contributions/") && u.endsWith("/treasurer-approval") && method === "PATCH") {
+      if (u.endsWith("/api/stokvels/stok-1/meetings") && method === "GET")
+        return okJson({ meetings: [] });
+      if (
+        u.includes("/contributions/") &&
+        u.endsWith("/treasurer-approval") &&
+        method === "PATCH"
+      ) {
         const body = JSON.parse(String(opts.body || "{}"));
         if (body.status === "pending") afterReset = true;
         return okJson({ success: true, contribution: {} });
@@ -377,12 +497,20 @@ describe("Payments", () => {
       throw new Error(`Unhandled fetch ${method} ${u}`);
     });
 
-    sessionState.current = { session: { access_token: "token-1", user: { id: "u2" } } };
+    sessionState.current = {
+      session: { access_token: "token-1", user: { id: "u2" } },
+    };
     renderPayments();
     await screen.findByText("Cycle ledger");
     expect(screen.getByText("Approved")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /reset approval to pending for ada l/i }));
-    expect(await screen.findByText(/Approval reset to pending/i)).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /reset approval to pending for ada l/i,
+      }),
+    );
+    expect(
+      await screen.findByText(/Approval reset to pending/i),
+    ).toBeInTheDocument();
   });
 
   it("shows load error when detail request fails", async () => {
@@ -401,9 +529,21 @@ describe("Payments", () => {
       ...detailBase,
       membership: { ...detailBase.membership, group_role: "treasurer" },
       members: [
-        { user_id: "u1", group_role: "treasurer", profiles: { full_name: "Treasurer One" } },
-        { user_id: "u2", group_role: "member", profiles: { full_name: "Member Two" } },
-        { user_id: "u3", group_role: "member", profiles: { full_name: "Member Three" } },
+        {
+          user_id: "u1",
+          group_role: "treasurer",
+          profiles: { full_name: "Treasurer One" },
+        },
+        {
+          user_id: "u2",
+          group_role: "member",
+          profiles: { full_name: "Member Two" },
+        },
+        {
+          user_id: "u3",
+          group_role: "member",
+          profiles: { full_name: "Member Three" },
+        },
       ],
       payouts: [
         {
@@ -440,7 +580,9 @@ describe("Payments", () => {
     await screen.findByText("Payout schedule");
     expect(screen.getByText(/1 completed payout locked/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Save upcoming payout order/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Save upcoming payout order/i }),
+    );
     await screen.findByText("Upcoming payout order updated.");
 
     const reorderCall = global.fetch.mock.calls.find(

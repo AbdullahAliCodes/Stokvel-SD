@@ -39,7 +39,13 @@ vi.mock("../utils/viewCache", () => ({
 }));
 
 vi.mock("../components/QuickPayModal", () => ({
-  default: ({ onClose, onDebugStep, onRecordError, onSuccess, monthlyContribution }) => (
+  default: ({
+    onClose,
+    onDebugStep,
+    onRecordError,
+    onSuccess,
+    monthlyContribution,
+  }) => (
     <div data-testid="quickpay-modal">
       <button type="button" onClick={() => onDebugStep("debug-step")}>
         debug
@@ -93,14 +99,27 @@ function pastIso(days = 1) {
 }
 
 const baseMembers = [
-  { user_id: "u1", group_role: "member", profiles: { first_name: "Ada", last_name: "Lovelace" } },
+  {
+    user_id: "u1",
+    group_role: "member",
+    profiles: { first_name: "Ada", last_name: "Lovelace" },
+  },
   { user_id: "u2", group_role: "admin", profiles: { full_name: "Admin User" } },
-  { user_id: "u3", group_role: "treasurer", profiles: { email: "treasurer@example.com" } },
+  {
+    user_id: "u3",
+    group_role: "treasurer",
+    profiles: { email: "treasurer@example.com" },
+  },
 ];
 
 const baseDetail = {
   membership: { group_role: "member", stokvels: { name: "Fallback Group" } },
-  stokvel: { id: "stok-1", name: "Main Group", contribution_amount: 500, status: "active" },
+  stokvel: {
+    id: "stok-1",
+    name: "Main Group",
+    contribution_amount: 500,
+    status: "active",
+  },
   members: baseMembers,
   totalContribution: 1500,
   contributions: [],
@@ -110,19 +129,26 @@ describe("StokvelDashboard", () => {
   beforeEach(() => {
     routerState.params = { stokvel_id: "stok-1" };
     routerState.navigate.mockReset();
-    sessionState.current = { session: { access_token: "token-1", user: { id: "u1" } } };
+    sessionState.current = {
+      session: { access_token: "token-1", user: { id: "u1" } },
+    };
     readViewCacheMock.mockReset();
     writeViewCacheMock.mockReset();
   });
 
   it("redirects to dashboard when stokvel_id is missing", async () => {
     routerState.params = {};
-    setupFetch({ detailRes: okJson(baseDetail), meetingsRes: okJson({ meetings: [] }) });
+    setupFetch({
+      detailRes: okJson(baseDetail),
+      meetingsRes: okJson({ meetings: [] }),
+    });
 
     const { container } = render(<StokvelDashboard />);
     expect(container.firstChild).toBeNull();
     await waitFor(() =>
-      expect(routerState.navigate).toHaveBeenCalledWith("/dashboard", { replace: true }),
+      expect(routerState.navigate).toHaveBeenCalledWith("/dashboard", {
+        replace: true,
+      }),
     );
   });
 
@@ -141,14 +167,16 @@ describe("StokvelDashboard", () => {
 
   it("shows hard error page when detail request fails and no effective stokvel exists", async () => {
     readViewCacheMock.mockReturnValue(null);
-    setupFetch({ detailRes: failText("boom"), meetingsRes: okJson({ meetings: [] }) });
+    setupFetch({
+      detailRes: failText("boom"),
+      meetingsRes: okJson({ meetings: [] }),
+    });
 
     render(<StokvelDashboard />);
     expect(await screen.findByText("boom")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Back to gateway" })).toHaveAttribute(
-      "href",
-      "/dashboard",
-    );
+    expect(
+      screen.getByRole("link", { name: "Back to gateway" }),
+    ).toHaveAttribute("href", "/dashboard");
   });
 
   it("renders dashboard summary cards, leadership info, and upcoming meeting", async () => {
@@ -157,8 +185,18 @@ describe("StokvelDashboard", () => {
       detailRes: okJson(baseDetail),
       meetingsRes: okJson({
         meetings: [
-          { id: "m-old", title: "Old", meeting_date: pastIso(2), notes: "old notes" },
-          { id: "m-next", title: "Next Meeting", meeting_date: futureIso(2), agenda: "Plan payouts" },
+          {
+            id: "m-old",
+            title: "Old",
+            meeting_date: pastIso(2),
+            notes: "old notes",
+          },
+          {
+            id: "m-next",
+            title: "Next Meeting",
+            meeting_date: futureIso(2),
+            agenda: "Plan payouts",
+          },
           { id: "m-later", title: "Later", meeting_date: futureIso(5) },
         ],
       }),
@@ -176,10 +214,9 @@ describe("StokvelDashboard", () => {
     expect(screen.getByText("Plan payouts")).toBeInTheDocument();
     expect(screen.getByText("Admin User")).toBeInTheDocument();
     expect(screen.getByText("treasurer")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Payments & finances" })).toHaveAttribute(
-      "href",
-      "/group/stok-1/payments",
-    );
+    expect(
+      screen.getByRole("link", { name: "Payments & finances" }),
+    ).toHaveAttribute("href", "/group/stok-1/payments");
     expect(screen.getByRole("link", { name: "All meetings" })).toHaveAttribute(
       "href",
       "/group/stok-1/meetings",
@@ -194,8 +231,12 @@ describe("StokvelDashboard", () => {
     });
 
     render(<StokvelDashboard />);
-    expect(await screen.findByText(/Meetings could not be loaded/)).toBeInTheDocument();
-    expect(screen.getByText("No upcoming meetings scheduled.")).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Meetings could not be loaded/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("No upcoming meetings scheduled."),
+    ).toBeInTheDocument();
   });
 
   it("renders inactive badge and disables quick pay for non-active stokvel", async () => {
@@ -210,18 +251,27 @@ describe("StokvelDashboard", () => {
 
     render(<StokvelDashboard />);
     expect(await screen.findByText("pending")).toBeInTheDocument();
-    const payBtn = screen.getByRole("button", { name: "Pay monthly contribution" });
+    const payBtn = screen.getByRole("button", {
+      name: "Pay monthly contribution",
+    });
     expect(payBtn).toBeDisabled();
-    expect(screen.getByText("Payments are available when the group is active.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Payments are available when the group is active."),
+    ).toBeInTheDocument();
   });
 
   it("opens quick pay modal, handles debug and close", async () => {
     readViewCacheMock.mockReturnValue(null);
-    setupFetch({ detailRes: okJson(baseDetail), meetingsRes: okJson({ meetings: [] }) });
+    setupFetch({
+      detailRes: okJson(baseDetail),
+      meetingsRes: okJson({ meetings: [] }),
+    });
 
     render(<StokvelDashboard />);
     await screen.findByText("Main Group");
-    fireEvent.click(screen.getByRole("button", { name: "Pay monthly contribution" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Pay monthly contribution" }),
+    );
     expect(screen.getByTestId("quickpay-modal")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "debug" }));
@@ -235,31 +285,39 @@ describe("StokvelDashboard", () => {
 
   it("handles quick pay record error callback without closing the modal", async () => {
     readViewCacheMock.mockReturnValue(null);
-    setupFetch({ detailRes: okJson(baseDetail), meetingsRes: okJson({ meetings: [] }) });
+    setupFetch({
+      detailRes: okJson(baseDetail),
+      meetingsRes: okJson({ meetings: [] }),
+    });
 
     render(<StokvelDashboard />);
     await screen.findByText("Main Group");
-    fireEvent.click(screen.getByRole("button", { name: "Pay monthly contribution" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Pay monthly contribution" }),
+    );
     fireEvent.click(screen.getByRole("button", { name: "record-error" }));
     expect(screen.getByTestId("quickpay-modal")).toBeInTheDocument();
     expect(screen.getByText("Main Group")).toBeInTheDocument();
   });
 
   it("handles quick pay success and updates cache when cached object exists", async () => {
-    readViewCacheMock
-      .mockReturnValueOnce(null)
-      .mockReturnValueOnce({
-        membership: baseDetail.membership,
-        stokvel: baseDetail.stokvel,
-        members: baseMembers,
-        totalContribution: 1500,
-        contributions: [],
-      });
-    setupFetch({ detailRes: okJson(baseDetail), meetingsRes: okJson({ meetings: [] }) });
+    readViewCacheMock.mockReturnValueOnce(null).mockReturnValueOnce({
+      membership: baseDetail.membership,
+      stokvel: baseDetail.stokvel,
+      members: baseMembers,
+      totalContribution: 1500,
+      contributions: [],
+    });
+    setupFetch({
+      detailRes: okJson(baseDetail),
+      meetingsRes: okJson({ meetings: [] }),
+    });
 
     render(<StokvelDashboard />);
     await screen.findByText("Main Group");
-    fireEvent.click(screen.getByRole("button", { name: "Pay monthly contribution" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Pay monthly contribution" }),
+    );
     fireEvent.click(screen.getByRole("button", { name: "success" }));
 
     await waitFor(() =>
@@ -272,12 +330,28 @@ describe("StokvelDashboard", () => {
   it("uses cached data immediately while still refreshing from API", async () => {
     readViewCacheMock.mockReturnValue({
       membership: { group_role: "member", stokvels: { name: "Cached Name" } },
-      stokvel: { id: "stok-1", name: "Cached Name", contribution_amount: 250, status: "active" },
-      members: [{ user_id: "u1", group_role: "member", profiles: { full_name: "Cached User" } }],
+      stokvel: {
+        id: "stok-1",
+        name: "Cached Name",
+        contribution_amount: 250,
+        status: "active",
+      },
+      members: [
+        {
+          user_id: "u1",
+          group_role: "member",
+          profiles: { full_name: "Cached User" },
+        },
+      ],
       totalContribution: 999,
-      meetings: [{ id: "m-cache", title: "Cached Meeting", meeting_date: futureIso(1) }],
+      meetings: [
+        { id: "m-cache", title: "Cached Meeting", meeting_date: futureIso(1) },
+      ],
     });
-    setupFetch({ detailRes: okJson(baseDetail), meetingsRes: okJson({ meetings: [] }) });
+    setupFetch({
+      detailRes: okJson(baseDetail),
+      meetingsRes: okJson({ meetings: [] }),
+    });
 
     render(<StokvelDashboard />);
     expect(await screen.findByText("Cached Name")).toBeInTheDocument();

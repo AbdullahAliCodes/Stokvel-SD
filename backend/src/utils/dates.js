@@ -14,6 +14,83 @@ export function zonedYmdParts(date) {
   return { year: y, month: m, day }
 }
 
+/* ============================================================================
+ * DEMO PAYMENT WINDOW OVERRIDE — REMOVE ENTIRE BLOCK AFTER SPRINT 3 DEMO (May 2026)
+ * Isolated: does not change getCurrentPaymentCycle / global SAST rules unless
+ * applyDemoWindowOverride() is called explicitly by routes.
+ * ============================================================================ */
+
+/** Fail-safe match when `process.env.DEMO_STOKVEL_IDENTIFIER` is unset (name-only). */
+const DEMO_PAYMENT_WINDOW_FAILSAFE_NAME = 'Sprint 3 Stokvel'
+
+const DEMO_TARGET_MONTH = '2026-05'
+const DEMO_YEAR = 2026
+const DEMO_MONTH = 5
+const DEMO_DAY_START = 10
+const DEMO_DAY_END = 15
+
+/**
+ * @param {unknown} stokvelRef string, or `{ id, name }` for env UUID/name matching without route-side literals.
+ */
+function matchesDemoStokvelIdentifier(stokvelRef) {
+  const env =
+    typeof process !== 'undefined' && process.env?.DEMO_STOKVEL_IDENTIFIER != null
+      ? String(process.env.DEMO_STOKVEL_IDENTIFIER).trim()
+      : ''
+  if (env) {
+    if (stokvelRef && typeof stokvelRef === 'object') {
+      const id = stokvelRef.id != null ? String(stokvelRef.id).trim() : ''
+      const name = stokvelRef.name != null ? String(stokvelRef.name).trim() : ''
+      return id === env || name === env
+    }
+    return String(stokvelRef ?? '').trim() === env
+  }
+  const nameOnly =
+    stokvelRef && typeof stokvelRef === 'object'
+      ? String(stokvelRef.name ?? '').trim()
+      : String(stokvelRef ?? '').trim()
+  return nameOnly === DEMO_PAYMENT_WINDOW_FAILSAFE_NAME
+}
+
+/**
+ * True when `date` falls (inclusive) on calendar days 10–15 May 2026 in SAST.
+ *
+ * @param {Date | string | number} date
+ */
+export function isDemoPaymentWindowDateRange(date = new Date()) {
+  const { year, month, day } = zonedYmdParts(date)
+  return (
+    year === DEMO_YEAR &&
+    month === DEMO_MONTH &&
+    day >= DEMO_DAY_START &&
+    day <= DEMO_DAY_END
+  )
+}
+
+/**
+ * Temporary demo-only: optionally rewires `cycle` for one stokvel + May 10–15 2026 SAST.
+ *
+ * @param {{ targetMonth?: string | null, inPaymentWindow?: boolean }} cycle
+ * @param {string | { id?: string, name?: string }} stokvelNameOrId
+ * @param {Date} [currentDate]
+ * @returns {typeof cycle & { isDemoOverride?: boolean }}
+ */
+export function applyDemoWindowOverride(cycle, stokvelNameOrId, currentDate = new Date()) {
+  if (!matchesDemoStokvelIdentifier(stokvelNameOrId) || !isDemoPaymentWindowDateRange(currentDate)) {
+    return cycle
+  }
+
+  const base = cycle && typeof cycle === 'object' ? cycle : {}
+  return {
+    ...base,
+    inPaymentWindow: true,
+    targetMonth: DEMO_TARGET_MONTH,
+    isDemoOverride: true,
+  }
+}
+
+/** END DEMO PAYMENT WINDOW OVERRIDE ========================================= */
+
 /**
  * Cycle `YYYY-MM`: payments accepted from the 25th of the previous calendar month
  * through the 5th of month MM (inclusive), in SAST.
