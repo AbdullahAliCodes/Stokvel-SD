@@ -12,7 +12,7 @@ export const labelLight =
   'flex flex-col gap-1.5 text-left text-sm font-medium text-stone-700 dark:text-stone-300'
 
 export const btnPrimary =
-  'rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 disabled:opacity-50'
+  'rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500'
 
 export const btnSecondary =
   'rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-sm transition hover:bg-stone-100 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-stone-200 dark:hover:bg-slate-700'
@@ -22,9 +22,8 @@ export const btnGhost =
 
 /** White card shell (replaces dark “glass” in admin + light surfaces). */
 export const cardLight =
-  // Note: tests build selectors from this string using `querySelectorAll`.
-  // Tailwind `dark:` variants include `:` which breaks those selectors unless escaped.
-  'rounded-2xl border border-stone-200 bg-white shadow-sm'
+  // Note: tests should only join class tokens that do not contain `dark:` for querySelector.
+  'rounded-2xl border border-stone-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-stone-100 dark:shadow-black/25'
 
 export const tableWrap = `${cardLight} overflow-hidden`
 

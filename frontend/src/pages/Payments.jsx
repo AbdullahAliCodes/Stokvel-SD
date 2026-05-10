@@ -881,13 +881,13 @@ export default function Payments() {
                                     <li
                                       ref={dragProvided.innerRef}
                                       {...dragProvided.draggableProps}
-                                      className={`flex items-center gap-3 rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm shadow-sm ${
+                                      className={`flex items-center gap-3 rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm shadow-sm dark:border-slate-600 dark:bg-slate-900 ${
                                         snapshot.isDragging ? 'ring-2 ring-emerald-500/40' : ''
                                       }`}
                                     >
                                       <button
                                         type="button"
-                                        className="touch-none rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                                        className="touch-none rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700 dark:text-stone-500 dark:hover:bg-slate-800 dark:hover:text-stone-200"
                                         aria-label="Drag payout to reorder"
                                         {...dragProvided.dragHandleProps}
                                       >

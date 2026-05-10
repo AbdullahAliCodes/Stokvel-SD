@@ -19,6 +19,23 @@
     />
   </head>
   <body>
+    <script>
+      (function () {
+        try {
+          var key = 'stokvel-theme'
+          var stored = localStorage.getItem(key)
+          var theme =
+            stored === 'light' || stored === 'dark'
+              ? stored
+              : window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light'
+          document.documentElement.classList.toggle('dark', theme === 'dark')
+        } catch (e) {
+          /* ignore */
+        }
+      })()
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

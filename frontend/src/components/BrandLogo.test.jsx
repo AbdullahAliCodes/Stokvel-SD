@@ -19,6 +19,7 @@ describe('BrandLogo', () => {
 
     expect(link).toHaveAttribute('href', '/')
     expect(image).toHaveAttribute('src', '/stokvel-logo.png')
+    expect(image).toHaveAttribute('data-preserve-tone', '')
     expect(image).toHaveAttribute('decoding', 'async')
     expect(image).toHaveAttribute('alt', 'StokGeld')
   })
