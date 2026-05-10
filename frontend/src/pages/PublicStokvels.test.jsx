@@ -24,6 +24,15 @@ vi.mock("../utils/api", () => ({
   apiUrl: (path) => `http://test${path}`,
 }));
 
+vi.mock("../utils/stokvelMembership", () => ({
+  myStokvelsCacheKey: (userId) => `my_stokvels:${userId}`,
+}));
+
+vi.mock("../utils/viewCache", () => ({
+  readViewCache: vi.fn(() => null),
+  writeViewCache: vi.fn(),
+}));
+
 vi.mock("../components/OpportunityCard", () => ({
   default: ({ name, subtitle, metrics, onApply, isJoining }) => (
     <article data-testid="opportunity-card">
@@ -137,7 +146,7 @@ describe("PublicStokvels", () => {
   });
 
   it("joins stokvel and navigates to group dashboard for authenticated user", async () => {
-    sessionState.current = { session: { access_token: "token-abc" } };
+    sessionState.current = { session: { access_token: "token-abc", user: { id: "u1" } } };
     global.fetch
       .mockResolvedValueOnce(
         responseOk(JSON.stringify([{ id: "s1", name: "Joinable", contribution_amount: 200, members_count: 2 }])),
@@ -149,12 +158,12 @@ describe("PublicStokvels", () => {
     fireEvent.click(screen.getByRole("button", { name: "Apply" }));
 
     await waitFor(() =>
-      expect(navState.navigate).toHaveBeenCalledWith("/group/s1/dashboard"),
+      expect(navState.navigate).toHaveBeenCalledWith("/group/s1/dashboard", { replace: true }),
     );
   });
 
   it("shows join error from JSON API payload and clears joining state", async () => {
-    sessionState.current = { session: { access_token: "token-abc" } };
+    sessionState.current = { session: { access_token: "token-abc", user: { id: "u1" } } };
     global.fetch
       .mockResolvedValueOnce(
         responseOk(JSON.stringify([{ id: "s1", name: "Joinable", contribution_amount: 200, members_count: 2 }])),
@@ -170,7 +179,7 @@ describe("PublicStokvels", () => {
   });
 
   it("shows join error from plain text API response", async () => {
-    sessionState.current = { session: { access_token: "token-abc" } };
+    sessionState.current = { session: { access_token: "token-abc", user: { id: "u1" } } };
     global.fetch
       .mockResolvedValueOnce(
         responseOk(JSON.stringify([{ id: "s1", name: "Joinable", contribution_amount: 200, members_count: 2 }])),
@@ -182,5 +191,23 @@ describe("PublicStokvels", () => {
     fireEvent.click(screen.getByRole("button", { name: "Apply" }));
 
     expect(await screen.findByText("Join blocked")).toBeInTheDocument();
+  });
+
+  it("navigates to dashboard when API says user is already a member", async () => {
+    sessionState.current = { session: { access_token: "token-abc", user: { id: "u1" } } };
+    global.fetch
+      .mockResolvedValueOnce(
+        responseOk(JSON.stringify([{ id: "s1", name: "Joinable", contribution_amount: 200, members_count: 2 }])),
+      )
+      .mockResolvedValueOnce(responseFail(JSON.stringify({ error: "You are already a member of this group." })));
+
+    render(<PublicStokvels />);
+    await screen.findByText("Joinable");
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+    await waitFor(() => {
+      expect(navState.navigate).toHaveBeenCalledWith("/group/s1/dashboard", { replace: true });
+    });
+    expect(screen.queryByText("You are already a member of this group.")).not.toBeInTheDocument();
   });
 });

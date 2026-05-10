@@ -21,6 +21,10 @@ vi.mock('../utils/supabase', () => ({
     },
 }))
 
+vi.mock('../utils/api', () => ({
+    apiUrl: (path) => `http://localhost${path}`,
+}))
+
 vi.mock('../components/BrandLogo', () => ({
     default: ({ to, onClick }) => (
         <a href={to} onClick={onClick} data-testid="brand-logo">
@@ -44,15 +48,6 @@ vi.mock('../components/OpportunityCard', () => ({
 vi.mock('../assets/landing', () => ({
     heroDashboardIllustration: 'hero.png',
     testimonialPortrait: 'portrait.png',
-}))
-
-vi.mock('../data/publicStokvelOpportunities', () => ({
-    PUBLIC_STOKVEL_OPPORTUNITIES: [
-        { id: '1', name: 'Savings Circle A' },
-        { id: '2', name: 'Savings Circle B' },
-        { id: '3', name: 'Savings Circle C' },
-        { id: '4', name: 'Savings Circle D' },
-    ],
 }))
 
 vi.mock('../data/landingTestimonial', () => ({
@@ -126,8 +121,49 @@ const adminSession = {
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe('Landing page', () => {
+    const mockFetch = vi.fn()
+    global.fetch = mockFetch
+
     beforeEach(() => {
         vi.clearAllMocks()
+        mockFetch.mockResolvedValue({
+            ok: true,
+            text: async () =>
+                JSON.stringify([
+                    {
+                        id: '1',
+                        name: 'Savings Circle A',
+                        type: 'Rotating',
+                        contribution_amount: 500,
+                        members_count: 10,
+                        cycle_length: 6,
+                    },
+                    {
+                        id: '2',
+                        name: 'Savings Circle B',
+                        type: 'Fixed',
+                        contribution_amount: 300,
+                        members_count: 8,
+                        cycle_length: 12,
+                    },
+                    {
+                        id: '3',
+                        name: 'Savings Circle C',
+                        type: 'Rotating',
+                        contribution_amount: 700,
+                        members_count: 15,
+                        cycle_length: 3,
+                    },
+                    {
+                        id: '4',
+                        name: 'Savings Circle D',
+                        type: 'Fixed',
+                        contribution_amount: 900,
+                        members_count: 11,
+                        cycle_length: 9,
+                    },
+                ]),
+        })
     })
 
     afterEach(() => {
@@ -310,9 +346,11 @@ describe('Landing page', () => {
             expect(screen.getByText(/Browse public stokvels/i)).toBeInTheDocument()
         })
 
-        it('renders only the first 3 opportunity cards', () => {
+        it('renders only the first 3 opportunity cards', async () => {
             renderLanding()
-            expect(screen.getAllByTestId('opportunity-card')).toHaveLength(3)
+            await waitFor(() => {
+                expect(screen.getAllByTestId('opportunity-card')).toHaveLength(3)
+            })
         })
 
         it('renders View all public stokvels link', () => {

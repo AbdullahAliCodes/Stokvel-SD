@@ -57,13 +57,13 @@ describe('AdminGroups', () => {
     expect(screen.getByText('Loading…')).toBeInTheDocument()
 
     await waitFor(() => {
-      expect(screen.getByText('Active Group 1')).toBeInTheDocument()
-      expect(screen.getByText('Active Group 2')).toBeInTheDocument()
+      expect(screen.getAllByText('Active Group 1').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('Active Group 2').length).toBeGreaterThan(0)
     })
 
     // Active tab is selected, so pending/rejected groups should not be visible in the table body
     // (though their counts are visible in tabs)
-    expect(screen.queryByText('Pending Group 1')).not.toBeInTheDocument()
+    expect(screen.queryAllByText('Pending Group 1')).toHaveLength(0)
     
     expect(screen.getByRole('button', { name: /Active.*2/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Pending.*1/i })).toBeInTheDocument()
@@ -84,7 +84,7 @@ describe('AdminGroups', () => {
     
     // Should immediately show the cached content without "Loading..."
     expect(screen.queryByText('Loading…')).not.toBeInTheDocument()
-    expect(screen.getByText('Active Group 1')).toBeInTheDocument()
+    expect(screen.getAllByText('Active Group 1').length).toBeGreaterThan(0)
     
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalled()
@@ -99,19 +99,19 @@ describe('AdminGroups', () => {
 
     renderWithProviders(<AdminGroups />, { session: { access_token: 'fake-token', user: { id: 1 } } })
     
-    await waitFor(() => expect(screen.getByText('Active Group 1')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getAllByText('Active Group 1').length).toBeGreaterThan(0))
 
     // Switch to Pending
     const pendingTab = screen.getByRole('button', { name: /Pending.*1/i })
     fireEvent.click(pendingTab)
-    expect(screen.getByText('Pending Group 1')).toBeInTheDocument()
-    expect(screen.queryByText('Active Group 1')).not.toBeInTheDocument()
+    expect(screen.getAllByText('Pending Group 1').length).toBeGreaterThan(0)
+    expect(screen.queryAllByText('Active Group 1')).toHaveLength(0)
 
     // Switch to Rejected
     const rejectedTab = screen.getByRole('button', { name: /Rejected.*1/i })
     fireEvent.click(rejectedTab)
-    expect(screen.getByText('Rejected Group 1')).toBeInTheDocument()
-    expect(screen.queryByText('Pending Group 1')).not.toBeInTheDocument()
+    expect(screen.getAllByText('Rejected Group 1').length).toBeGreaterThan(0)
+    expect(screen.queryAllByText('Pending Group 1')).toHaveLength(0)
   })
 
   it('shows empty state when no groups exist for a tab', async () => {
@@ -123,7 +123,7 @@ describe('AdminGroups', () => {
     renderWithProviders(<AdminGroups />, { session: { access_token: 'fake-token', user: { id: 1 } } })
     
     await waitFor(() => {
-      expect(screen.getByText('No groups in this list.')).toBeInTheDocument()
+      expect(screen.getAllByText('No groups in this list.').length).toBeGreaterThan(0)
     })
   })
 

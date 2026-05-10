@@ -1,15 +1,17 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import BrandLogo from '../components/BrandLogo'
 import ThemeToggle from '../components/ThemeToggle'
 import PublicFooter from '../components/PublicFooter'
 import OpportunityCard from '../components/OpportunityCard'
 import { heroDashboardIllustration, testimonialPortrait } from '../assets/landing'
-import { PUBLIC_STOKVEL_OPPORTUNITIES } from '../data/publicStokvelOpportunities'
 import { LANDING_TESTIMONIAL } from '../data/landingTestimonial'
 import { LogOut, Menu, ShieldCheck, X } from 'lucide-react'
 import { useSession } from '../context/SessionContext'
 import { supabase } from '../utils/supabase'
+import { apiUrl } from '../utils/api'
+import { myStokvelsCacheKey } from '../utils/stokvelMembership'
+import { readViewCache, writeViewCache } from '../utils/viewCache'
 import {
   bodyMuted,
   bodyMutedLg,
@@ -353,7 +355,105 @@ function Testimonial() {
   )
 }
 
+function formatZarAmount(value) {
+  const num = Number(value)
+  if (!Number.isFinite(num)) return 'R 0'
+  return `R ${num.toLocaleString()}`
+}
+
+function iconForType(type) {
+  return String(type || '').toLowerCase() === 'fixed' ? 'wallet' : 'users'
+}
+
+function parseApiError(text) {
+  try {
+    const payload = JSON.parse(String(text || ''))
+    return payload?.error || 'Request failed.'
+  } catch {
+    return String(text || 'Request failed.')
+  }
+}
+
 export default function Landing() {
+  const navigate = useNavigate()
+  const { session } = useSession()
+  const [publicItems, setPublicItems] = useState([])
+  const [joiningId, setJoiningId] = useState('')
+
+  useEffect(() => {
+    const ctrl = new AbortController()
+
+    async function loadLandingPublicStokvels() {
+      try {
+        const res = await fetch(apiUrl('/api/public/stokvels'), { signal: ctrl.signal })
+        const text = await res.text()
+        if (!res.ok) return
+        const rows = JSON.parse(text)
+        if (!Array.isArray(rows)) return
+        setPublicItems(rows.slice(0, 3))
+      } catch (err) {
+        if (err?.name === 'AbortError') return
+      }
+    }
+
+    loadLandingPublicStokvels()
+    return () => ctrl.abort()
+  }, [])
+
+  function rememberJoinedStokvel(stokvelId) {
+    const sid = String(stokvelId || '').trim()
+    if (!sid) return
+    try {
+      localStorage.setItem('last_stokvel_id', sid)
+    } catch {
+      // ignore storage failures
+    }
+    const uid = session?.user?.id
+    if (!uid) return
+    const cacheKey = myStokvelsCacheKey(uid)
+    const cached = readViewCache(cacheKey, 180000)
+    const list = Array.isArray(cached?.memberships) ? cached.memberships : []
+    if (list.some((m) => String(m?.stokvels?.id || '') === sid)) return
+    const selected = publicItems.find((row) => String(row?.id || '') === sid)
+    const optimisticRow = {
+      group_role: 'member',
+      stokvels: {
+        id: sid,
+        name: selected?.name || 'Stokvel',
+        status: 'active',
+        contribution_amount: selected?.contribution_amount ?? null,
+        type: selected?.type ?? null,
+        cycle_length: selected?.cycle_length ?? null,
+      },
+    }
+    writeViewCache(cacheKey, { memberships: [optimisticRow, ...list] })
+  }
+
+  async function handleLandingApply(stokvelId) {
+    const sid = String(stokvelId || '').trim()
+    if (!sid) return
+    if (!session?.access_token) {
+      navigate('/auth')
+      return
+    }
+    setJoiningId(sid)
+    try {
+      const res = await fetch(apiUrl(`/api/stokvels/${sid}/join`), {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      const text = await res.text()
+      if (!res.ok) {
+        const parsed = parseApiError(text)
+        if (!/already a member/i.test(parsed)) return
+      }
+      rememberJoinedStokvel(sid)
+      navigate(`/group/${sid}/dashboard`, { replace: true })
+    } finally {
+      setJoiningId('')
+    }
+  }
+
   return (
     <div className={landingPageShell}>
       <TopNav />
@@ -381,9 +481,25 @@ export default function Landing() {
             </p>
           </div>
           <ul className="mt-10 grid list-none grid-cols-1 gap-6 p-0 md:mt-12 md:grid-cols-2 md:items-stretch lg:grid-cols-3">
-            {PUBLIC_STOKVEL_OPPORTUNITIES.slice(0, 3).map((item) => (
+            {publicItems.map((item) => (
               <li key={item.id} className="min-w-0">
-                <OpportunityCard {...item} />
+                <OpportunityCard
+                  name={item.name || 'Stokvel'}
+                  subtitle={`${item.type || 'Community savings'} · ${item.cycle_length || 1} month cycle`}
+                  icon={iconForType(item.type)}
+                  metrics={[
+                    {
+                      label: 'Contribution',
+                      value: formatZarAmount(item.contribution_amount),
+                    },
+                    {
+                      label: 'Members',
+                      value: String(item.members_count ?? 0),
+                    },
+                  ]}
+                  onApply={() => handleLandingApply(item.id)}
+                  isJoining={joiningId === String(item.id)}
+                />
               </li>
             ))}
           </ul>

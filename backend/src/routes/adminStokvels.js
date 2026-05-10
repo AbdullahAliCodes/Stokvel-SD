@@ -202,19 +202,22 @@ function normalizeDocuments(raw, limit = 50) {
 async function getGroupAndCreatorContact(client, stokvelId) {
   const { data: stokvel, error: stokvelError } = await client
     .from('stokvels')
-    .select('id, name')
+    .select('id, name, created_by')
     .eq('id', stokvelId)
     .maybeSingle()
   if (stokvelError || !stokvel) return { stokvel: null, creatorEmail: '', creatorId: null }
 
-  const { data: creatorRow } = await client
-    .from('stokvel_members')
-    .select('user_id')
-    .eq('stokvel_id', stokvelId)
-    .eq('group_role', 'treasurer')
-    .maybeSingle()
-
-  const creatorId = creatorRow?.user_id || null
+  const createdBy = typeof stokvel.created_by === 'string' ? stokvel.created_by : ''
+  let creatorId = createdBy || null
+  if (!creatorId) {
+    const { data: creatorRow } = await client
+      .from('stokvel_members')
+      .select('user_id')
+      .eq('stokvel_id', stokvelId)
+      .eq('group_role', 'treasurer')
+      .maybeSingle()
+    creatorId = creatorRow?.user_id || null
+  }
   if (!creatorId) return { stokvel, creatorEmail: '', creatorId: null }
 
   const { data: profile } = await client
@@ -224,6 +227,43 @@ async function getGroupAndCreatorContact(client, stokvelId) {
     .maybeSingle()
 
   return { stokvel, creatorEmail: profile?.email || '', creatorId }
+}
+
+async function notifyAllCurrentMembersAdded(client, { stokvelId, groupName }) {
+  const { data: members, error: membersError } = await client
+    .from('stokvel_members')
+    .select('user_id, group_role')
+    .eq('stokvel_id', stokvelId)
+
+  if (membersError || !Array.isArray(members) || members.length === 0) return
+
+  const uniqueUserIds = [...new Set(members.map((m) => m?.user_id).filter(Boolean))]
+  if (uniqueUserIds.length === 0) return
+
+  const { data: profiles, error: profilesError } = await client
+    .from('profiles')
+    .select('id, email')
+    .in('id', uniqueUserIds)
+  if (profilesError || !Array.isArray(profiles) || profiles.length === 0) return
+
+  const emailByUserId = new Map(
+    profiles
+      .map((p) => [p.id, normalizeInviteEmail(p.email)])
+      .filter(([, email]) => Boolean(email)),
+  )
+  const emailed = new Set()
+
+  await Promise.all(
+    members.map(async (m) => {
+      const userId = m?.user_id
+      const to = emailByUserId.get(userId)
+      if (!to || emailed.has(to)) return
+      emailed.add(to)
+      const role =
+        typeof m?.group_role === 'string' && m.group_role.trim() ? m.group_role.trim() : 'member'
+      await sendGroupAddedEmail({ to, groupName, role })
+    }),
+  )
 }
 
 async function notifyMemberAdded(client, { userId, groupName, role }) {
@@ -990,6 +1030,12 @@ router.patch('/stokvels/:stokvelId', requireAuth, requireAdmin, async (req, res)
           status: body.status,
         })
       }
+    }
+    if (body.status === 'active') {
+      await notifyAllCurrentMembersAdded(client, {
+        stokvelId,
+        groupName: finalRow.name,
+      })
     }
 
     return res.json({ success: true, stokvel: finalRow })

@@ -22,7 +22,7 @@ export default function AdminLayout() {
   const navigate = useNavigate()
 
   return (
-    <div className="box-border flex h-dvh min-h-0 w-full flex-col gap-3 overflow-hidden bg-[#F4F5F0] p-3 text-stone-800 dark:bg-slate-950 dark:text-stone-100 md:flex-row md:gap-4 md:p-4">
+    <div className="box-border flex min-h-dvh w-full flex-col gap-3 overflow-y-auto bg-[#F4F5F0] p-3 text-stone-800 dark:bg-slate-950 dark:text-stone-100 md:h-dvh md:min-h-0 md:flex-row md:gap-4 md:overflow-hidden md:p-4">
       <aside
         className={`${cardLight} flex w-full shrink-0 flex-col overflow-hidden border-t-4 border-emerald-700 md:h-full md:w-[240px] md:min-w-[240px] md:max-w-[240px]`}
       >
@@ -72,7 +72,7 @@ export default function AdminLayout() {
         </div>
       </aside>
       <main
-        className={`${cardLight} min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain border-t-4 border-emerald-700 p-6 md:p-8`}
+        className={`${cardLight} min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain border-t-4 border-emerald-700 p-4 sm:p-6 md:p-8`}
       >
         <Outlet />
       </main>

@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import OpportunityCard from '../components/OpportunityCard'
 import { useSession } from '../context/SessionContext'
 import { apiUrl } from '../utils/api'
+import { myStokvelsCacheKey } from '../utils/stokvelMembership'
+import { readViewCache, writeViewCache } from '../utils/viewCache'
 import {
   bodyMutedLg,
   headingSection,
@@ -33,6 +35,37 @@ export default function PublicStokvels() {
   const [error, setError] = useState('')
   const [joinError, setJoinError] = useState('')
   const [joiningId, setJoiningId] = useState('')
+
+  function rememberJoinedStokvel(stokvelId) {
+    const sid = String(stokvelId || '').trim()
+    if (!sid) return
+    try {
+      localStorage.setItem('last_stokvel_id', sid)
+    } catch {
+      // ignore storage errors
+    }
+    const uid = session?.user?.id
+    if (!uid) return
+
+    const cacheKey = myStokvelsCacheKey(uid)
+    const cached = readViewCache(cacheKey, 180000)
+    const list = Array.isArray(cached?.memberships) ? cached.memberships : []
+    if (list.some((m) => String(m?.stokvels?.id || '') === sid)) return
+
+    const picked = items.find((row) => String(row?.id || '') === sid)
+    const optimisticRow = {
+      group_role: 'member',
+      stokvels: {
+        id: sid,
+        name: picked?.name || 'Stokvel',
+        status: 'active',
+        contribution_amount: picked?.contribution_amount ?? null,
+        type: picked?.type ?? null,
+        cycle_length: picked?.cycle_length ?? null,
+      },
+    }
+    writeViewCache(cacheKey, { memberships: [optimisticRow, ...list] })
+  }
 
   useEffect(() => {
     const ctrl = new AbortController()
@@ -71,14 +104,19 @@ export default function PublicStokvels() {
   }, [])
 
   async function handleJoin(stokvelId) {
+    const sid = String(stokvelId || '').trim()
+    if (!sid) {
+      setJoinError('Invalid stokvel selection. Please refresh and try again.')
+      return
+    }
     setJoinError('')
     if (!session?.access_token) {
       navigate('/auth')
       return
     }
-    setJoiningId(stokvelId)
+    setJoiningId(sid)
     try {
-      const res = await fetch(apiUrl(`/api/stokvels/${stokvelId}/join`), {
+      const res = await fetch(apiUrl(`/api/stokvels/${sid}/join`), {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -86,9 +124,16 @@ export default function PublicStokvels() {
       })
       const text = await res.text()
       if (!res.ok) {
-        throw new Error(parseApiError(text))
+        const parsedError = parseApiError(text)
+        if (/already a member/i.test(parsedError)) {
+          rememberJoinedStokvel(sid)
+          navigate(`/group/${sid}/dashboard`, { replace: true })
+          return
+        }
+        throw new Error(parsedError)
       }
-      navigate(`/group/${stokvelId}/dashboard`)
+      rememberJoinedStokvel(sid)
+      navigate(`/group/${sid}/dashboard`, { replace: true })
     } catch (err) {
       setJoinError(err.message || 'Could not join this group right now.')
     } finally {
