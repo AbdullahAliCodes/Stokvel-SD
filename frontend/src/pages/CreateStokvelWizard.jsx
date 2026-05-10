@@ -228,15 +228,15 @@ export function CreateStokvelWizard({ variant = "admin" }) {
   const fileInputRef = useRef(null);
   const isAdmin = variant === "admin";
 
-  const [activeTab, setActiveTab] = useState(/** @type {'details' | 'members' | 'documents'} */ ("details"));
+  const [activeTab, setActiveTab] = useState(/** @type {'details' | 'members' | 'documents'} */("details"));
   const [name, setName] = useState("");
   const [type, setType] = useState("Rotating");
   const [contributionAmount, setContributionAmount] = useState("");
   const [payoutOrderType, setPayoutOrderType] = useState(
-    /** @type {'randomize' | 'manual'} */ ("randomize"),
+    /** @type {'randomize' | 'manual'} */("randomize"),
   );
   const [proposedPayoutSequence, setProposedPayoutSequence] = useState(
-    /** @type {string[]} */ ([]),
+    /** @type {string[]} */([]),
   );
   const [meetingFrequency, setMeetingFrequency] = useState("monthly");
   const [cycleLength, setCycleLength] = useState("1");
@@ -256,7 +256,7 @@ export function CreateStokvelWizard({ variant = "admin" }) {
   /** Non-creator member id chosen as treasurer (member apply flow only). */
   const [treasurerMemberId, setTreasurerMemberId] = useState("");
 
-  const [emailPopoverId, setEmailPopoverId] = useState(/** @type {string | null} */ (null));
+  const [emailPopoverId, setEmailPopoverId] = useState(/** @type {string | null} */(null));
   const [emailPopoverDraft, setEmailPopoverDraft] = useState("");
   const [emailPopoverError, setEmailPopoverError] = useState("");
 
@@ -345,23 +345,23 @@ export function CreateStokvelWizard({ variant = "admin" }) {
       const profileHasEmail = Boolean(String(creatorEmail || "").trim());
       const creatorRow = existing
         ? {
-            ...existing,
-            label,
-            isCreator: true,
-            email: creatorEmail || existing.email || "",
-            profileHasEmail,
-          }
+          ...existing,
+          label,
+          isCreator: true,
+          email: creatorEmail || existing.email || "",
+          profileHasEmail,
+        }
         : {
-            id: myUserId,
-            label,
-            email: creatorEmail || "",
-            profileHasEmail,
-            username: "",
-            firstName: "",
-            lastName: "",
-            role: !isAdmin ? "Admin (Chairperson)" : "Admin",
-            isCreator: true,
-          };
+          id: myUserId,
+          label,
+          email: creatorEmail || "",
+          profileHasEmail,
+          username: "",
+          firstName: "",
+          lastName: "",
+          role: !isAdmin ? "Admin (Chairperson)" : "Admin",
+          isCreator: true,
+        };
       return [
         creatorRow,
         ...withoutCreator.map((m) => ({ ...m, isCreator: false })),
@@ -986,57 +986,57 @@ export function CreateStokvelWizard({ variant = "admin" }) {
           </p>
         </section>
         {isAdmin ? (
-        <section className={`${cardLight} p-6`}>
-          <form
-            className="flex flex-col gap-3 sm:flex-row sm:items-end"
-            onSubmit={handleInvite}
-          >
-            <label className={`${labelLight} min-w-0 flex-1`}>
-              Add by username
-              <input
-                value={inviteUsername}
-                onChange={(e) => setInviteUsername(e.target.value)}
-                className={inputLight}
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={inviteSubmitting || !inviteUsername.trim()}
-              className={btnPrimary}
+          <section className={`${cardLight} p-6`}>
+            <form
+              className="flex flex-col gap-3 sm:flex-row sm:items-end"
+              onSubmit={handleInvite}
             >
-              {inviteSubmitting ? "Adding..." : "Add member"}
-            </button>
-          </form>
-          <form
-            className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end"
-            onSubmit={handleEmailInvite}
-          >
-            <label className={`${labelLight} min-w-0 flex-1`}>
-              Invite by email
-              <input
-                type="email"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                className={inputLight}
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={inviteSubmitting || !inviteEmail.trim()}
-              className={btnSecondary}
+              <label className={`${labelLight} min-w-0 flex-1`}>
+                Add by username
+                <input
+                  value={inviteUsername}
+                  onChange={(e) => setInviteUsername(e.target.value)}
+                  className={inputLight}
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={inviteSubmitting || !inviteUsername.trim()}
+                className={btnPrimary}
+              >
+                {inviteSubmitting ? "Adding..." : "Add member"}
+              </button>
+            </form>
+            <form
+              className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end"
+              onSubmit={handleEmailInvite}
             >
-              {inviteSubmitting ? "Sending..." : "Send invite"}
-            </button>
-          </form>
-          {inviteError ? (
-            <p className={`${errorBox} mt-3`}>{inviteError}</p>
-          ) : null}
-          {inviteOk ? (
-            <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-200">
-              {inviteOk}
-            </p>
-          ) : null}
-        </section>
+              <label className={`${labelLight} min-w-0 flex-1`}>
+                Invite by email
+                <input
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  className={inputLight}
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={inviteSubmitting || !inviteEmail.trim()}
+                className={btnSecondary}
+              >
+                {inviteSubmitting ? "Sending..." : "Send invite"}
+              </button>
+            </form>
+            {inviteError ? (
+              <p className={`${errorBox} mt-3`}>{inviteError}</p>
+            ) : null}
+            {inviteOk ? (
+              <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-200">
+                {inviteOk}
+              </p>
+            ) : null}
+          </section>
         ) : null}
         <Link
           to={isAdmin ? `/group/${createdStokvel.id}/dashboard` : "/dashboard"}
@@ -1071,13 +1071,12 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                 type="button"
                 aria-label={`Step ${stepIdx + 1}: ${tab.label}`}
                 onClick={() =>
-                  setActiveTab(/** @type {'details' | 'members' | 'documents'} */ (tab.id))
+                  setActiveTab(/** @type {'details' | 'members' | 'documents'} */(tab.id))
                 }
-                className={`relative flex-1 px-3 py-3.5 text-sm font-medium transition-colors duration-200 sm:px-4 sm:text-base ${
-                  activeTab === tab.id
+                className={`relative flex-1 px-3 py-3.5 text-sm font-medium transition-colors duration-200 sm:px-4 sm:text-base ${activeTab === tab.id
                     ? "border-b-2 border-emerald-700 bg-emerald-50/70 text-emerald-800"
                     : "border-b-2 border-transparent text-stone-500 hover:bg-stone-100 hover:text-stone-800 dark:text-stone-400 dark:hover:bg-slate-800 dark:hover:text-stone-100"
-                }`}
+                  }`}
               >
                 <span
                   className={
@@ -1130,7 +1129,12 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                       step="0.01"
                       className={inputLight}
                       value={contributionAmount}
-                      onChange={(e) => setContributionAmount(e.target.value)}
+                      onChange={(e) => {
+                        let val = e.target.value;
+                        // Strip leading zeros unless it's just a single "0"
+                        val = val.replace(/^0+(?=\d)/, '');
+                        setContributionAmount(val);
+                      }}
                     />
                   </label>
                   <label className={labelLight}>
@@ -1199,9 +1203,9 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                         placeholder="Search by name, username, or email…"
                       />
                       {searchOpen &&
-                      (searchLoading ||
-                        searchResults.length > 0 ||
-                        searchError) ? (
+                        (searchLoading ||
+                          searchResults.length > 0 ||
+                          searchError) ? (
                         <ul className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-stone-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900">
                           {searchLoading ? (
                             <li className="px-3 py-2 text-xs text-stone-500 dark:text-stone-400">
@@ -1214,8 +1218,8 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                             </li>
                           ) : null}
                           {!searchLoading &&
-                          !searchError &&
-                          searchResults.length > 0 ? (
+                            !searchError &&
+                            searchResults.length > 0 ? (
                             <li className="sticky top-0 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)] gap-2 border-b border-stone-200 bg-stone-100 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-stone-600 dark:border-slate-700 dark:bg-slate-800 dark:text-stone-300">
                               <span>Username</span>
                               <span>Name</span>
@@ -1417,7 +1421,7 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                   {selectedMembers.map((m, idx) => (
                     <li
                       key={m.id}
-                    className="rounded-xl border border-stone-200 bg-stone-50 p-4 transition-colors hover:bg-stone-100/80 dark:border-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800"
+                      className="rounded-xl border border-stone-200 bg-stone-50 p-4 transition-colors hover:bg-stone-100/80 dark:border-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800"
                     >
                       <div className="flex gap-3">
                         <div
@@ -1617,11 +1621,10 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                                         <li
                                           ref={dragProvided.innerRef}
                                           {...dragProvided.draggableProps}
-                                          className={`flex items-center gap-3 rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-900 ${
-                                            snapshot.isDragging
+                                          className={`flex items-center gap-3 rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-900 ${snapshot.isDragging
                                               ? "ring-2 ring-emerald-500/40"
                                               : ""
-                                          }`}
+                                            }`}
                                         >
                                           <button
                                             type="button"
@@ -1701,16 +1704,14 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                     setDropzoneActive(false);
                     addDocumentFiles(e.dataTransfer.files);
                   }}
-                  className={`flex w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-12 text-center transition-all duration-200 ${
-                    dropzoneActive
+                  className={`flex w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-12 text-center transition-all duration-200 ${dropzoneActive
                       ? "border-emerald-600 bg-emerald-50/80"
                       : "border-stone-400 bg-stone-50/50 hover:border-stone-500 hover:bg-stone-100/80 dark:border-slate-600 dark:bg-slate-800/60 dark:hover:border-slate-500 dark:hover:bg-slate-800"
-                  }`}
+                    }`}
                 >
                   <div
-                    className={`rounded-full p-4 transition-colors duration-200 ${
-                      dropzoneActive ? "bg-emerald-100 dark:bg-emerald-900/40" : "bg-stone-100 dark:bg-slate-700"
-                    }`}
+                    className={`rounded-full p-4 transition-colors duration-200 ${dropzoneActive ? "bg-emerald-100 dark:bg-emerald-900/40" : "bg-stone-100 dark:bg-slate-700"
+                      }`}
                   >
                     <Upload
                       className={`h-8 w-8 ${dropzoneActive ? "text-emerald-700 dark:text-emerald-300" : "text-stone-500 dark:text-stone-300"}`}
@@ -1759,9 +1760,8 @@ export function CreateStokvelWizard({ variant = "admin" }) {
             ) : null}
 
             <div
-              className={`mt-8 flex flex-wrap items-center gap-3 border-t border-stone-200 pt-6 dark:border-slate-700 ${
-                activeTab === "details" ? "justify-end" : "justify-between"
-              }`}
+              className={`mt-8 flex flex-wrap items-center gap-3 border-t border-stone-200 pt-6 dark:border-slate-700 ${activeTab === "details" ? "justify-end" : "justify-between"
+                }`}
             >
               {activeTab !== "details" ? (
                 <button
@@ -1827,7 +1827,7 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                   className="text-lg font-semibold text-stone-900 dark:text-stone-100"
                 >
                   {emailPopoverMember.isPending &&
-                  emailPopoverMember.pendingUsername
+                    emailPopoverMember.pendingUsername
                     ? "Add contact email (optional)"
                     : "Add email"}
                 </h2>
@@ -1861,7 +1861,7 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                 }}
                 placeholder={
                   emailPopoverMember.isPending &&
-                  emailPopoverMember.pendingUsername
+                    emailPopoverMember.pendingUsername
                     ? "Optional"
                     : "name@example.com"
                 }
