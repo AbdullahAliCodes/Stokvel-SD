@@ -19,7 +19,6 @@ export default function QuickPayModal({
   onSuccess,
   onClose,
   onRecordError,
-  onDebugStep,
 }) {
   const [amount, setAmount] = useState(String(monthlyContribution || ''))
   const [error, setError] = useState(null)
@@ -37,7 +36,6 @@ export default function QuickPayModal({
     const ts = new Date().toLocaleTimeString()
     setDebugLog((prev) => [...prev, `[${ts}] ${msg}`])
     console.log('[QuickPay]', msg)
-    onDebugStep?.(msg)
   }
 
   useEffect(() => {

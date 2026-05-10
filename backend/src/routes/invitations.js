@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/auth.js'
 import { getServiceSupabase } from '../utils/supabaseAdmin.js'
 import { groupRoleForUserProfile } from '../utils/platformAdminStokvelMembers.js'
 import { normalizeInviteEmail } from '../utils/invitations.js'
+import { activateStokvel } from '../utils/stokvelActivation.js'
 
 const router = Router()
 
@@ -98,6 +99,14 @@ router.post('/accept', requireAuth, async (req, res) => {
       .update({ status: 'accepted' })
       .eq('id', invite.id)
     if (upErr) return res.status(500).json({ error: upErr.message })
+
+    const svc = getServiceSupabase()
+    if (svc) {
+      const act = await activateStokvel(invite.stokvel_id, svc)
+      if (!act.ok) {
+        console.error('activateStokvel after invitation accept:', act.error)
+      }
+    }
 
     return res.json({ success: true })
   } catch (err) {

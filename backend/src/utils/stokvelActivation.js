@@ -1,7 +1,11 @@
 import { generatePayoutSchedule } from './dates.js'
+import { normalizeInviteEmail } from './invitations.js'
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+/** Invitations that still represent unfilled roster seats (not accepted/processed). */
+export const OPEN_INVITATION_STATUSES = ['pending', 'pending_group_request']
 
 function normalizeUuid(id) {
   if (typeof id !== 'string') return ''
@@ -50,7 +54,7 @@ function sameSet(a, b) {
 /**
  * @param {import('@supabase/supabase-js').SupabaseClient} serviceSupabase Service-role client (bypasses RLS).
  * @param {{ activationInstant?: Date }} [opts]
- * @returns {Promise<{ ok: boolean, error?: string, skipped?: boolean, payoutCount?: number }>}
+ * @returns {Promise<{ ok: boolean, error?: string, skipped?: boolean, deferred?: boolean, payoutCount?: number, registeredCount?: number, pendingInviteCount?: number }>}
  */
 export async function activateStokvel(stokvelId, serviceSupabase, opts = {}) {
   if (!serviceSupabase) {
@@ -103,10 +107,75 @@ export async function activateStokvel(stokvelId, serviceSupabase, opts = {}) {
 
   const memberIds = normalizeUuidArray((memberRows ?? []).map((r) => r.user_id)).sort()
 
-  if (memberIds.length !== cycleLen) {
+  let profileRows = []
+  if (memberIds.length > 0) {
+    const { data: profData, error: profErr } = await serviceSupabase
+      .from('profiles')
+      .select('id, email')
+      .in('id', memberIds)
+
+    if (profErr) {
+      return { ok: false, error: profErr.message || String(profErr) }
+    }
+    profileRows = Array.isArray(profData) ? profData : []
+  }
+
+  const memberEmailSet = new Set()
+  for (const p of profileRows) {
+    const e = normalizeInviteEmail(p?.email)
+    if (e) memberEmailSet.add(e)
+  }
+
+  const { data: rawInvites, error: invErr } = await serviceSupabase
+    .from('invitations')
+    .select('id, email')
+    .eq('stokvel_id', stokvelId)
+    .in('status', OPEN_INVITATION_STATUSES)
+
+  if (invErr) {
+    return { ok: false, error: invErr.message || String(invErr) }
+  }
+
+  const seenInviteEmails = new Set()
+  const pendingInviteRows = []
+  for (const row of rawInvites ?? []) {
+    const e = normalizeInviteEmail(row?.email)
+    if (!e) continue
+    if (memberEmailSet.has(e)) continue
+    if (seenInviteEmails.has(e)) continue
+    seenInviteEmails.add(e)
+    pendingInviteRows.push(row)
+  }
+
+  const registeredCount = memberIds.length
+  const pendingInviteCount = pendingInviteRows.length
+  const totalSeats = registeredCount + pendingInviteCount
+
+  if (totalSeats !== cycleLen) {
     return {
       ok: false,
-      error: `Member count (${memberIds.length}) must equal cycle_length (${cycleLen}) before activation.`,
+      error: `Total roster (${registeredCount} registered + ${pendingInviteCount} pending) must equal cycle_length (${cycleLen}).`,
+    }
+  }
+
+  const deferSchedule = pendingInviteCount > 0
+
+  if (deferSchedule) {
+    const { error: deferUpErr } = await serviceSupabase
+      .from('stokvels')
+      .update({ status: 'active' })
+      .eq('id', stokvelId)
+
+    if (deferUpErr) {
+      return { ok: false, error: deferUpErr.message || String(deferUpErr) }
+    }
+
+    return {
+      ok: true,
+      deferred: true,
+      payoutCount: 0,
+      registeredCount,
+      pendingInviteCount,
     }
   }
 
@@ -174,5 +243,5 @@ export async function activateStokvel(stokvelId, serviceSupabase, opts = {}) {
     return { ok: false, error: upErr.message || String(upErr) }
   }
 
-  return { ok: true, payoutCount: payoutInserts.length }
+  return { ok: true, deferred: false, payoutCount: payoutInserts.length }
 }
