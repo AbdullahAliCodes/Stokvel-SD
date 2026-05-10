@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Calendar, CreditCard, LayoutDashboard, Users, Wallet } from 'lucide-react'
+import { Calendar, CreditCard, ChevronRight, LayoutDashboard, Users, Wallet } from 'lucide-react'
 import { useSession } from '../context/SessionContext'
 import { apiUrl } from '../utils/api'
 import { btnPrimary, cardLight, errorBox, pageSubtitle } from '../ui'
@@ -370,9 +370,10 @@ export default function StokvelDashboard() {
           </p>
           <Link
             to={paymentsPath}
-            className="mt-4 inline-block text-sm font-medium text-emerald-800 underline-offset-2 hover:underline dark:text-emerald-300"
+            className="stkg-link-arrow mt-4 inline-flex items-center gap-1 text-sm font-medium text-emerald-800 underline-offset-2 hover:underline dark:text-emerald-300"
           >
             Open payout queue
+            <ChevronRight className="stkg-link-arrow__icon h-4 w-4 shrink-0" aria-hidden />
           </Link>
         </section>
 

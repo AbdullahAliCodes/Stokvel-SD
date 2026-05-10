@@ -537,7 +537,7 @@ export default function Meetings() {
                 <button
                   type="button"
                   onClick={() => handleDeleteMeeting(meeting.id)}
-                  className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-800 hover:bg-red-100 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-900/50"
+                  className="stkg-btn rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-800 hover:bg-red-100 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-900/50"
                   disabled={meetingSaving}
                 >
                   Delete meeting
@@ -615,7 +615,7 @@ export default function Meetings() {
               setMeetingsTab("list");
               setDayPanel(null);
             }}
-            className={`relative flex-1 px-3 py-3 text-sm font-medium transition-colors duration-200 sm:px-4 sm:text-base ${
+            className={`relative flex-1 overflow-visible px-3 py-3 text-sm font-medium transition-colors duration-200 sm:px-4 sm:text-base stkg-btn ${
               meetingsTab === "list"
                 ? "border-b-2 border-emerald-700 bg-emerald-50/70 text-emerald-800"
                 : "border-b-2 border-transparent text-stone-500 hover:bg-stone-100 hover:text-stone-800 dark:text-stone-400 dark:hover:bg-slate-800 dark:hover:text-stone-100"
@@ -626,7 +626,7 @@ export default function Meetings() {
           <button
             type="button"
             onClick={() => setMeetingsTab("calendar")}
-            className={`relative flex-1 px-3 py-3 text-sm font-medium transition-colors duration-200 sm:px-4 sm:text-base ${
+            className={`relative flex-1 overflow-visible px-3 py-3 text-sm font-medium transition-colors duration-200 sm:px-4 sm:text-base stkg-btn ${
               meetingsTab === "calendar"
                 ? "border-b-2 border-emerald-700 bg-emerald-50/70 text-emerald-800"
                 : "border-b-2 border-transparent text-stone-500 hover:bg-stone-100 hover:text-stone-800 dark:text-stone-400 dark:hover:bg-slate-800 dark:hover:text-stone-100"

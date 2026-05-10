@@ -30,6 +30,7 @@ import {
   inputLight,
   labelLight,
 } from "../ui";
+import MemberAvatarInteractive from "../components/MemberAvatarInteractive";
 
 const MAX_GROUP_MEMBERS = 12;
 const PDF_MAX_BYTES = 5 * 1024 * 1024;
@@ -1417,15 +1418,20 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                   {selectedMembers.map((m, idx) => (
                     <li
                       key={m.id}
-                    className="rounded-xl border border-stone-200 bg-stone-50 p-4 transition-colors hover:bg-stone-100/80 dark:border-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800"
+                      className="stkg-list-row rounded-xl border border-stone-200 bg-stone-50 p-4 transition-colors hover:bg-stone-100/80 dark:border-slate-700 dark:bg-slate-800/60 dark:hover:bg-slate-800"
                     >
                       <div className="flex gap-3">
-                        <div
-                          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-stone-200 bg-white text-lg font-semibold text-emerald-800 dark:border-slate-600 dark:bg-slate-900 dark:text-emerald-300"
-                          aria-hidden
+                        <MemberAvatarInteractive
+                          name={displayName(m)}
+                          statusLabel="Pending group setup"
                         >
-                          {memberAvatarLetter(m)}
-                        </div>
+                          <span
+                            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-stone-200 bg-white text-lg font-semibold text-emerald-800 dark:border-slate-600 dark:bg-slate-900 dark:text-emerald-300"
+                            aria-hidden
+                          >
+                            {memberAvatarLetter(m)}
+                          </span>
+                        </MemberAvatarInteractive>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start justify-between gap-2">
                             <div>
@@ -1792,10 +1798,10 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                       ? "Add a registered member to assign as treasurer before continuing."
                       : undefined
                   }
-                  className={`${btnSecondary} inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50`}
+                  className={`${btnSecondary} stkg-link-arrow inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50`}
                 >
                   Next
-                  <ChevronRight className="h-4 w-4" />
+                  <ChevronRight className="stkg-link-arrow__icon h-4 w-4" />
                 </button>
               )}
             </div>

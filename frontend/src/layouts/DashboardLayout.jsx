@@ -8,6 +8,8 @@ import {
 } from "react-router-dom";
 import BrandLogo from "../components/BrandLogo";
 import ThemeToggle from "../components/ThemeToggle";
+import { DashboardChromeProvider } from "../context/DashboardChromeContext";
+import { DashboardNotificationBell } from "../components/dashboard/NotificationPanel";
 import {
   LayoutDashboard,
   Wallet,
@@ -33,10 +35,8 @@ import {
 const CACHE_TTL_MS = 180000;
 
 const linkClass = ({ isActive }) =>
-  `flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition ${
-    isActive
-      ? "bg-emerald-50 font-semibold text-emerald-800 dark:bg-emerald-900/35 dark:text-emerald-100"
-      : "text-stone-600 hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-slate-800 dark:hover:text-stone-100"
+  `stkg-sidebar-link flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${
+    isActive ? "" : "text-stone-600 dark:text-stone-400"
   }`;
 
 function membershipStokvelId(m) {
@@ -223,6 +223,7 @@ export default function DashboardLayout() {
   }
 
   return (
+    <DashboardChromeProvider>
     <div className="box-border flex h-dvh min-h-0 w-full flex-col gap-3 overflow-hidden bg-[#F4F5F0] p-3 text-stone-800 dark:bg-slate-950 dark:text-stone-100 md:flex-row md:gap-4 md:p-4">
       <aside className="flex w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900 md:h-full md:w-[220px] md:min-w-[220px] md:max-w-[220px]">
         <div className="shrink-0 border-b border-stone-200 p-3 dark:border-slate-700">
@@ -235,7 +236,7 @@ export default function DashboardLayout() {
           <select
             id="stokvel-selector"
             disabled={memberships === null}
-            className="w-full rounded-lg border border-stone-200 bg-stone-50 px-2 py-2 text-sm text-stone-800 shadow-sm outline-none transition focus:border-emerald-400 focus:ring-1 focus:ring-emerald-300 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-stone-100 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/40"
+            className="stkg-input w-full rounded-lg border border-stone-200 bg-stone-50 px-2 py-2 text-sm text-stone-800 shadow-sm outline-none transition disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-stone-100"
             value={memberships === null ? "" : selectValue}
             onChange={handleStokvelSelect}
           >
@@ -333,7 +334,7 @@ export default function DashboardLayout() {
           </NavLink>
           <Link
             to="/apply"
-            className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-stone-600 transition hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-slate-800 dark:hover:text-stone-100"
+            className="stkg-sidebar-link flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-stone-600 dark:text-stone-400"
           >
             <UserPlus
               className="h-4 w-4 shrink-0 text-emerald-700"
@@ -352,7 +353,7 @@ export default function DashboardLayout() {
           ) : null}
           <Link
             to="/"
-            className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-stone-600 transition hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-slate-800 dark:hover:text-stone-100"
+            className="stkg-sidebar-link flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-stone-600 dark:text-stone-400"
           >
             <Home className="h-4 w-4" aria-hidden />
             Back to Home
@@ -362,7 +363,7 @@ export default function DashboardLayout() {
           <ThemeToggle layout="sidebar" />
           <button
             type="button"
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-stone-200 bg-stone-50 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-100 dark:border-slate-600 dark:bg-slate-800 dark:text-stone-200 dark:hover:bg-slate-700"
+            className="stkg-btn flex w-full items-center justify-center gap-2 rounded-lg border border-stone-200 bg-stone-50 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-100 dark:border-slate-600 dark:bg-slate-800 dark:text-stone-200 dark:hover:bg-slate-700"
             onClick={async () => {
               await supabase.auth.signOut();
               navigate("/", { replace: true });
@@ -374,8 +375,14 @@ export default function DashboardLayout() {
         </div>
       </aside>
       <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain rounded-2xl border border-stone-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-stone-100 md:p-8">
+        {stokvel_id ? (
+          <div className="mb-4 flex justify-end">
+            <DashboardNotificationBell />
+          </div>
+        ) : null}
         {blockOutlet ? null : <Outlet />}
       </main>
     </div>
+    </DashboardChromeProvider>
   );
 }

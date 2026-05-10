@@ -68,7 +68,7 @@ export const publicLayoutNavRow =
 
 /** Guest CTA in layout chrome (outline on cream) */
 export const publicNavCtaGuest =
-  'rounded-lg border border-emerald-800/25 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-900 shadow-sm transition hover:border-emerald-800/40 hover:bg-emerald-50/90 dark:border-emerald-500/30 dark:bg-slate-900 dark:text-emerald-100 dark:hover:border-emerald-400/40 dark:hover:bg-slate-800'
+  'stkg-btn rounded-lg border border-emerald-800/25 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-900 shadow-sm transition hover:border-emerald-800/40 hover:bg-emerald-50/90 dark:border-emerald-500/30 dark:bg-slate-900 dark:text-emerald-100 dark:hover:border-emerald-400/40 dark:hover:bg-slate-800'
 
 export const publicLayoutScrollMain =
   'min-h-0 flex-1 overflow-y-auto overscroll-y-contain scroll-smooth'
@@ -132,7 +132,7 @@ export const roseTitle = 'text-sm font-semibold text-rose-950 dark:text-rose-200
 export const roseBody = 'mt-1 text-xs leading-snug text-rose-900/70 dark:text-rose-200/80'
 
 export const opportunityCard =
-  'flex h-full flex-col rounded-2xl border border-emerald-900/10 bg-white p-5 shadow-sm shadow-emerald-900/5 outline-none transition duration-200 hover:-translate-y-1 hover:border-emerald-800/30 hover:shadow-lg focus-within:ring-2 focus-within:ring-emerald-600/30 focus-within:ring-offset-2 focus-within:ring-offset-[#faf8f5] sm:p-6 dark:border-slate-700 dark:bg-slate-900 dark:focus-within:ring-offset-slate-950'
+  'stkg-card flex h-full flex-col rounded-2xl border border-emerald-900/10 bg-white p-5 shadow-sm shadow-emerald-900/5 outline-none transition duration-200 focus-within:ring-2 focus-within:ring-emerald-600/30 focus-within:ring-offset-2 focus-within:ring-offset-[#faf8f5] sm:p-6 dark:border-slate-700 dark:bg-slate-900 dark:focus-within:ring-offset-slate-950'
 
 export const opportunityIconBubble =
   'flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200'
@@ -166,13 +166,13 @@ export const testimonialQuote =
 // ——— Navigation & chrome ———
 
 export const navLink =
-  'text-sm font-medium text-emerald-900/70 transition hover:text-emerald-900 dark:text-emerald-200/75 dark:hover:text-emerald-100'
+  'stkg-nav-link text-sm font-medium text-emerald-900/70 transition hover:text-emerald-900 dark:text-emerald-200/75 dark:hover:text-emerald-100'
 
 export const iconButton =
-  'rounded-full p-2 text-emerald-900/60 transition hover:bg-emerald-900/5 hover:text-emerald-900 dark:text-emerald-200/70 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-100'
+  'stkg-btn rounded-full p-2 text-emerald-900/60 transition hover:bg-emerald-900/5 hover:text-emerald-900 dark:text-emerald-200/70 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-100'
 
 export const iconButtonSubtle =
-  'rounded-full p-2 text-emerald-900/50 transition hover:bg-emerald-900/5 hover:text-emerald-900'
+  'stkg-btn rounded-full p-2 text-emerald-900/50 transition hover:bg-emerald-900/5 hover:text-emerald-900'
 
 export const dividerSubtle = 'border-t border-emerald-900/10'
 
@@ -194,7 +194,7 @@ export const footerLink = 'transition hover:text-white'
 export const footerLegal = 'text-xs text-emerald-200/70'
 
 export const footerSocialButton =
-  'rounded-full p-2 text-emerald-200/80 transition hover:bg-emerald-900/50 hover:text-white'
+  'stkg-btn rounded-full p-2 text-emerald-200/80 transition hover:bg-emerald-900/50 hover:text-white'
 
 export const footerSocialRow = 'flex flex-wrap items-center gap-2'
 
@@ -204,10 +204,10 @@ export const footerLegalLink =
 // ——— Buttons (public marketing — slightly deeper green than dashboard forms) ———
 
 export const btnPrimary =
-  'rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-900 disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500'
+  'stkg-btn rounded-lg bg-emerald-800 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-900 disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500'
 
 export const btnSecondary =
-  'rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-sm transition hover:bg-stone-100 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-stone-200 dark:hover:bg-slate-700'
+  'stkg-btn rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 shadow-sm transition hover:bg-stone-100 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-stone-200 dark:hover:bg-slate-700'
 
 /** Outline that reads on sage/cream hero */
 export const btnSecondaryOnHero = `${btnSecondary} border-emerald-900/15 text-emerald-900`
@@ -230,7 +230,7 @@ export const authTabGroup =
   'mb-6 flex rounded-xl bg-emerald-900/[0.06] p-1 dark:bg-emerald-500/10'
 
 export const authTabActive =
-  'flex-1 rounded-lg bg-white py-2.5 text-sm font-semibold text-emerald-900 shadow-sm dark:bg-slate-800 dark:text-emerald-100'
+  'stkg-btn flex-1 rounded-lg bg-white py-2.5 text-sm font-semibold text-emerald-900 shadow-sm dark:bg-slate-800 dark:text-emerald-100'
 
 export const authTabInactive =
-  'flex-1 rounded-lg py-2.5 text-sm font-semibold text-emerald-800/65 transition hover:text-emerald-900 dark:text-emerald-300/70 dark:hover:text-emerald-100'
+  'stkg-btn flex-1 rounded-lg py-2.5 text-sm font-semibold text-emerald-800/65 transition hover:text-emerald-900 dark:text-emerald-300/70 dark:hover:text-emerald-100'

@@ -1,5 +1,8 @@
+import https from "https";
 import axios from "axios";
 import { updateMarketRates } from "../services/marketDataService.js";
+
+const agent = new https.Agent({ rejectUnauthorized: false });
 
 const FRED_OBSERVATIONS_URL =
   "https://api.stlouisfed.org/fred/series/observations";
@@ -41,6 +44,7 @@ async function fetchFredObservationsJson(apiKey, seriesId) {
         },
         timeout: 20_000,
         validateStatus: () => true,
+        httpsAgent: agent,
         headers: {
           Accept: "application/json",
           "User-Agent": "StokvelBackend/1.0 (FRED client)",
