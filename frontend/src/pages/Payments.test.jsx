@@ -41,11 +41,8 @@ vi.mock("../components/MarketRatesWidget", () => ({
 }));
 
 vi.mock("../components/QuickPayModal", () => ({
-  default: ({ onClose, onDebugStep, onSuccess, onRecordError, monthlyContribution }) => (
+  default: ({ onClose, onSuccess, onRecordError, monthlyContribution }) => (
     <div data-testid="quickpay-modal">
-      <button type="button" onClick={() => onDebugStep("modal-debug")}>
-        debug
-      </button>
       <button
         type="button"
         onClick={() =>
@@ -203,7 +200,7 @@ describe("Payments", () => {
     expect(await screen.findByText("Application rejected.")).toBeInTheDocument();
   });
 
-  it("opens quick pay modal, handles debug/success/close, and updates contributions", async () => {
+  it("opens quick pay modal, handles success, and closes after ledger reload", async () => {
     readViewCacheMock.mockReturnValue(null);
     setupFetch({ detail: okJson(detailBase), meetings: okJson({ meetings: [] }) });
 
@@ -213,14 +210,10 @@ describe("Payments", () => {
     fireEvent.click(screen.getByRole("button", { name: /Pay monthly contribution/i }));
     expect(screen.getByTestId("quickpay-modal")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "debug" }));
-    expect(screen.getByText(/Payment debug: modal-debug/)).toBeInTheDocument();
-
     fireEvent.click(screen.getByRole("button", { name: "success" }));
     await waitFor(() =>
       expect(screen.queryByTestId("quickpay-modal")).not.toBeInTheDocument(),
     );
-    expect(await screen.findByText(/Payment debug: Ledger refreshed from server/)).toBeInTheDocument();
   });
 
   it("shows record error from quick pay callback", async () => {

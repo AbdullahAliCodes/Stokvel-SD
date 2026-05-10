@@ -39,11 +39,8 @@ vi.mock("../utils/viewCache", () => ({
 }));
 
 vi.mock("../components/QuickPayModal", () => ({
-  default: ({ onClose, onDebugStep, onRecordError, onSuccess, monthlyContribution }) => (
+  default: ({ onClose, onRecordError, onSuccess, monthlyContribution }) => (
     <div data-testid="quickpay-modal">
-      <button type="button" onClick={() => onDebugStep("debug-step")}>
-        debug
-      </button>
       <button type="button" onClick={() => onRecordError("record-failed")}>
         record-error
       </button>
@@ -215,7 +212,7 @@ describe("StokvelDashboard", () => {
     expect(screen.getByText("Payments are available when the group is active.")).toBeInTheDocument();
   });
 
-  it("opens quick pay modal, handles debug and close", async () => {
+  it("opens quick pay modal and closes", async () => {
     readViewCacheMock.mockReturnValue(null);
     setupFetch({ detailRes: okJson(baseDetail), meetingsRes: okJson({ meetings: [] }) });
 
@@ -223,9 +220,6 @@ describe("StokvelDashboard", () => {
     await screen.findByText("Main Group");
     fireEvent.click(screen.getByRole("button", { name: "Pay monthly contribution" }));
     expect(screen.getByTestId("quickpay-modal")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "debug" }));
-    expect(screen.getByText("debug-step")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "close" }));
     await waitFor(() =>
@@ -265,7 +259,6 @@ describe("StokvelDashboard", () => {
     await waitFor(() =>
       expect(screen.queryByTestId("quickpay-modal")).not.toBeInTheDocument(),
     );
-    expect(screen.getByText("Contribution recorded")).toBeInTheDocument();
     expect(writeViewCacheMock).toHaveBeenCalled();
   });
 
