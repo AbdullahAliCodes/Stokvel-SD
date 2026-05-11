@@ -23,6 +23,7 @@ export default function BrandLogo({
       <img
         src={logoSrc}
         alt="StokGeld"
+        data-preserve-tone=""
         className={`${imgClassName} w-auto max-w-[min(100%,56rem)] shrink-0 object-contain object-left ${onDark ? "brightness-0 invert" : ""}`}
         decoding="async"
       />

@@ -37,6 +37,11 @@ html.dark body {
   color: #e7e5e4;
 }
 
+/* Raster/SVG imagery: tone down glare in dark mode (logos: `data-preserve-tone` on `<img>`). */
+html.dark img:not([data-preserve-tone]) {
+  filter: brightness(0.7) saturate(0.82);
+}
+
 #root {
   height: 100%;
   min-height: 0;

@@ -264,12 +264,12 @@ function Hero() {
                   alt=""
                   width={800}
                   height={600}
-                  className="absolute inset-0 h-full w-full object-cover object-center dark:brightness-75 dark:contrast-105 dark:saturate-75"
+                  className="absolute inset-0 h-full w-full object-cover object-center"
                   loading="lazy"
                   decoding="async"
                 />
                 <div
-                  className="pointer-events-none absolute inset-0 bg-gradient-to-t from-emerald-900/[0.07] to-transparent dark:from-slate-950/70 dark:via-slate-900/35 dark:to-slate-900/10"
+                  className="pointer-events-none absolute inset-0 bg-gradient-to-t from-emerald-900/[0.07] to-transparent dark:from-slate-950/85 dark:via-slate-900/50 dark:to-slate-900/20"
                   aria-hidden
                 />
               </div>
@@ -315,12 +315,12 @@ function Testimonial() {
             alt=""
             width={480}
             height={480}
-            className="absolute inset-0 h-full w-full object-cover object-center dark:brightness-75 dark:contrast-105 dark:saturate-75"
+            className="absolute inset-0 h-full w-full object-cover object-center"
             loading="lazy"
             decoding="async"
           />
           <div
-            className="pointer-events-none absolute inset-0 rounded-2xl bg-transparent ring-1 ring-inset ring-emerald-900/10 dark:bg-slate-950/35 dark:ring-slate-700"
+            className="pointer-events-none absolute inset-0 rounded-2xl bg-transparent ring-1 ring-inset ring-emerald-900/10 dark:bg-slate-950/50 dark:ring-slate-700"
             aria-hidden
           />
         </div>
@@ -331,18 +331,18 @@ function Testimonial() {
           </h2>
           <blockquote className="mt-4">
             <p className={testimonialQuote}>
-              <span className="text-emerald-700/50" aria-hidden>
+              <span className="text-emerald-700/50 dark:text-emerald-500/45" aria-hidden>
                 &ldquo;
               </span>
               {quote}
-              <span className="text-emerald-700/50" aria-hidden>
+              <span className="text-emerald-700/50 dark:text-emerald-500/45" aria-hidden>
                 &rdquo;
               </span>
             </p>
-            <footer className="mt-8 border-l-2 border-emerald-700/40 pl-4">
-              <p className="text-sm font-semibold text-emerald-900 sm:text-base">
+            <footer className="mt-8 border-l-2 border-emerald-700/40 pl-4 dark:border-emerald-500/35">
+              <p className="text-sm font-semibold text-emerald-900 sm:text-base dark:text-stone-100">
                 {author}
-                <span className="font-normal text-emerald-800/80"> · {role}</span>
+                <span className="font-normal text-emerald-800/80 dark:text-emerald-300/90"> · {role}</span>
               </p>
               <p className={`mt-1 text-sm ${bodyMuted}`}>
                 {organization} · {location}
@@ -474,7 +474,7 @@ export default function Landing() {
             <p className="mt-4">
               <Link
                 to="/stokvels"
-                className="text-sm font-semibold text-emerald-800 underline-offset-4 hover:text-emerald-950 hover:underline"
+                className="text-sm font-semibold text-emerald-800 underline-offset-4 hover:text-emerald-950 hover:underline dark:text-emerald-300 dark:hover:text-emerald-200"
               >
                 View all public stokvels →
               </Link>

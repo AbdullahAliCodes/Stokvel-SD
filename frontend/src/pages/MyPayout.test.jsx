@@ -39,7 +39,8 @@ describe("MyPayout", () => {
     const subtitle = screen.getByText("Payout history and schedule — coming soon.");
     expect(subtitle).toHaveClass(...pageSubtitle.split(" "));
 
-    const cardNodes = container.querySelectorAll(`div.${cardLight.split(" ").join(".")}`);
+    const cardClasses = cardLight.split(" ").filter((c) => !c.startsWith("dark:"));
+    const cardNodes = container.querySelectorAll(`div.${cardClasses.join(".")}`);
     expect(cardNodes.length).toBeGreaterThanOrEqual(2);
   });
 });
