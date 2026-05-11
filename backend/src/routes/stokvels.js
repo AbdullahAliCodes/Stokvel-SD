@@ -804,6 +804,15 @@ router.post("/:id/meetings", requireAuth, async (req, res) => {
             .filter(Boolean),
         ),
       ];
+      console.log("[meetings] meeting notification profile emails", {
+        stokvelId,
+        meetingId: created.id,
+        members: (profiles ?? []).map((p) => ({
+          userId: p.id,
+          profileEmail: p.email ?? null,
+        })),
+        recipients,
+      });
       await Promise.all(
         recipients.map((to) =>
           sendMeetingScheduledEmail({
