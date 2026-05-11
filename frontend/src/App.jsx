@@ -56,16 +56,13 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  if (loading) {
-    return (
-      <div className="flex h-dvh items-center justify-center overflow-hidden bg-[#0f172a] text-slate-300">
-        <p className="text-sm tracking-wide">Loading…</p>
-      </div>
-    );
-  }
-
   return (
     <ThemeProvider>
+      {loading ? (
+        <div className="flex h-dvh items-center justify-center overflow-hidden bg-[#faf8f5] text-stone-600 dark:bg-slate-950 dark:text-stone-400">
+          <p className="text-sm tracking-wide">Loading…</p>
+        </div>
+      ) : (
       <SessionProvider session={session}>
         <div className="h-full min-h-0 overflow-hidden">
           <BrowserRouter>
@@ -148,6 +145,7 @@ export default function App() {
           </BrowserRouter>
         </div>
       </SessionProvider>
+      )}
     </ThemeProvider>
   );
 }
