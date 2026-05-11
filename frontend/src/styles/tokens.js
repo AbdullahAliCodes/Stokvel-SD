@@ -37,7 +37,7 @@ export const heroRoseCard =
 
 /** Alternating section on cream */
 export const surfaceMutedBand =
-  'border-y border-emerald-900/10 bg-[#faf8f5] py-16 md:py-20'
+  'border-y border-emerald-900/10 bg-[#faf8f5] py-16 md:py-20 dark:border-slate-800 dark:bg-slate-950'
 
 /** Footer strip */
 export const surfaceFooter = 'bg-emerald-950 text-emerald-50'
@@ -97,12 +97,13 @@ export const statValue =
 
 export const statLabel = 'text-sm text-stone-500 dark:text-stone-400'
 
-export const metricValue = 'font-medium text-emerald-900'
+export const metricValue =
+  'font-medium text-emerald-900 dark:text-emerald-200'
 
-export const metricLabel = 'text-xs text-stone-500'
+export const metricLabel = 'text-xs text-stone-500 dark:text-stone-400'
 
 export const quote =
-  'text-xl font-medium leading-relaxed text-emerald-950 md:text-2xl'
+  'text-xl font-medium leading-relaxed text-emerald-950 md:text-2xl dark:text-stone-100'
 
 export const attributionName = 'text-sm font-semibold text-emerald-900'
 
@@ -172,7 +173,7 @@ export const iconButton =
   'rounded-full p-2 text-emerald-900/60 transition hover:bg-emerald-900/5 hover:text-emerald-900 dark:text-emerald-200/70 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-100'
 
 export const iconButtonSubtle =
-  'rounded-full p-2 text-emerald-900/50 transition hover:bg-emerald-900/5 hover:text-emerald-900'
+  'rounded-full p-2 text-emerald-900/50 transition hover:bg-emerald-900/5 hover:text-emerald-900 dark:text-emerald-200/55 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-100'
 
 export const dividerSubtle = 'border-t border-emerald-900/10'
 

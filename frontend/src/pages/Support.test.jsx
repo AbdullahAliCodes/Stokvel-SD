@@ -35,8 +35,8 @@ describe("Support", () => {
     const subtitle = screen.getByText("Help center and contact — coming soon.");
     expect(subtitle).toHaveClass(...pageSubtitle.split(" "));
 
-    const cardSelector = `.${cardLight.split(" ").join(".")}`;
-    const card = container.querySelector(cardSelector);
+    const cardClasses = cardLight.split(" ").filter((c) => !c.startsWith("dark:"));
+    const card = container.querySelector(`.${cardClasses.join(".")}`);
     expect(card).toBeTruthy();
   });
 });
