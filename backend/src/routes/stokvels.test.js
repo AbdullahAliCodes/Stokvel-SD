@@ -489,6 +489,50 @@ describe('stokvels routes', () => {
     expect(mockSendMeetingScheduledEmail).toHaveBeenCalledTimes(2)
   })
 
+  it('POST /:id/meetings loads profile emails via service client when configured', async () => {
+    const userClient = createSupabaseMock()
+    const svcClient = createSupabaseMock()
+    mockCreateClient.mockReturnValue(userClient)
+    mockGetServiceSupabase.mockReturnValue(svcClient)
+
+    userClient.__push('stokvel_members.selectMaybeSingle', {
+      data: { group_role: 'admin' },
+      error: null,
+    })
+    svcClient.__push('meetings.insertSingle', {
+      data: {
+        id: 'm1',
+        title: 'Planning',
+        meeting_date: '2026-05-01',
+        meeting_link: null,
+        agenda: null,
+        notes: null,
+      },
+      error: null,
+    })
+    userClient.__push('stokvels.selectMaybeSingle', { data: { name: 'Group A' }, error: null })
+    userClient.__push('stokvel_members.selectMany', {
+      data: [{ user_id: 'u1' }, { user_id: 'u2' }],
+      error: null,
+    })
+
+    svcClient.__push('profiles.selectMany', {
+      data: [
+        { id: 'u1', email: 'a@x.com' },
+        { id: 'u2', email: 'b@x.com' },
+      ],
+      error: null,
+    })
+
+    const res = await request(makeApp()).post('/api/stokvels/s1/meetings').send({
+      title: 'Planning',
+      meetingDate: '2026-05-01',
+    })
+
+    expect(res.status).toBe(201)
+    expect(mockSendMeetingScheduledEmail).toHaveBeenCalledTimes(2)
+  })
+
   it('PATCH /:id/meetings/:meetingId returns 400 with no patch fields', async () => {
     const client = createSupabaseMock()
     mockCreateClient.mockReturnValue(client)

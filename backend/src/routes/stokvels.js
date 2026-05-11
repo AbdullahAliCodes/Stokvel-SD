@@ -780,10 +780,23 @@ router.post("/:id/meetings", requireAuth, async (req, res) => {
       ...new Set((memberRows ?? []).map((m) => m.user_id).filter(Boolean)),
     ];
     if (memberIds.length > 0) {
-      const { data: profiles } = await userSupabase
+      const svc = getServiceSupabase();
+      const profileClient = svc ?? userSupabase;
+      if (!svc) {
+        console.warn(
+          "[meetings] SUPABASE_SERVICE_ROLE_KEY missing; profile emails use the caller token and may be incomplete under RLS.",
+        );
+      }
+      const { data: profiles, error: profilesEmailErr } = await profileClient
         .from("profiles")
         .select("id, email")
         .in("id", memberIds);
+      if (profilesEmailErr) {
+        console.error(
+          "POST /api/stokvels/:id/meetings profile emails:",
+          profilesEmailErr,
+        );
+      }
       const recipients = [
         ...new Set(
           (profiles ?? [])
