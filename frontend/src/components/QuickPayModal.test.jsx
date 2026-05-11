@@ -12,7 +12,6 @@ function baseProps(overrides = {}) {
     onSuccess: vi.fn(),
     onClose: vi.fn(),
     onRecordError: vi.fn(),
-    onDebugStep: vi.fn(),
     ...overrides,
   };
 }

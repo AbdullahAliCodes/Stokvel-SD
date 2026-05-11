@@ -197,7 +197,6 @@ export default function Payments() {
   const [payoutOrderError, setPayoutOrderError] = useState("");
   const [payoutOrderOk, setPayoutOrderOk] = useState("");
   const [upcomingPayoutOrderIds, setUpcomingPayoutOrderIds] = useState([]);
-  const [paymentDebug, setPaymentDebug] = useState("");
   const [flaggingCandidate, setFlaggingCandidate] = useState(null);
   const [flaggingSubmitting, setFlaggingSubmitting] = useState(false);
   const [ledgerToast, setLedgerToast] = useState("");
@@ -901,14 +900,6 @@ export default function Payments() {
                 <p className="mt-1 text-sm text-stone-600 dark:text-stone-300">
                   {cycleBannerText}
                 </p>
-                {paymentDebug ? (
-                  <p
-                    className="mt-1 text-xs text-amber-800 dark:text-amber-200"
-                    role="status"
-                  >
-                    Payment debug: {paymentDebug}
-                  </p>
-                ) : null}
                 <button
                   type="button"
                   disabled={!quickPayEnabled}
@@ -1517,21 +1508,17 @@ export default function Payments() {
               session={session}
               monthlyContribution={monthlyContribution}
               onClose={() => setQuickPayOpen(false)}
-              onDebugStep={setPaymentDebug}
               onRecordError={(message) =>
                 setError(
                   `Payment succeeded, but contribution was not recorded: ${message}`,
                 )
               }
               onSuccess={async () => {
-                setPaymentDebug("Refreshing from server");
                 setQuickPayOpen(false);
                 try {
                   await silentReloadDetail();
-                  setPaymentDebug("Ledger refreshed from server");
                 } catch (e) {
                   setError(e.message ?? String(e));
-                  setPaymentDebug("");
                 }
               }}
             />

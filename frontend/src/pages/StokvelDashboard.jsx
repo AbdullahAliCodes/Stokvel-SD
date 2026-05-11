@@ -68,7 +68,6 @@ export default function StokvelDashboard() {
   const [totalContribution, setTotalContribution] = useState(0);
   const [meetings, setMeetings] = useState([]);
   const [quickPayOpen, setQuickPayOpen] = useState(false);
-  const [paymentDebug, setPaymentDebug] = useState("");
 
   useEffect(() => {
     if (!stokvel_id) {
@@ -459,9 +458,6 @@ export default function StokvelDashboard() {
               Payments are available when the group is active.
             </p>
           ) : null}
-          {paymentDebug ? (
-            <p className="mt-2 text-xs text-stone-400">{paymentDebug}</p>
-          ) : null}
         </section>
       </div>
 
@@ -472,14 +468,12 @@ export default function StokvelDashboard() {
           session={session}
           monthlyContribution={monthlyContribution}
           onClose={() => setQuickPayOpen(false)}
-          onDebugStep={setPaymentDebug}
           onRecordError={(message) => {
             setError(
               `Payment succeeded, but contribution was not recorded: ${message}`,
             );
           }}
           onSuccess={(paidAmount, contribution) => {
-            setPaymentDebug("Contribution recorded");
             setQuickPayOpen(false);
             const effectiveAmount =
               Number(contribution?.amount ?? paidAmount) || 0;
