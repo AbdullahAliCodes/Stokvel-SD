@@ -18,6 +18,7 @@ import {
 import { readViewCache, writeViewCache } from '../utils/viewCache'
 import MarketRatesWidget from '../components/MarketRatesWidget'
 import QuickPayModal from '../components/QuickPayModal'
+import ComplianceReportWidget from '../components/ComplianceReportWidget'
 
 const TARGET_MONTH_RE = /^\d{4}-\d{2}$/
 
@@ -933,6 +934,16 @@ export default function Payments() {
                 ) : null}
               </section>
             </div>
+          </div>
+
+          {/* ---- Contribution Compliance Report ---- */}
+          <div className="mt-10">
+            <ComplianceReportWidget
+              members={members}
+              contributions={contributions}
+              missedPayments={missedPayments}
+              ledgerMonths={ledgerMonths}
+            />
           </div>
 
           <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-2">
