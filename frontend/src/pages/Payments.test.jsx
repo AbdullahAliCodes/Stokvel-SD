@@ -164,6 +164,8 @@ describe("Payments", () => {
     expect(screen.getByText("Payout schedule")).toBeInTheDocument();
     expect(screen.getAllByText("Ada L").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Pending").length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "CSV" }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "PDF" }).length).toBeGreaterThan(0);
   });
 
   it("shows empty table messages when contributions and members are empty", async () => {

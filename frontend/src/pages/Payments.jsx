@@ -18,6 +18,7 @@ import {
 import { readViewCache, writeViewCache } from '../utils/viewCache'
 import MarketRatesWidget from '../components/MarketRatesWidget'
 import QuickPayModal from '../components/QuickPayModal'
+import ReportExportActions from '../components/ReportExportActions'
 
 const TARGET_MONTH_RE = /^\d{4}-\d{2}$/
 
@@ -633,6 +634,74 @@ export default function Payments() {
     { label: 'Members', value: String(memberCount) },
   ]
 
+  const reportExportSubtitle = useMemo(() => {
+    const parts = [groupName, cycleBannerText].filter(Boolean)
+    parts.push(`Exported ${new Date().toLocaleString('en-ZA')}`)
+    return parts.join(' · ')
+  }, [groupName, cycleBannerText])
+
+  const financeSummaryExport = useMemo(
+    () => ({
+      headers: ['Metric', 'Value'],
+      rows: statCards.map((card) => [card.label, card.value]),
+    }),
+    [statCards],
+  )
+
+  const payoutScheduleExport = useMemo(() => {
+    const headers = ['Date', 'Member', 'Expected amount']
+    const rows = (payouts ?? []).map((p) => {
+      const prof = members.find((m) => m.user_id === p.user_id)?.profiles ?? null
+      return [
+        formatScheduleDate(p.scheduled_payout_date),
+        memberDisplay(prof),
+        formatZAR(expectedPayout),
+      ]
+    })
+    return { headers, rows }
+  }, [payouts, members, expectedPayout])
+
+  const cycleLedgerExportByMonth = useMemo(() => {
+    const headers = ['Member', 'Status', 'Approved?']
+    const byMonth = {}
+    for (const month of ledgerMonths) {
+      byMonth[month] = sortedMembers.map((m) => {
+        const paid = memberPaidForMonth(contributions, m.user_id, month)
+        const contrib = primaryContributionForMonth(contributions, m.user_id, month)
+        const flagged = memberFlaggedForMonth(missedPayments, m.user_id, month)
+        let statusLabel = 'Unpaid'
+        if (paid) statusLabel = 'Paid'
+        else if (flagged) statusLabel = 'Unpaid (Missed Deadline)'
+        return [memberDisplay(m.profiles), statusLabel, treasurerApprovalColumnLabel(contrib)]
+      })
+    }
+    return { headers, byMonth }
+  }, [ledgerMonths, sortedMembers, contributions, missedPayments])
+
+  const cycleLedgerExportAll = useMemo(() => {
+    const headers = ['Cycle', 'Member', 'Status', 'Approved?']
+    const rows = []
+    for (const month of ledgerMonths) {
+      for (const row of cycleLedgerExportByMonth.byMonth[month] ?? []) {
+        rows.push([month, ...row])
+      }
+    }
+    return { headers, rows }
+  }, [ledgerMonths, cycleLedgerExportByMonth])
+
+  const treasurerPayoutsExport = useMemo(() => {
+    const headers = ['Member name', 'Payout date', 'Status']
+    const rows = (treasurerPayoutRows ?? []).map((row) => {
+      const completed = String(row.status || '').toLowerCase() === 'completed'
+      return [
+        memberDisplay(row.profile),
+        formatScheduleDate(row.scheduled_payout_date),
+        completed ? 'completed' : 'pending',
+      ]
+    })
+    return { headers, rows }
+  }, [treasurerPayoutRows])
+
   const fetchTreasurerPayouts = useCallback(async () => {
     if (!session?.access_token || !stokvel_id || !isTreasurerRole) {
       setTreasurerPayoutRows([])
@@ -764,6 +833,16 @@ export default function Payments() {
 
       {session && !loading && membership ? (
         <>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm font-medium text-stone-600 dark:text-stone-300">Finance summary</p>
+            <ReportExportActions
+              title="Finance summary"
+              subtitle={reportExportSubtitle}
+              filenameBase={`${groupName || 'stokvel'}_finance_summary`}
+              headers={financeSummaryExport.headers}
+              rows={financeSummaryExport.rows}
+            />
+          </div>
           <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {statCards.map((card) => (
               <div key={card.label} className={`${cardLight} p-4`}>
@@ -799,9 +878,16 @@ export default function Payments() {
               </div>
 
               <section className={`${cardLight} min-h-0 flex-1 p-4`}>
-                <h3 className="mb-3 border-b border-stone-200 pb-2 text-lg font-bold text-emerald-800 dark:border-slate-700 dark:text-emerald-300">
-                  Payout schedule
-                </h3>
+                <div className="mb-3 flex flex-wrap items-start justify-between gap-2 border-b border-stone-200 pb-2 dark:border-slate-700">
+                  <h3 className="text-lg font-bold text-emerald-800 dark:text-emerald-300">Payout schedule</h3>
+                  <ReportExportActions
+                    title="Payout schedule"
+                    subtitle={reportExportSubtitle}
+                    filenameBase={`${groupName || 'stokvel'}_payout_schedule`}
+                    headers={payoutScheduleExport.headers}
+                    rows={payoutScheduleExport.rows}
+                  />
+                </div>
                 <p className="mb-3 text-xs text-stone-500 dark:text-stone-400">
                   Scheduled payouts from the group roster (amount ≈ pool for that cycle).
                 </p>
@@ -938,9 +1024,17 @@ export default function Payments() {
           <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div className="order-1 space-y-8 lg:col-span-2">
               <section>
-                <h3 className="mb-4 border-b border-stone-200 pb-2 text-lg font-bold text-emerald-800 dark:border-slate-700 dark:text-emerald-300">
-                  Cycle ledger
-                </h3>
+                <div className="mb-4 flex flex-wrap items-start justify-between gap-2 border-b border-stone-200 pb-2 dark:border-slate-700">
+                  <h3 className="text-lg font-bold text-emerald-800 dark:text-emerald-300">Cycle ledger</h3>
+                  <ReportExportActions
+                    title="Cycle ledger (all cycles)"
+                    subtitle={reportExportSubtitle}
+                    filenameBase={`${groupName || 'stokvel'}_cycle_ledger_all`}
+                    headers={cycleLedgerExportAll.headers}
+                    rows={cycleLedgerExportAll.rows}
+                    disabled={ledgerMonths.length === 0}
+                  />
+                </div>
                 {approvalError ? (
                   <p className={`mb-4 text-sm ${errorBox}`} role="alert">
                     {approvalError}
@@ -956,8 +1050,15 @@ export default function Payments() {
                       const isPastMonth = month < refMonth
                       return (
                         <div key={month} className={`${cardLight} overflow-hidden`}>
-                          <div className="border-b border-stone-200 bg-stone-50/80 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/40">
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 bg-stone-50/80 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/40">
                             <h4 className="text-sm font-bold text-stone-800 dark:text-stone-100">{month}</h4>
+                            <ReportExportActions
+                              title={`Cycle ledger — ${month}`}
+                              subtitle={reportExportSubtitle}
+                              filenameBase={`${groupName || 'stokvel'}_cycle_ledger_${month}`}
+                              headers={cycleLedgerExportByMonth.headers}
+                              rows={cycleLedgerExportByMonth.byMonth[month] ?? []}
+                            />
                           </div>
                           <div className={tableWrap}>
                             <table className="w-full min-w-[320px] text-left text-sm text-stone-800 dark:text-stone-100">
@@ -1128,9 +1229,17 @@ export default function Payments() {
 
               {isTreasurerRole ? (
                 <section className={`${cardLight} w-full p-4`}>
-                  <h3 className="mb-3 border-b border-stone-200 pb-2 text-lg font-bold text-emerald-800 dark:border-slate-700 dark:text-emerald-300">
-                    Payouts (Treasurer)
-                  </h3>
+                  <div className="mb-3 flex flex-wrap items-start justify-between gap-2 border-b border-stone-200 pb-2 dark:border-slate-700">
+                    <h3 className="text-lg font-bold text-emerald-800 dark:text-emerald-300">Payouts (Treasurer)</h3>
+                    <ReportExportActions
+                      title="Payouts (Treasurer)"
+                      subtitle={reportExportSubtitle}
+                      filenameBase={`${groupName || 'stokvel'}_treasurer_payouts`}
+                      headers={treasurerPayoutsExport.headers}
+                      rows={treasurerPayoutsExport.rows}
+                      disabled={payoutsLoading}
+                    />
+                  </div>
                   {payoutActionError ? (
                     <p className="mb-2 text-xs text-red-700 dark:text-red-300">{payoutActionError}</p>
                   ) : null}
