@@ -920,6 +920,71 @@ describe('stokvels routes', () => {
     expect(res.body.contribution.treasurer_approved_at).toBeNull()
   })
 
+  it('GET /:id/payout-report allows any member and returns history and projections', async () => {
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    mockGetServiceSupabase.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'member' }, error: null })
+    client.__push('stokvels.selectSingle', {
+      data: {
+        id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        name: 'Test Group',
+        contribution_amount: 200,
+        status: 'active',
+      },
+      error: null,
+    })
+    client.__push('stokvel_members.selectMany', {
+      data: [
+        {
+          user_id: '11111111-1111-4111-8111-111111111111',
+          group_role: 'member',
+          profiles: { first_name: 'Me', last_name: 'Member' },
+        },
+        { user_id: 'u2', group_role: 'member', profiles: { first_name: 'Other', last_name: 'User' } },
+      ],
+      error: null,
+    })
+    client.__push('payouts.selectMany', {
+      data: [
+        {
+          id: 'p-past',
+          user_id: '11111111-1111-4111-8111-111111111111',
+          target_month: '2026-03',
+          scheduled_payout_date: '2026-04-01',
+          cycle_index: 0,
+          status: 'completed',
+          disbursed_at: '2026-04-02T10:00:00Z',
+        },
+        {
+          id: 'p-future',
+          user_id: '11111111-1111-4111-8111-111111111111',
+          target_month: '2026-07',
+          scheduled_payout_date: '2099-07-01',
+          cycle_index: 1,
+          status: 'pending',
+        },
+      ],
+      error: null,
+    })
+    client.__push('profiles.selectMany', {
+      data: [
+        { id: '11111111-1111-4111-8111-111111111111', first_name: 'Me', last_name: 'Member' },
+        { id: 'u2', first_name: 'Other', last_name: 'User' },
+      ],
+      error: null,
+    })
+
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const res = await request(makeApp()).get(`/api/stokvels/${sid}/payout-report`)
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+    expect(res.body.report.summary.expected_payout_amount).toBe(400)
+    expect(res.body.report.history).toHaveLength(1)
+    expect(res.body.report.upcoming_projections).toHaveLength(1)
+    expect(res.body.report.my_summary.next_expected?.expected_amount).toBe(400)
+  })
+
   it('GET /:id/payouts allows treasurer and returns profile-enriched payout list', async () => {
     const client = createSupabaseMock()
     mockCreateClient.mockReturnValue(client)
