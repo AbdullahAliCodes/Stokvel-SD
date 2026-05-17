@@ -206,10 +206,7 @@ describe("Meetings page", () => {
     renderMeetings();
 
     expect(await screen.findByText("Detail exploded")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Back to dashboard" })).toHaveAttribute(
-      "href",
-      "/dashboard",
-    );
+    expect(screen.queryByRole("link", { name: "Back to dashboard" })).not.toBeInTheDocument();
   });
 
   it("renders upcoming and past meetings, markdown fallback labels, and role controls", async () => {

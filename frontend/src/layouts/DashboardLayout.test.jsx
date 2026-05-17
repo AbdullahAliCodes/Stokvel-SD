@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import DashboardLayout from './DashboardLayout'
 import { SessionContext } from '../context/SessionContext'
 
@@ -59,37 +59,21 @@ function renderLayout(initialPath) {
   )
 }
 
-describe('DashboardLayout back navigation', () => {
+describe('DashboardLayout page content', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     localStorage.clear()
   })
 
-  it('hides back link on group dashboard home', async () => {
-    renderLayout('/group/stok-1/dashboard')
-    expect(await screen.findByText('Group home')).toBeInTheDocument()
+  it('renders outlet without a back-to-dashboard link on scoped sub-pages', async () => {
+    renderLayout('/group/stok-1/payments')
+    expect(await screen.findByText('Payments page')).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Back to dashboard' })).not.toBeInTheDocument()
   })
 
-  it('shows back link to group dashboard on scoped sub-pages', async () => {
-    renderLayout('/group/stok-1/payments')
-    expect(await screen.findByText('Payments page')).toBeInTheDocument()
-    await waitFor(() => {
-      expect(screen.getByRole('link', { name: 'Back to dashboard' })).toHaveAttribute(
-        'href',
-        '/group/stok-1/dashboard',
-      )
-    })
-  })
-
-  it('shows back link on global member routes', async () => {
+  it('renders outlet without a back-to-dashboard link on global member routes', async () => {
     renderLayout('/account')
     expect(await screen.findByText('Account page')).toBeInTheDocument()
-    await waitFor(() => {
-      expect(screen.getByRole('link', { name: 'Back to dashboard' })).toHaveAttribute(
-        'href',
-        '/dashboard',
-      )
-    })
+    expect(screen.queryByRole('link', { name: 'Back to dashboard' })).not.toBeInTheDocument()
   })
 })
