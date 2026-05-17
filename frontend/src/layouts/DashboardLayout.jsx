@@ -31,6 +31,8 @@ import {
   myStokvelsCacheKey,
   stokvelStatusOf,
 } from "../utils/stokvelMembership";
+import { memberPageBackTarget } from "../utils/dashboardPaths";
+import PageBackNav from "../components/PageBackNav";
 
 const CACHE_TTL_MS = 180000;
 
@@ -200,6 +202,11 @@ export default function DashboardLayout() {
     onScopedRoute &&
     !knownMembershipIds.has(String(stokvel_id)) &&
     String(userRole || "").toLowerCase() !== "admin";
+
+  const pageBack = useMemo(
+    () => memberPageBackTarget(location.pathname),
+    [location.pathname],
+  );
 
   if (memberships === null && isScopedPath) {
     return (
@@ -408,7 +415,12 @@ export default function DashboardLayout() {
         </div>
       </aside>
       <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain rounded-2xl border border-stone-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-stone-100 sm:p-6 md:p-8">
-        {blockOutlet ? null : <Outlet />}
+        {blockOutlet ? null : (
+          <>
+            {pageBack ? <PageBackNav to={pageBack.to} label={pageBack.label} /> : null}
+            <Outlet />
+          </>
+        )}
       </main>
     </div>
   );

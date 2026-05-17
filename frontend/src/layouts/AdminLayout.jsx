@@ -1,4 +1,5 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useMemo } from 'react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import BrandLogo from '../components/BrandLogo'
 import ThemeToggle from '../components/ThemeToggle'
 import {
@@ -10,6 +11,8 @@ import {
 } from 'lucide-react'
 import { supabase } from '../utils/supabase'
 import { cardLight } from '../ui'
+import { adminPageBackTarget } from '../utils/dashboardPaths'
+import PageBackNav from '../components/PageBackNav'
 
 const linkClass = ({ isActive }) =>
   `flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition ${
@@ -20,6 +23,11 @@ const linkClass = ({ isActive }) =>
 
 export default function AdminLayout() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const pageBack = useMemo(
+    () => adminPageBackTarget(location.pathname),
+    [location.pathname],
+  )
 
   return (
     <div className="box-border flex min-h-dvh w-full flex-col gap-3 overflow-y-auto bg-[#F4F5F0] p-3 text-stone-800 dark:bg-slate-950 dark:text-stone-100 md:h-dvh md:min-h-0 md:flex-row md:gap-4 md:overflow-hidden md:p-4">
@@ -74,6 +82,7 @@ export default function AdminLayout() {
       <main
         className={`${cardLight} min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain border-t-4 border-emerald-700 p-4 sm:p-6 md:p-8`}
       >
+        {pageBack ? <PageBackNav to={pageBack.to} label={pageBack.label} /> : null}
         <Outlet />
       </main>
     </div>
