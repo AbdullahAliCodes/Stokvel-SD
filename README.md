@@ -1,6 +1,6 @@
 # Stokvel Management System
 
-[![Codecov](https://img.shields.io/codecov/c/github/REPLACE_WITH_ORG/Stokvel-SD?label=coverage)](https://codecov.io/gh/REPLACE_WITH_ORG/Stokvel-SD)
+[![Codecov](https://img.shields.io/codecov/c/github/AbdullahAliCodes/Stokvel-SD?label=coverage)](https://codecov.io/gh/AbdullahAliCodes/Stokvel-SD)
 [![Node.js](https://img.shields.io/badge/node-20%20LTS-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](backend/package.json)
 
@@ -74,6 +74,7 @@ This project uses Supabase for its PostgreSQL database and authentication. To ru
    - Open the `supabase/schema.sql` file from this repository, copy its entire contents, and paste it into the query editor.
    - Click **Run**. This will instantly create all necessary tables and security policies.
 3. **Configure API Keys:** From **Project Settings → API**, copy your Project URL and `anon` key into both your backend and frontend `.env` files.
+4. **Create Storage Bucket:** Navigate to **Storage** in your Supabase dashboard and create a new public bucket named `stokvel-documents`.
 
 > **Note:** There is no bundled seed data. You can create test users via the app's sign-up flow. The provided SQL script automatically applies the necessary Row-Level Security (RLS) policies.
 
