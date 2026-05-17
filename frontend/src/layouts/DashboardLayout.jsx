@@ -31,7 +31,6 @@ import {
   myStokvelsCacheKey,
   stokvelStatusOf,
 } from "../utils/stokvelMembership";
-
 const CACHE_TTL_MS = 180000;
 
 const linkClass = ({ isActive }) =>

@@ -401,12 +401,6 @@ export default function Meetings() {
       <div>
         <h1 className="mb-2 text-2xl font-bold text-emerald-800 dark:text-emerald-300">Meetings</h1>
         <p className={errorBox}>{error}</p>
-        <Link
-          to="/dashboard"
-          className="mt-4 inline-block rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-50 dark:border-slate-600 dark:bg-slate-800 dark:text-stone-100 dark:hover:bg-slate-700"
-        >
-          Back to dashboard
-        </Link>
       </div>
     );
   }

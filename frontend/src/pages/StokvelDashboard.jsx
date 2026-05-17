@@ -192,9 +192,6 @@ export default function StokvelDashboard() {
       <div>
         <h1 className="mb-2 text-2xl font-bold text-emerald-800 dark:text-emerald-300">Dashboard</h1>
         <p className={`${errorBox}`}>{error}</p>
-        <Link to="/dashboard" className={`${btnPrimary} mt-4 inline-block`}>
-          Back to gateway
-        </Link>
       </div>
     )
   }

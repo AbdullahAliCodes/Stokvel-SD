@@ -40,6 +40,15 @@ vi.mock("../components/MarketRatesWidget", () => ({
   ),
 }));
 
+vi.mock("../components/ReportExportActions", () => ({
+  default: () => (
+    <div data-testid="report-export-actions">
+      <button type="button">CSV</button>
+      <button type="button">PDF</button>
+    </div>
+  ),
+}));
+
 vi.mock("../components/QuickPayModal", () => ({
   default: ({ onClose, onSuccess, onRecordError, monthlyContribution }) => (
     <div data-testid="quickpay-modal">
@@ -74,14 +83,23 @@ function failText(text) {
   return { ok: false, text: async () => text };
 }
 
-function setupFetch({ detail, meetings, treasurerPatch, approvalPatch }) {
+function setupFetch({ detail, meetings, treasurerPatch, approvalPatch, treasurerPayouts } = {}) {
   global.fetch = vi.fn(async (url, opts = {}) => {
     const method = opts.method ?? "GET";
     const u = String(url);
     if (u.endsWith("/api/stokvels/stok-1") && method === "GET") return detail;
     if (u.endsWith("/api/stokvels/stok-1/meetings") && method === "GET") return meetings;
+    if (u.endsWith("/api/stokvels/stok-1/payouts") && method === "GET") {
+      return treasurerPayouts ?? okJson({ payouts: [] });
+    }
     if (u.endsWith("/api/stokvels/stok-1/treasurer") && method === "PATCH") return treasurerPatch;
     if (u.endsWith("/api/stokvels/stok-1/payout-order") && method === "PATCH") return okJson({ success: true });
+    if (u.endsWith("/api/stokvels/stok-1/missed-payments") && method === "POST") {
+      return okJson({ success: true });
+    }
+    if (u.includes("/api/stokvels/stok-1/payouts/") && method === "POST") {
+      return okJson({ success: true, payout: { status: "completed" } });
+    }
     if (u.includes("/contributions/") && u.endsWith("/treasurer-approval") && method === "PATCH") {
       return approvalPatch ?? okJson({ success: true, contribution: {} });
     }
@@ -319,6 +337,7 @@ describe("Payments", () => {
         return okJson(approvalDone ? detailAfterApproval : detailTreasurer);
       }
       if (u.endsWith("/api/stokvels/stok-1/meetings") && method === "GET") return okJson({ meetings: [] });
+      if (u.endsWith("/api/stokvels/stok-1/payouts") && method === "GET") return okJson({ payouts: [] });
       if (u.includes("/contributions/") && u.endsWith("/treasurer-approval") && method === "PATCH") {
         approvalDone = true;
         return okJson({ success: true, contribution: {} });
@@ -364,6 +383,7 @@ describe("Payments", () => {
         return okJson(afterReset ? pendingAgain : approvedDetail);
       }
       if (u.endsWith("/api/stokvels/stok-1/meetings") && method === "GET") return okJson({ meetings: [] });
+      if (u.endsWith("/api/stokvels/stok-1/payouts") && method === "GET") return okJson({ payouts: [] });
       if (u.includes("/contributions/") && u.endsWith("/treasurer-approval") && method === "PATCH") {
         const body = JSON.parse(String(opts.body || "{}"));
         if (body.status === "pending") afterReset = true;
