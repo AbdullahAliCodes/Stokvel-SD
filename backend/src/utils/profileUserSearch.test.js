@@ -59,6 +59,18 @@ describe('searchProfilesForMemberInvite', () => {
     mockCreateUserJwtSupabase.mockReturnValue(null)
   })
 
+  it('returns 503 when neither service nor user client is available', async () => {
+    const req = makeReq({ q: 'jo' })
+    const res = makeRes()
+
+    await searchProfilesForMemberInvite(req, res)
+
+    expect(res.status).toHaveBeenCalledWith(503)
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.stringMatching(/unavailable/i) }),
+    )
+  })
+
   it('returns empty users when query length is less than 2', async () => {
     const req = makeReq({ q: 'a' })
     const res = makeRes()

@@ -4,6 +4,7 @@ import { activateStokvel, shuffleMemberIds } from './stokvelActivation.js'
 function createServiceSupabaseMock({
   stokvel,
   memberRows = [],
+  membersError = null,
   payoutCount = 0,
   inviteRows = [],
   inviteError = null,
@@ -17,7 +18,7 @@ function createServiceSupabaseMock({
   const payoutDeleteEqMock = jest.fn(async () => ({ error: generateDeleteError }))
   const payoutsSelectEqMock = jest.fn(async () => ({ count: payoutCount, error: null }))
   const stokvelSelectEqMock = jest.fn(async () => ({ data: stokvel, error: null }))
-  const membersEqMock = jest.fn(async () => ({ data: memberRows, error: null }))
+  const membersEqMock = jest.fn(async () => ({ data: memberRows, error: membersError }))
   const stokvelUpdateEqMock = jest.fn(async () => ({ error: updateError }))
 
   return {
@@ -191,6 +192,27 @@ describe('activateStokvel', () => {
     expect(svc._mocks.stokvelUpdateEqMock).toHaveBeenCalledWith('id', 'stokvel-1')
   })
 
+  it('returns error when manual payout sequence does not match roster', async () => {
+    const m1 = '123e4567-e89b-12d3-a456-426614174100'
+    const m2 = '987f6543-a21b-12d3-a456-426614174101'
+    const svc = createServiceSupabaseMock({
+      stokvel: {
+        id: 'stokvel-1',
+        status: 'pending',
+        type: 'Rotating',
+        cycle_length: 2,
+        payout_order_type: 'manual',
+        proposed_payout_sequence: [m1],
+      },
+      memberRows: [{ user_id: m1 }, { user_id: m2 }],
+      inviteRows: [],
+      profileRows: [],
+    })
+    const result = await activateStokvel('stokvel-1', svc)
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/Manual payout order/i)
+  })
+
   it('activates pending stokvel with manual payout sequence when roster is fully registered', async () => {
     const m1 = '123e4567-e89b-12d3-a456-426614174000'
     const m2 = '987f6543-a21b-12d3-a456-426614174000'
@@ -265,6 +287,173 @@ describe('activateStokvel', () => {
     const result = await activateStokvel('stokvel-1', svc)
     expect(result.ok).toBe(false)
     expect(result.error).toMatch(/invite query failed/)
+  })
+
+  it('returns error when payout delete fails during activation', async () => {
+    const m1 = '123e4567-e89b-12d3-a456-426614174070'
+    const m2 = '987f6543-a21b-12d3-a456-426614174071'
+    const svc = createServiceSupabaseMock({
+      stokvel: {
+        id: 'stokvel-1',
+        status: 'pending',
+        type: 'Rotating',
+        cycle_length: 2,
+        payout_order_type: 'randomize',
+      },
+      memberRows: [{ user_id: m1 }, { user_id: m2 }],
+      inviteRows: [],
+      profileRows: [],
+      generateDeleteError: { message: 'delete failed' },
+    })
+    const result = await activateStokvel('stokvel-1', svc, {
+      activationInstant: new Date('2026-01-15T00:00:00.000Z'),
+    })
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/delete failed/)
+  })
+
+  it('returns error when payout insert fails during activation', async () => {
+    const m1 = '123e4567-e89b-12d3-a456-426614174080'
+    const m2 = '987f6543-a21b-12d3-a456-426614174081'
+    const svc = createServiceSupabaseMock({
+      stokvel: {
+        id: 'stokvel-1',
+        status: 'pending',
+        type: 'Rotating',
+        cycle_length: 2,
+        payout_order_type: 'randomize',
+      },
+      memberRows: [{ user_id: m1 }, { user_id: m2 }],
+      inviteRows: [],
+      profileRows: [],
+      insertError: { message: 'insert failed' },
+    })
+    const result = await activateStokvel('stokvel-1', svc, {
+      activationInstant: new Date('2026-01-15T00:00:00.000Z'),
+    })
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/insert failed/)
+  })
+
+  it('returns error when member lookup fails', async () => {
+    const svc = createServiceSupabaseMock({
+      stokvel: {
+        id: 'stokvel-1',
+        status: 'pending',
+        type: 'Rotating',
+        cycle_length: 2,
+        payout_order_type: 'randomize',
+      },
+      membersError: { message: 'members failed' },
+    })
+    const result = await activateStokvel('stokvel-1', svc)
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/members failed/)
+  })
+
+  it('returns error when profile lookup fails', async () => {
+    const m1 = '123e4567-e89b-12d3-a456-426614174060'
+    const svc = createServiceSupabaseMock({
+      stokvel: {
+        id: 'stokvel-1',
+        status: 'pending',
+        type: 'Rotating',
+        cycle_length: 1,
+        payout_order_type: 'randomize',
+      },
+      memberRows: [{ user_id: m1 }],
+      profileError: { message: 'profiles failed' },
+    })
+    const result = await activateStokvel('stokvel-1', svc)
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/profiles failed/)
+  })
+
+  it('returns error when cycle_length is invalid', async () => {
+    const svc = createServiceSupabaseMock({
+      stokvel: {
+        id: 'stokvel-1',
+        status: 'pending',
+        type: 'Rotating',
+        cycle_length: 0,
+        payout_order_type: 'randomize',
+      },
+    })
+    const result = await activateStokvel('stokvel-1', svc)
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/Invalid cycle_length/i)
+  })
+
+  it('returns error when stokvel is not found', async () => {
+    const svc = createServiceSupabaseMock({
+      stokvel: null,
+    })
+    const result = await activateStokvel('stokvel-1', svc)
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/not found/i)
+  })
+
+  it('returns error when stokvel select fails', async () => {
+    const svc = {
+      from(table) {
+        if (table === 'stokvels') {
+          return {
+            select() {
+              return {
+                eq() {
+                  return {
+                    maybeSingle: async () => ({ data: null, error: { message: 'select failed' } }),
+                  }
+                },
+              }
+            },
+          }
+        }
+        throw new Error(`Unexpected table: ${table}`)
+      },
+    }
+    const result = await activateStokvel('stokvel-1', svc)
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/select failed/)
+  })
+
+  it('returns error when stokvel update fails after payouts are inserted', async () => {
+    const m1 = '123e4567-e89b-12d3-a456-426614174090'
+    const m2 = '987f6543-a21b-12d3-a456-426614174091'
+    const svc = createServiceSupabaseMock({
+      stokvel: {
+        id: 'stokvel-1',
+        status: 'pending',
+        type: 'Rotating',
+        cycle_length: 2,
+        payout_order_type: 'randomize',
+      },
+      memberRows: [{ user_id: m1 }, { user_id: m2 }],
+      inviteRows: [],
+      profileRows: [],
+      updateError: { message: 'final update failed' },
+    })
+    const result = await activateStokvel('stokvel-1', svc, {
+      activationInstant: new Date('2026-01-15T00:00:00.000Z'),
+    })
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/final update failed/)
+    expect(svc._mocks.payoutDeleteEqMock).toHaveBeenCalled()
+  })
+
+  it('returns error when stokvel status cannot be activated', async () => {
+    const svc = createServiceSupabaseMock({
+      stokvel: {
+        id: 'stokvel-1',
+        status: 'rejected',
+        type: 'Rotating',
+        cycle_length: 2,
+        payout_order_type: 'randomize',
+      },
+    })
+    const result = await activateStokvel('stokvel-1', svc)
+    expect(result.ok).toBe(false)
+    expect(result.error).toMatch(/Cannot activate/i)
   })
 
   it('dedupes pending invite when email already belongs to a registered member', async () => {

@@ -33,6 +33,11 @@ jest.unstable_mockModule('../utils/invitations.js', () => ({
   normalizeInviteEmail: mockNormalizeInviteEmail,
 }))
 
+const mockActivateStokvel = jest.fn()
+jest.unstable_mockModule('../utils/stokvelActivation.js', () => ({
+  activateStokvel: (...args) => mockActivateStokvel(...args),
+}))
+
 const { default: invitationsRouter } = await import('./invitations.js')
 
 function makeClient(overrides = {}) {
@@ -97,6 +102,7 @@ beforeEach(() => {
     typeof v === 'string' && v.includes('@') ? v.trim().toLowerCase() : '',
   )
   mockGroupRoleForUserProfile.mockResolvedValue('member')
+  mockActivateStokvel.mockResolvedValue({ ok: true })
 })
 
 describe('Invitations router', () => {
@@ -155,6 +161,16 @@ describe('Invitations router', () => {
 
       expect(res.status).toBe(404)
       expect(res.body).toEqual({ error: 'Invitation not found.' })
+    })
+
+    it('returns 500 on unexpected GET errors', async () => {
+      const client = makeClient()
+      mockGetServiceSupabase.mockImplementation(() => {
+        throw new Error('boom')
+      })
+      const res = await request(makeApp()).get('/api/invitations/token123')
+      expect(res.status).toBe(500)
+      expect(res.body).toEqual({ error: 'Internal Server Error' })
     })
 
     it('returns invitation details when token is valid and pending', async () => {
@@ -292,6 +308,38 @@ describe('Invitations router', () => {
       expect(mockGroupRoleForUserProfile).not.toHaveBeenCalled()
       expect(res.status).toBe(500)
       expect(res.body).toEqual({ error: 'update failed' })
+    })
+
+    it('returns 500 on unexpected POST accept errors', async () => {
+      mockGetServiceSupabase.mockImplementation(() => {
+        throw new Error('accept boom')
+      })
+      const res = await request(makeApp()).post('/api/invitations/accept').send({ token: 'abc' })
+      expect(res.status).toBe(500)
+      expect(res.body).toEqual({ error: 'Internal Server Error' })
+    })
+
+    it('returns success and triggers activation when service client is configured', async () => {
+      const client = makeClient()
+      mockGetServiceSupabase.mockReturnValue(client)
+      client._state.maybeSingleQueue.push({
+        data: {
+          id: 'i1',
+          email: 'auth@site.com',
+          status: 'pending',
+          stokvel_id: 's1',
+          group_role: 'member',
+        },
+        error: null,
+      })
+      client._state.maybeSingleQueue.push({ data: { email: 'auth@site.com' }, error: null })
+      client._state.upsertQueue.push({ error: null })
+      client._state.updateEqQueue.push({ error: null })
+
+      const res = await request(makeApp()).post('/api/invitations/accept').send({ token: 'abc' })
+
+      expect(res.status).toBe(200)
+      expect(mockActivateStokvel).toHaveBeenCalledWith('s1', client)
     })
 
     it('returns success when accept flow completes with fallback db client', async () => {
