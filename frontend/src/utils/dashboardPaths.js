@@ -17,30 +17,6 @@ export function groupDashboardPath(stokvelId) {
   return id ? `/group/${id}/dashboard` : '/dashboard'
 }
 
-export function memberPageBackTarget(pathname) {
-  const path = String(pathname || '')
-
-  if (/^\/group\/[^/]+\/dashboard\/?$/.test(path)) {
-    return null
-  }
-
-  const scopedId = stokvelIdFromPath(path)
-  if (scopedId && /^\/group\/[^/]+\//.test(path)) {
-    return { to: `/group/${scopedId}/dashboard`, label: 'Back to dashboard' }
-  }
-
-  if (
-    path === '/account' ||
-    path === '/support' ||
-    path === '/apply' ||
-    path === '/my-payout'
-  ) {
-    return { to: groupDashboardPath(null), label: 'Back to dashboard' }
-  }
-
-  return null
-}
-
 export function adminPageBackTarget(pathname) {
   const path = String(pathname || '')
   if (path === '/admin' || path === '/admin/groups') {

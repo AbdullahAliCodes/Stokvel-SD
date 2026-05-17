@@ -40,7 +40,7 @@ function yearFromIsoDate(iso) {
   return Number.isFinite(y) ? y : null;
 }
 
-/** Member payout history & upcoming projections (pool = contribution × member count). */
+/** Member payout history & upcoming projections (pool = contribution × member count, or Fixed projection). */
 export function buildPayoutReport({
   stokvel,
   payoutRows,
@@ -48,10 +48,14 @@ export function buildPayoutReport({
   profileById,
   viewerUserId,
   todayIso,
+  fixedPoolProjection = null,
 }) {
   const memberCount = (members ?? []).length;
   const monthlyContribution = Number(stokvel?.contribution_amount) || 0;
-  const expectedPayoutAmount = monthlyContribution * memberCount;
+  const expectedPayoutAmount =
+    fixedPoolProjection?.expected_payout_per_member != null
+      ? fixedPoolProjection.expected_payout_per_member
+      : monthlyContribution * memberCount;
   const currentYear = parseInt(String(todayIso).slice(0, 4), 10);
 
   const enrich = (p) => {
@@ -101,6 +105,7 @@ export function buildPayoutReport({
       monthly_contribution: monthlyContribution,
       member_count: memberCount,
       expected_payout_amount: expectedPayoutAmount,
+      fixed_pool: fixedPoolProjection,
     },
     my_summary: {
       next_expected: myNextRow

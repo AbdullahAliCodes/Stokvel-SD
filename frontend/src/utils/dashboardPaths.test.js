@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import {
   adminPageBackTarget,
   groupDashboardPath,
-  memberPageBackTarget,
   readLastStokvelId,
   stokvelIdFromPath,
 } from './dashboardPaths'
@@ -51,31 +50,6 @@ describe('dashboardPaths', () => {
 
     it('falls back to gateway when no id is known', () => {
       expect(groupDashboardPath(null)).toBe('/dashboard')
-    })
-  })
-
-  describe('memberPageBackTarget', () => {
-    it('returns null on group dashboard home', () => {
-      expect(memberPageBackTarget('/group/s1/dashboard')).toBeNull()
-    })
-
-    it('returns group dashboard for scoped sub-routes', () => {
-      expect(memberPageBackTarget('/group/s1/payments')).toEqual({
-        to: '/group/s1/dashboard',
-        label: 'Back to dashboard',
-      })
-    })
-
-    it('returns gateway or last group for global member routes', () => {
-      expect(memberPageBackTarget('/account')).toEqual({
-        to: '/dashboard',
-        label: 'Back to dashboard',
-      })
-      localStorage.setItem('last_stokvel_id', 'last-1')
-      expect(memberPageBackTarget('/support')).toEqual({
-        to: '/group/last-1/dashboard',
-        label: 'Back to dashboard',
-      })
     })
   })
 

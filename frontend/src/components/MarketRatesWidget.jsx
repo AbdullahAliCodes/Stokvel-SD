@@ -98,8 +98,15 @@ export default function MarketRatesWidget({ memberMonthlyContribution = 0, class
       </div>
       <div>
         <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">
-          Estimated savings growth
+          Illustrative growth if you contribute{' '}
+          {contribution > 0
+            ? `R${contribution.toLocaleString('en-ZA', { maximumFractionDigits: 0 })}/month`
+            : 'X/month'}
         </h4>
+        <p className="mb-2 text-xs text-stone-500 dark:text-stone-400">
+          Compound projection at the current prime rate — not the same formula as
+          your group&apos;s live pool payout estimate.
+        </p>
         {contribution <= 0 ? (
           <p className="text-xs text-stone-500 dark:text-stone-400">
             Set a monthly contribution on this group to see a projection curve.

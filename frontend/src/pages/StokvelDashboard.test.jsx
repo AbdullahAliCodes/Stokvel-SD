@@ -142,10 +142,7 @@ describe("StokvelDashboard", () => {
 
     render(<StokvelDashboard />);
     expect(await screen.findByText("boom")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Back to dashboard" })).toHaveAttribute(
-      "href",
-      "/dashboard",
-    );
+    expect(screen.queryByRole("link", { name: "Back to dashboard" })).not.toBeInTheDocument();
   });
 
   it("renders dashboard summary cards, leadership info, and upcoming meeting", async () => {

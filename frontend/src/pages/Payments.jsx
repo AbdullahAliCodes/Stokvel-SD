@@ -19,6 +19,7 @@ import { readViewCache, writeViewCache } from "../utils/viewCache";
 import MarketRatesWidget from "../components/MarketRatesWidget";
 import QuickPayModal from "../components/QuickPayModal";
 import ReportExportActions from "../components/ReportExportActions";
+import GroupPageHeader from "../components/GroupPageHeader";
 
 const TARGET_MONTH_RE = /^\d{4}-\d{2}$/;
 
@@ -209,6 +210,8 @@ export default function Payments() {
   const [payoutActionLoadingId, setPayoutActionLoadingId] = useState("");
   const [payoutActionError, setPayoutActionError] = useState("");
   const [payoutActionOk, setPayoutActionOk] = useState("");
+  const [fixedPool, setFixedPool] = useState(null);
+  const [ratesStale, setRatesStale] = useState(false);
 
   const showLedgerToast = useCallback((msg) => {
     if (ledgerToastTimer.current) clearTimeout(ledgerToastTimer.current);
@@ -243,6 +246,8 @@ export default function Payments() {
     setMissedPayments(
       Array.isArray(json.missedPayments) ? json.missedPayments : [],
     );
+    setFixedPool(json.fixedPool ?? null);
+    setRatesStale(Boolean(json.rates_stale));
   }, []);
 
   const silentReloadDetail = useCallback(async () => {
@@ -285,6 +290,8 @@ export default function Payments() {
       missedPayments: Array.isArray(json.missedPayments)
         ? json.missedPayments
         : [],
+      fixedPool: json.fixedPool ?? null,
+      rates_stale: Boolean(json.rates_stale),
     });
   }, [
     session?.access_token,
@@ -324,6 +331,8 @@ export default function Payments() {
         setMissedPayments(
           Array.isArray(cached.missedPayments) ? cached.missedPayments : [],
         );
+        setFixedPool(cached.fixedPool ?? null);
+        setRatesStale(Boolean(cached.rates_stale));
         setLoading(false);
       }
       try {
@@ -372,6 +381,8 @@ export default function Payments() {
             missedPayments: Array.isArray(json.missedPayments)
               ? json.missedPayments
               : [],
+            fixedPool: json.fixedPool ?? null,
+            rates_stale: Boolean(json.rates_stale),
           });
         }
       } catch (e) {
@@ -404,9 +415,33 @@ export default function Payments() {
   const memberCount = members.length;
   const monthlyContribution =
     Number(effectiveStokvel?.contribution_amount) || 0;
-  const expectedPayout = monthlyContribution * memberCount;
   const stokvelType = String(effectiveStokvel?.type ?? "");
+  const isFixedStokvel = stokvelType === "Fixed";
   const isRotatingStokvel = stokvelType === "Rotating";
+  const fixedCycleLength = Math.max(
+    1,
+    Number(effectiveStokvel?.cycle_length) || memberCount,
+  );
+  const fixedMaturityPrincipal = monthlyContribution * fixedCycleLength;
+  const maturityPayoutEstimate =
+    isFixedStokvel && fixedPool?.expected_payout_per_member != null
+      ? Number(fixedPool.expected_payout_per_member)
+      : isFixedStokvel
+        ? fixedMaturityPrincipal
+        : monthlyContribution * memberCount;
+  const estimatedAmountMade =
+    isFixedStokvel && fixedPool?.estimated_amount_made != null
+      ? Number(fixedPool.estimated_amount_made)
+      : null;
+  const expectedPayout = isFixedStokvel
+    ? maturityPayoutEstimate
+    : monthlyContribution * memberCount;
+  const estimatedAmountMadeHint =
+    isFixedStokvel &&
+    fixedPool?.member_contributions_to_date != null &&
+    fixedPool?.member_interest_share_to_date != null
+      ? `${formatZAR(Number(fixedPool.member_contributions_to_date))} contributed + ${formatZAR(Number(fixedPool.member_interest_share_to_date))} est. interest share`
+      : null;
   const myRole = String(
     members.find((m) => m.user_id === session?.user?.id)?.group_role ??
       membership?.group_role ??
@@ -713,7 +748,18 @@ export default function Payments() {
 
   const statCards = [
     { label: "Total contribution", value: formatZAR(totalContribution) },
-    { label: "Expected payout", value: formatZAR(expectedPayout) },
+    {
+      label: isFixedStokvel ? "Estimated Amount Made" : "Expected payout",
+      value:
+        ratesStale && isFixedStokvel
+          ? "—"
+          : isFixedStokvel && estimatedAmountMade != null
+            ? formatZAR(estimatedAmountMade)
+            : isFixedStokvel
+              ? formatZAR(0)
+              : formatZAR(expectedPayout),
+      hint: estimatedAmountMadeHint,
+    },
     { label: "Monthly contribution", value: formatZAR(monthlyContribution) },
     { label: "Members", value: String(memberCount) },
   ];
@@ -854,7 +900,7 @@ export default function Payments() {
   }
 
   return (
-    <div>
+    <div className="space-y-8">
       {ledgerToast ? (
         <div
           className="fixed bottom-6 left-1/2 z-60 max-w-md -translate-x-1/2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-900 shadow-lg dark:border-emerald-800 dark:bg-emerald-950/90 dark:text-emerald-100"
@@ -890,49 +936,46 @@ export default function Payments() {
         </div>
       ) : null}
 
-      <div
-        className={`mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between ${
-          isActiveStokvel
-            ? "rounded-xl border-t-4 border-emerald-700 pt-4"
-            : "rounded-xl border-t-4 border-stone-300 pt-4"
-        }`}
-      >
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-emerald-800 sm:text-3xl">
-            <span className="flex items-center gap-2">
-              <i className="fa-solid fa-wallet text-emerald-700" aria-hidden />
-              Payments &amp; finances
-            </span>
-          </h1>
-          {groupName || membership?.group_role ? (
-            <p className={`mt-1 ${pageSubtitle}`}>
+      <GroupPageHeader
+        title="Payments & finances"
+        iconClassName="fa-solid fa-wallet"
+        subtitle={
+          groupName || membership?.group_role || stokvelStatus ? (
+            <>
               {groupName ? (
                 <span className="font-medium text-stone-800 dark:text-stone-100">
                   {groupName}
                 </span>
               ) : null}
               {stokvelStatus ? (
-                <span className="ml-2 capitalize text-stone-500 dark:text-stone-400">
-                  · {stokvelStatus}
+                <span className="capitalize text-stone-500 dark:text-stone-400">
+                  {groupName ? " · " : null}
+                  {stokvelStatus}
                 </span>
               ) : null}
               {membership?.group_role ? (
-                <span className="ml-2 text-stone-500 dark:text-stone-400">
-                  · {formatGroupRole(membership.group_role)}
+                <span className="text-stone-500 dark:text-stone-400">
+                  {" · "}
+                  {formatGroupRole(membership.group_role)}
                 </span>
               ) : null}
-            </p>
-          ) : null}
-          <div className="mt-2 inline-flex items-center gap-2 rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-100">
-            <span className="font-semibold uppercase tracking-wide">
-              Current treasurer
-            </span>
-            <span className="text-emerald-900 dark:text-emerald-50">
-              {currentTreasurerName}
-            </span>
-          </div>
+              {" — "}
+              Contributions, quick pay, payout schedule, and cycle ledger.
+            </>
+          ) : (
+            "Contributions, quick pay, payout schedule, and cycle ledger."
+          )
+        }
+      >
+        <div className="mt-2 inline-flex items-center gap-2 rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-100">
+          <span className="font-semibold uppercase tracking-wide">
+            Current treasurer
+          </span>
+          <span className="text-emerald-900 dark:text-emerald-50">
+            {currentTreasurerName}
+          </span>
         </div>
-      </div>
+      </GroupPageHeader>
 
       {!session ? (
         <p className="mb-6 text-sm text-stone-500">
@@ -971,17 +1014,26 @@ export default function Payments() {
                 <p className="text-xl font-semibold text-stone-800 dark:text-stone-100">
                   {card.value}
                 </p>
+                {card.hint ? (
+                  <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+                    {card.hint}
+                  </p>
+                ) : null}
               </div>
             ))}
           </div>
 
-          <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-stretch">
-            <div className="h-full">
-              <MarketRatesWidget
-                memberMonthlyContribution={monthlyContribution}
-                className="h-full"
-              />
-            </div>
+          <div
+            className={`mb-8 grid grid-cols-1 gap-6 lg:items-stretch ${isFixedStokvel ? "lg:grid-cols-2" : ""}`}
+          >
+            {isFixedStokvel ? (
+              <div className="h-full">
+                <MarketRatesWidget
+                  memberMonthlyContribution={monthlyContribution}
+                  className="h-full"
+                />
+              </div>
+            ) : null}
             <div className="flex h-full flex-col gap-4">
               <div className={`${cardLight} p-4`}>
                 <span className="text-sm font-bold text-stone-800 dark:text-stone-100">
@@ -1021,10 +1073,11 @@ export default function Payments() {
                   />
                 </div>
                 <p className="mb-3 text-xs text-stone-500 dark:text-stone-400">
-                  Scheduled payouts from the group roster (amount ≈ pool for
-                  that cycle).
+                  {isFixedStokvel
+                    ? "Scheduled maturity payout per member (full cycle contributions plus estimated interest at maturity)."
+                    : "Scheduled payouts from the group roster (amount ≈ pool for that cycle)."}
                 </p>
-                {canManagePayoutOrder ? (
+                {canManagePayoutOrder && !isFixedStokvel ? (
                   <p className="mb-3 text-xs text-stone-600 dark:text-stone-300">
                     Treasurers can reorder upcoming payouts only. Completed
                     payouts are locked.
@@ -1081,7 +1134,7 @@ export default function Payments() {
                     </tbody>
                   </table>
                 </div>
-                {canManagePayoutOrder && upcomingPayouts.length > 1 ? (
+                {canManagePayoutOrder && !isFixedStokvel && upcomingPayouts.length > 1 ? (
                   <div className="mt-4">
                     <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
                       Reorder upcoming disbursements
