@@ -46,7 +46,9 @@ frontend (5173)  --/api/*-->  backend (5000)  -->  Supabase
 ```
 backend/                 Express API
 frontend/                Vite + React SPA
-supabase/migrations/     SQL migrations (apply to your Supabase project)
+supabase/schema.sql      Full public schema + RLS (bootstrap)
+supabase/seed.sql        Demo data (run after Auth users exist)
+supabase/migrations/     Historical incremental SQL
 .github/workflows/       Codecov (tests) and Render deploy (backend)
 ```
 
@@ -63,20 +65,38 @@ supabase/migrations/     SQL migrations (apply to your Supabase project)
 
 ---
 
-## Database & Supabase Setup
+## Database & Supabase setup
 
-This project uses Supabase for its PostgreSQL database and authentication. To run this locally, you must replicate the database schema.
+This project uses Supabase for PostgreSQL and Auth.
 
-1. **Create a project:** Go to the [Supabase Dashboard](https://supabase.com/dashboard) and create a new project.
-2. **Apply the schema:**
-   - Navigate to the **SQL Editor** in your Supabase dashboard.
-   - Click **New Query**.
-   - Open the `supabase/schema.sql` file from this repository, copy its entire contents, and paste it into the query editor.
-   - Click **Run**. This will instantly create all necessary tables and security policies.
-3. **Configure API Keys:** From **Project Settings → API**, copy your Project URL and `anon` key into both your backend and frontend `.env` files.
-4. **Create Storage Bucket:** Navigate to **Storage** in your Supabase dashboard and create a new public bucket named `stokvel-documents`.
+| Script | Purpose |
+| --- | --- |
+| [`supabase/schema.sql`](supabase/schema.sql) | Creates all `public` tables and RLS policies (run **once** on a new project). |
+| [`supabase/seed.sql`](supabase/seed.sql) | Loads demo data for local testing (run **after** schema + Auth users). |
 
-> **Note:** There is no bundled seed data. You can create test users via the app's sign-up flow. The provided SQL script automatically applies the necessary Row-Level Security (RLS) policies.
+1. **Create a project** in the [Supabase Dashboard](https://supabase.com/dashboard).
+2. **Apply the schema:** SQL Editor → New query → paste [`supabase/schema.sql`](supabase/schema.sql) → **Run**.
+3. **Create Auth users** (required before seed):
+   - **Authentication → Users → Add user** (or use app sign-up) for:
+     - `treasurer@example.com`
+     - `member1@example.com`
+     - `member2@example.com`
+   - Set a password for each (e.g. `DevPassword123!` for local dev only).
+4. **Run the seed:** New query → paste [`supabase/seed.sql`](supabase/seed.sql) → **Run**.
+   - Creates profiles, an **active** stokvel (“Kasi Wealth Builders”), memberships, contributions, a payout, a meeting, market rates, a pending invitation, and a sample issue.
+   - **Safe to re-run** on dev: it deletes and recreates the demo stokvel (`f9e8d7c6-…`). Do not use on production.
+5. **Configure API keys:** **Project Settings → API** → copy URL, `anon` key, and `service_role` key into `backend/.env` and `frontend/.env`.
+6. **Storage:** Create a bucket named `stokvel-documents` for document uploads.
+
+### Demo accounts (after seed)
+
+| Email | Role in “Kasi Wealth Builders” |
+| --- | --- |
+| `treasurer@example.com` | Treasurer |
+| `member1@example.com` | Member (one contribution pending approval) |
+| `member2@example.com` | Member (missed-payment flag for the cycle) |
+
+Log in through the app with the passwords you set in step 3. Incremental schema history also lives in `supabase/migrations/`.
 
 ---
 
