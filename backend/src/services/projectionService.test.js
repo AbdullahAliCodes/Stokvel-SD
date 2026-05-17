@@ -1,8 +1,28 @@
 import { describe, expect, it } from '@jest/globals'
 import {
+  accrueFixedPoolInterestToDate,
   calendarMonthsInclusive,
   computeFixedPoolProjection,
 } from './projectionService.js'
+
+const MEMBER_A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+const MEMBER_B = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+
+function fiveMemberMonth(/** @type {string} */ month, /** @type {number} */ amountEach) {
+  const ids = [
+    MEMBER_A,
+    MEMBER_B,
+    'cccccccc-cccc-cccc-cccc-cccccccccccc',
+    'dddddddd-dddd-dddd-dddd-dddddddddddd',
+    'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee',
+  ]
+  return ids.map((user_id) => ({
+    user_id,
+    amount: amountEach,
+    target_month: month,
+    treasurer_approval_status: 'approved',
+  }))
+}
 
 describe('projectionService', () => {
   it('calendarMonthsInclusive enforces minimum 1 month', () => {
@@ -17,24 +37,76 @@ describe('projectionService', () => {
     expect(calendarMonthsInclusive(a, b)).toBe(3)
   })
 
-  it('computeFixedPoolProjection uses approved principal and simple interest', () => {
+  it('accrueFixedPoolInterestToDate: month1 R5k then month2 R5k at 12% prime', () => {
+    const contributions = [
+      ...fiveMemberMonth('2026-01', 1000),
+      ...fiveMemberMonth('2026-02', 1000),
+    ]
+    const result = accrueFixedPoolInterestToDate({
+      contributions,
+      primeRate: 12,
+      asOfMonth: '2026-02',
+    })
+    expect(result.pool_interest_to_date).toBe(150.5)
+    expect(result.pool_balance).toBe(10150.5)
+    expect(result.months_accrued).toBe(2)
+  })
+
+  it('does not accrue interest in months after the last contribution month', () => {
+    const contributions = fiveMemberMonth('2026-01', 1000)
+    const result = accrueFixedPoolInterestToDate({
+      contributions,
+      primeRate: 12,
+      asOfMonth: '2026-03',
+    })
+    expect(result.pool_interest_to_date).toBe(50)
+    expect(result.months_accrued).toBe(1)
+  })
+
+  it('computeFixedPoolProjection estimated_amount_made for viewer', () => {
+    const contributions = [
+      ...fiveMemberMonth('2026-01', 1000),
+      ...fiveMemberMonth('2026-02', 1000),
+    ]
+    const result = computeFixedPoolProjection({
+      stokvel: {
+        type: 'Fixed',
+        created_at: '2026-01-01T00:00:00Z',
+        maturity_date: '2026-07-01T00:00:00Z',
+        contribution_amount: 1000,
+        cycle_length: 6,
+      },
+      contributions,
+      members: [{}, {}, {}, {}, {}],
+      primeRate: 12,
+      viewerUserId: MEMBER_A,
+      now: new Date('2026-02-28T12:00:00Z'),
+    })
+
+    expect(result).not.toBeNull()
+    expect(result.member_contributions_to_date).toBe(2000)
+    expect(result.pool_interest_to_date).toBe(150.5)
+    expect(result.member_interest_share_to_date).toBe(30.1)
+    expect(result.estimated_amount_made).toBe(2030.1)
+    expect(result.expected_payout_per_member).toBe(6420)
+  })
+
+  it('computeFixedPoolProjection maturity fields use full cycle', () => {
     const now = new Date('2026-04-01T12:00:00Z')
     const result = computeFixedPoolProjection({
       stokvel: {
         type: 'Fixed',
         created_at: '2026-01-01T00:00:00Z',
-        maturity_date: '2027-01-01T00:00:00Z',
+        maturity_date: '2026-04-01T00:00:00Z',
+        contribution_amount: 500,
+        cycle_length: 6,
       },
       contributions: [
         {
+          user_id: MEMBER_A,
           amount: 1000,
-          paid_at: '2026-02-01T00:00:00Z',
+          target_month: '2026-02',
           treasurer_approval_status: 'approved',
-        },
-        {
-          amount: 500,
-          paid_at: '2026-03-01T00:00:00Z',
-          treasurer_approval_status: 'pending',
         },
       ],
       members: [{}, {}, {}],
@@ -42,36 +114,9 @@ describe('projectionService', () => {
       now,
     })
 
-    expect(result).not.toBeNull()
-    expect(result.pool_principal).toBe(1000)
-    expect(result.months_active).toBe(3)
-    expect(result.pool_interest).toBe(30)
-    expect(result.pool_total).toBe(1030)
-    expect(result.expected_payout_per_member).toBeCloseTo(1030 / 3, 2)
-  })
-
-  it('caps accrual at maturity_date when before now', () => {
-    const now = new Date('2026-06-01T00:00:00Z')
-    const result = computeFixedPoolProjection({
-      stokvel: {
-        type: 'Fixed',
-        created_at: '2026-01-01T00:00:00Z',
-        maturity_date: '2026-03-01T00:00:00Z',
-      },
-      contributions: [
-        {
-          amount: 1200,
-          paid_at: '2026-01-15T00:00:00Z',
-          treasurer_approval_status: 'approved',
-        },
-      ],
-      members: [{}],
-      primeRate: 10,
-      now,
-    })
-
-    expect(result.months_active).toBe(3)
-    expect(result.pool_interest).toBe(30)
+    expect(result.expected_principal_per_member).toBe(3000)
+    expect(result.expected_payout_per_member).toBe(3090)
+    expect(result.estimated_amount_made).toBeNull()
   })
 
   it('returns null for Rotating stokvel', () => {

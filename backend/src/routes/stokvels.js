@@ -419,6 +419,7 @@ router.get("/:id", requireAuth, async (req, res) => {
           contributions: contributionsWithProfiles,
           members: members ?? [],
           primeRate: prime,
+          viewerUserId: req.user.id,
           now: new Date(),
         });
         if (!fixedPool) {
@@ -618,7 +619,9 @@ router.get("/:id/payout-report", requireAuth, async (req, res) => {
 
     const { data: contributionRows, error: contribErr } = await access.reader
       .from("contributions")
-      .select("amount, paid_at, treasurer_approval_status")
+      .select(
+        "amount, paid_at, user_id, target_month, treasurer_approval_status",
+      )
       .eq("stokvel_id", stokvelId);
 
     if (contribErr) {
@@ -638,6 +641,7 @@ router.get("/:id/payout-report", requireAuth, async (req, res) => {
           contributions: contributionRows ?? [],
           members: members ?? [],
           primeRate: rates?.prime?.value,
+          viewerUserId: req.user.id,
           now: new Date(),
         });
       } catch (rateErr) {

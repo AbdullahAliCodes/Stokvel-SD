@@ -7,6 +7,7 @@ import { cardLight, errorBox } from "../ui";
 import { readViewCache, writeViewCache } from "../utils/viewCache";
 import PayoutReportPanel from "../components/PayoutReportPanel";
 import ComplianceReportWidget from "../components/ComplianceReportWidget";
+import CustomFinancialReport from "../components/CustomFinancialReport";
 import GroupPageHeader from "../components/GroupPageHeader";
 
 const TARGET_MONTH_RE = /^\d{4}-\d{2}$/;
@@ -60,6 +61,7 @@ export default function Reports() {
   const [currentCycle, setCurrentCycle] = useState(null);
   const [payouts, setPayouts] = useState([]);
   const [missedPayments, setMissedPayments] = useState([]);
+  const [fixedPool, setFixedPool] = useState(null);
 
   const applyStokvelDetail = useCallback((json) => {
     setMembership(json.membership ?? null);
@@ -73,6 +75,7 @@ export default function Reports() {
     setMissedPayments(
       Array.isArray(json.missedPayments) ? json.missedPayments : [],
     );
+    setFixedPool(json.fixedPool ?? null);
   }, []);
 
   useEffect(() => {
@@ -101,6 +104,7 @@ export default function Reports() {
         setMissedPayments(
           Array.isArray(cached.missedPayments) ? cached.missedPayments : [],
         );
+        setFixedPool(cached.fixedPool ?? null);
         setLoading(false);
       }
       try {
@@ -125,6 +129,7 @@ export default function Reports() {
             missedPayments: Array.isArray(json.missedPayments)
               ? json.missedPayments
               : [],
+            fixedPool: json.fixedPool ?? null,
           });
         }
       } catch (e) {
@@ -136,6 +141,7 @@ export default function Reports() {
           setCurrentCycle(null);
           setPayouts([]);
           setMissedPayments([]);
+          setFixedPool(null);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -188,10 +194,11 @@ export default function Reports() {
                 {groupName}
               </span>
               {" — "}
-              Payout history, projections, and contribution compliance.
+              Payout history, projections, compliance, and custom financial
+              views.
             </>
           ) : (
-            "Payout history, projections, and contribution compliance."
+            "Payout history, projections, compliance, and custom financial views."
           )
         }
       />
@@ -224,6 +231,17 @@ export default function Reports() {
               ledgerMonths={ledgerMonths}
             />
           </div>
+
+          <CustomFinancialReport
+            effectiveStokvel={effectiveStokvel}
+            members={members}
+            contributions={contributions}
+            payouts={payouts}
+            missedPayments={missedPayments}
+            ledgerMonths={ledgerMonths}
+            fixedPool={fixedPool}
+            currentUserId={session?.user?.id ?? null}
+          />
         </>
       ) : null}
 

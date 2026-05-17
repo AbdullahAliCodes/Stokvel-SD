@@ -418,10 +418,30 @@ export default function Payments() {
   const stokvelType = String(effectiveStokvel?.type ?? "");
   const isFixedStokvel = stokvelType === "Fixed";
   const isRotatingStokvel = stokvelType === "Rotating";
-  const expectedPayout =
+  const fixedCycleLength = Math.max(
+    1,
+    Number(effectiveStokvel?.cycle_length) || memberCount,
+  );
+  const fixedMaturityPrincipal = monthlyContribution * fixedCycleLength;
+  const maturityPayoutEstimate =
     isFixedStokvel && fixedPool?.expected_payout_per_member != null
       ? Number(fixedPool.expected_payout_per_member)
-      : monthlyContribution * memberCount;
+      : isFixedStokvel
+        ? fixedMaturityPrincipal
+        : monthlyContribution * memberCount;
+  const estimatedAmountMade =
+    isFixedStokvel && fixedPool?.estimated_amount_made != null
+      ? Number(fixedPool.estimated_amount_made)
+      : null;
+  const expectedPayout = isFixedStokvel
+    ? maturityPayoutEstimate
+    : monthlyContribution * memberCount;
+  const estimatedAmountMadeHint =
+    isFixedStokvel &&
+    fixedPool?.member_contributions_to_date != null &&
+    fixedPool?.member_interest_share_to_date != null
+      ? `${formatZAR(Number(fixedPool.member_contributions_to_date))} contributed + ${formatZAR(Number(fixedPool.member_interest_share_to_date))} est. interest share`
+      : null;
   const myRole = String(
     members.find((m) => m.user_id === session?.user?.id)?.group_role ??
       membership?.group_role ??
@@ -729,8 +749,16 @@ export default function Payments() {
   const statCards = [
     { label: "Total contribution", value: formatZAR(totalContribution) },
     {
-      label: isFixedStokvel ? "Equal share (est.)" : "Expected payout",
-      value: ratesStale && isFixedStokvel ? "—" : formatZAR(expectedPayout),
+      label: isFixedStokvel ? "Estimated Amount Made" : "Expected payout",
+      value:
+        ratesStale && isFixedStokvel
+          ? "—"
+          : isFixedStokvel && estimatedAmountMade != null
+            ? formatZAR(estimatedAmountMade)
+            : isFixedStokvel
+              ? formatZAR(0)
+              : formatZAR(expectedPayout),
+      hint: estimatedAmountMadeHint,
     },
     { label: "Monthly contribution", value: formatZAR(monthlyContribution) },
     { label: "Members", value: String(memberCount) },
@@ -986,6 +1014,11 @@ export default function Payments() {
                 <p className="text-xl font-semibold text-stone-800 dark:text-stone-100">
                   {card.value}
                 </p>
+                {card.hint ? (
+                  <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+                    {card.hint}
+                  </p>
+                ) : null}
               </div>
             ))}
           </div>
@@ -1041,7 +1074,7 @@ export default function Payments() {
                 </div>
                 <p className="mb-3 text-xs text-stone-500 dark:text-stone-400">
                   {isFixedStokvel
-                    ? "All members are scheduled for the same maturity payout (equal share estimate)."
+                    ? "Scheduled maturity payout per member (full cycle contributions plus estimated interest at maturity)."
                     : "Scheduled payouts from the group roster (amount ≈ pool for that cycle)."}
                 </p>
                 {canManagePayoutOrder && !isFixedStokvel ? (
