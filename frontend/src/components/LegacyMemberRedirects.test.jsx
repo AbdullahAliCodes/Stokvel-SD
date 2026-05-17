@@ -80,17 +80,17 @@ describe('LegacyMemberRedirects', () => {
     });
 
     describe('LegacyMyPayoutRedirect', () => {
-        it('redirects to payments for the last known stokvel if found in localStorage', () => {
+        it('redirects to reports for the last known stokvel if found in localStorage', () => {
             window.localStorage.setItem('last_stokvel_id', 'lastGroup789');
             render(
                 <MemoryRouter initialEntries={['/mypayout']}>
                     <Routes>
                         <Route path="/mypayout" element={<LegacyMyPayoutRedirect />} />
-                        <Route path="/group/lastGroup789/payments" element={<DestinationPage name="LastGroupPayments" />} />
+                        <Route path="/group/lastGroup789/reports" element={<DestinationPage name="LastGroupReports" />} />
                     </Routes>
                 </MemoryRouter>
             );
-            expect(screen.getByTestId('location')).toHaveTextContent('LastGroupPayments');
+            expect(screen.getByTestId('location')).toHaveTextContent('LastGroupReports');
         });
 
         it('falls back to the main dashboard if no last_stokvel_id is in localStorage', () => {

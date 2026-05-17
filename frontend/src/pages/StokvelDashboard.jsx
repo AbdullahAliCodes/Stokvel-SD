@@ -6,7 +6,7 @@ import { apiUrl } from '../utils/api'
 import { btnPrimary, cardLight, errorBox, pageSubtitle } from '../ui'
 import { readViewCache, writeViewCache } from '../utils/viewCache'
 import QuickPayModal from '../components/QuickPayModal'
-import MemberHealthScore from '../components/HealthScore/MemberHealthScore'
+import MemberHealthScoreCompact from '../components/HealthScore/MemberHealthScoreCompact'
 
 function formatZAR(n) {
   const num = Number(n)
@@ -227,8 +227,8 @@ export default function StokvelDashboard() {
             ) : null}
           </div>
           <p className={pageSubtitle}>
-            Summary for this group. Meetings live on the Meetings tab; contributions, rates, and
-            payout roster are on Payments.
+            Summary for this group. Your ML health score preview is below; full financial health
+            details are on the Financial Health tab. Meetings, Payments, and Reports have the rest.
           </p>
         </div>
       </header>
@@ -238,7 +238,7 @@ export default function StokvelDashboard() {
       ) : null}
 
       {session?.user?.id && stokvel_id ? (
-        <MemberHealthScore userId={session.user.id} groupId={stokvel_id} />
+        <MemberHealthScoreCompact userId={session.user.id} groupId={stokvel_id} />
       ) : null}
 
       <section>

@@ -18,7 +18,7 @@ export function LegacyStokvelToGroup() {
 export function LegacyMyPayoutRedirect() {
   const last =
     typeof localStorage !== 'undefined' ? localStorage.getItem('last_stokvel_id') : null
-  if (last) return <Navigate to={`/group/${last}/payments#payout-report`} replace />
+  if (last) return <Navigate to={`/group/${last}/reports#payout-report`} replace />
   return <Navigate to="/dashboard" replace />
 }
 

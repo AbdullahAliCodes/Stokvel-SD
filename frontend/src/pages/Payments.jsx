@@ -17,9 +17,7 @@ import {
 } from "../ui";
 import { readViewCache, writeViewCache } from "../utils/viewCache";
 import MarketRatesWidget from "../components/MarketRatesWidget";
-import PayoutReportPanel from "../components/PayoutReportPanel";
 import QuickPayModal from "../components/QuickPayModal";
-import ComplianceReportWidget from "../components/ComplianceReportWidget";
 import ReportExportActions from "../components/ReportExportActions";
 
 const TARGET_MONTH_RE = /^\d{4}-\d{2}$/;
@@ -977,12 +975,6 @@ export default function Payments() {
             ))}
           </div>
 
-          <PayoutReportPanel
-            stokvelId={stokvel_id}
-            accessToken={session?.access_token}
-            enabled={Boolean(session && membership)}
-          />
-
           <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-stretch">
             <div className="h-full">
               <MarketRatesWidget
@@ -1188,16 +1180,6 @@ export default function Payments() {
                 ) : null}
               </section>
             </div>
-          </div>
-
-          {/* ---- Contribution Compliance Report ---- */}
-          <div className="mt-10">
-            <ComplianceReportWidget
-              members={members}
-              contributions={contributions}
-              missedPayments={missedPayments}
-              ledgerMonths={ledgerMonths}
-            />
           </div>
 
           <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-2">
