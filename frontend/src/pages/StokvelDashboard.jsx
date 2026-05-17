@@ -230,12 +230,6 @@ export default function StokvelDashboard() {
             payout roster are on Payments.
           </p>
         </div>
-        <Link
-          to={paymentsPath}
-          className="shrink-0 rounded-lg border border-stone-200 bg-stone-50 px-4 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-100 dark:border-slate-600 dark:bg-slate-800 dark:text-stone-200 dark:hover:bg-slate-700"
-        >
-          Payments &amp; finances
-        </Link>
       </header>
 
       {meetingsError ? (
