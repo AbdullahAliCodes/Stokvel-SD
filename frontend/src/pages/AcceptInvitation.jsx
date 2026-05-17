@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { useSession } from '../context/SessionContext'
 import { apiUrl } from '../utils/api'
 import { sectionContainer } from '../styles/tokens'
@@ -110,11 +110,6 @@ export default function AcceptInvitation() {
         </div>
       ) : null}
 
-      <div className="mt-6">
-        <Link to="/dashboard" className="text-sm font-medium text-emerald-800 hover:underline dark:text-emerald-300">
-          Back to dashboard
-        </Link>
-      </div>
     </div>
   )
 }

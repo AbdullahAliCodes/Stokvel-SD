@@ -1038,12 +1038,14 @@ export function CreateStokvelWizard({ variant = "admin" }) {
             ) : null}
           </section>
         ) : null}
-        <Link
-          to={isAdmin ? `/group/${createdStokvel.id}/dashboard` : "/dashboard"}
-          className={`${btnPrimary} inline-flex`}
-        >
-          {isAdmin ? "Open group dashboard" : "Back to dashboard"}
-        </Link>
+        {isAdmin ? (
+          <Link
+            to={`/group/${createdStokvel.id}/dashboard`}
+            className={`${btnPrimary} inline-flex`}
+          >
+            Open group dashboard
+          </Link>
+        ) : null}
       </div>
     );
   }
