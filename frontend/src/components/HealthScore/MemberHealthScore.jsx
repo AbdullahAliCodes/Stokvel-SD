@@ -1,21 +1,11 @@
-import { useCallback, useEffect, useId, useState } from 'react'
-import { useSession } from '../../context/SessionContext'
-import { apiUrl } from '../../utils/api'
 import {
   btnSecondary,
   cardLight,
   errorBox,
   pageSubtitle,
 } from '../../ui'
-
-function parseApiError(text) {
-  try {
-    const j = JSON.parse(text)
-    return j.error || text || 'Request failed'
-  } catch {
-    return text || 'Request failed'
-  }
-}
+import ScoreGauge from './ScoreGauge'
+import { useMemberHealthScore } from './useMemberHealthScore'
 
 function formatWhen(iso) {
   if (!iso) return '—'
@@ -54,71 +44,6 @@ function gradeEmoji(grade) {
   }
 }
 
-function gaugeStroke(grade) {
-  switch (String(grade || '')) {
-    case 'Excellent':
-      return '#047857'
-    case 'Good':
-      return '#ca8a04'
-    case 'Fair':
-      return '#ea580c'
-    case 'At Risk':
-      return '#b91c1c'
-    default:
-      return '#57534e'
-  }
-}
-
-/** Semi-circle arc gauge (0–100), SVG — no chart libraries. */
-function ScoreGauge({ score, grade }) {
-  const gradId = useId().replace(/:/g, '')
-  const r = 54
-  const arcLen = Math.PI * r
-  const pct = Math.min(100, Math.max(0, Number(score)))
-  const filled = (pct / 100) * arcLen
-  const stroke = gaugeStroke(grade)
-
-  return (
-    <div className="relative mx-auto flex h-36 w-44 shrink-0 items-end justify-center">
-      <svg
-        viewBox="0 0 140 90"
-        className="h-full w-full overflow-visible"
-        aria-hidden
-      >
-        <defs>
-          <linearGradient id={gradId} x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor={stroke} stopOpacity="0.95" />
-            <stop offset="100%" stopColor={stroke} stopOpacity="0.55" />
-          </linearGradient>
-        </defs>
-        <path
-          d="M 22 82 A 54 54 0 0 1 118 82"
-          fill="none"
-          stroke="#e7e5e4"
-          strokeWidth="12"
-          strokeLinecap="round"
-          className="dark:stroke-slate-700"
-        />
-        <path
-          d="M 22 82 A 54 54 0 0 1 118 82"
-          fill="none"
-          stroke={`url(#${gradId})`}
-          strokeWidth="12"
-          strokeLinecap="round"
-          strokeDasharray={`${filled} ${arcLen}`}
-          style={{ transition: 'stroke-dasharray 0.45s ease' }}
-        />
-      </svg>
-      <div className="pointer-events-none absolute inset-x-0 bottom-2 flex flex-col items-center text-center">
-        <span className="text-3xl font-bold tabular-nums tracking-tight text-stone-900 dark:text-stone-50">
-          {Math.round(pct)}
-        </span>
-        <span className={`${pageSubtitle} mt-0.5`}>ML health score</span>
-      </div>
-    </div>
-  )
-}
-
 function FeatureImportanceList({ fi }) {
   if (!fi || typeof fi !== 'object') return null
   const entries = Object.entries(fi)
@@ -147,66 +72,8 @@ function FeatureImportanceList({ fi }) {
 }
 
 export default function MemberHealthScore({ userId, groupId }) {
-  const { session } = useSession()
-  const [loading, setLoading] = useState(false)
-  const [refreshing, setRefreshing] = useState(false)
-  const [error, setError] = useState('')
-  const [payload, setPayload] = useState(null)
-
-  const canFetch =
-    Boolean(session?.access_token) &&
-    typeof userId === 'string' &&
-    userId.trim().length > 0 &&
-    typeof groupId === 'string' &&
-    groupId.trim().length > 0
-
-  const load = useCallback(async () => {
-    if (!canFetch) return
-    setLoading(true)
-    setError('')
-    try {
-      const uid = encodeURIComponent(userId.trim())
-      const q = `?groupId=${encodeURIComponent(groupId.trim())}`
-      const res = await fetch(apiUrl(`/api/members/${uid}/health-score${q}`), {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      })
-      const text = await res.text()
-      if (!res.ok) throw new Error(parseApiError(text))
-      const data = JSON.parse(text)
-      setPayload(data)
-    } catch (e) {
-      setPayload(null)
-      setError(e.message ?? String(e))
-    } finally {
-      setLoading(false)
-    }
-  }, [canFetch, groupId, session?.access_token, userId])
-
-  useEffect(() => {
-    load()
-  }, [load])
-
-  async function handleRefresh() {
-    if (!canFetch) return
-    setRefreshing(true)
-    setError('')
-    try {
-      const uid = encodeURIComponent(userId.trim())
-      const q = `?groupId=${encodeURIComponent(groupId.trim())}`
-      const res = await fetch(
-        apiUrl(`/api/members/${uid}/health-score/refresh${q}`),
-        { method: 'POST', headers: { Authorization: `Bearer ${session.access_token}` } },
-      )
-      const text = await res.text()
-      if (!res.ok) throw new Error(parseApiError(text))
-      const data = JSON.parse(text)
-      setPayload(data)
-    } catch (e) {
-      setError(e.message ?? String(e))
-    } finally {
-      setRefreshing(false)
-    }
-  }
+  const { session, loading, refreshing, error, payload, refresh } =
+    useMemberHealthScore(userId, groupId)
 
   if (!userId || !groupId) {
     return (
@@ -366,7 +233,7 @@ export default function MemberHealthScore({ userId, groupId }) {
             type="button"
             className={btnSecondary}
             disabled={loading || refreshing}
-            onClick={handleRefresh}
+            onClick={refresh}
           >
             {refreshing ? 'Refreshing…' : 'Refresh score'}
           </button>
@@ -375,7 +242,3 @@ export default function MemberHealthScore({ userId, groupId }) {
     </section>
   )
 }
-
-// TO USE: On the member dashboard page, add:
-// import MemberHealthScore from '../components/HealthScore/MemberHealthScore';
-// <MemberHealthScore userId={currentUser.id} groupId={activeGroup.id} />

@@ -20,6 +20,8 @@ import {
   ClipboardList,
   Settings,
   Shield,
+  BarChart3,
+  HeartPulse,
 } from "lucide-react";
 import { supabase } from "../utils/supabase";
 import { useSession } from "../context/SessionContext";
@@ -305,6 +307,38 @@ export default function DashboardLayout() {
           >
             <Wallet className="h-4 w-4 shrink-0 text-emerald-700" aria-hidden />
             Payments
+          </NavLink>
+          <NavLink
+            to={
+              scopedPrefix
+                ? `${scopedPrefix}/reports`
+                : firstActiveId
+                  ? `/group/${firstActiveId}/reports`
+                  : "/dashboard"
+            }
+            className={linkClass}
+          >
+            <BarChart3
+              className="h-4 w-4 shrink-0 text-emerald-700"
+              aria-hidden
+            />
+            Reports
+          </NavLink>
+          <NavLink
+            to={
+              scopedPrefix
+                ? `${scopedPrefix}/financial-health`
+                : firstActiveId
+                  ? `/group/${firstActiveId}/financial-health`
+                  : "/dashboard"
+            }
+            className={linkClass}
+          >
+            <HeartPulse
+              className="h-4 w-4 shrink-0 text-emerald-700"
+              aria-hidden
+            />
+            Financial Health
           </NavLink>
           {String(userRole || "").toLowerCase() === "admin" ? (
             <NavLink to="/admin/groups" className={linkClass}>
