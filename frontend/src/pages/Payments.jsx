@@ -1010,15 +1010,10 @@ export default function Payments() {
                                     <li
                                       ref={dragProvided.innerRef}
                                       {...dragProvided.draggableProps}
-<<<<<<< HEAD
                                       className={`flex items-center gap-3 rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm shadow-sm ${
                                         snapshot.isDragging
                                           ? "ring-2 ring-emerald-500/40"
                                           : ""
-=======
-                                      className={`flex items-center gap-3 rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm shadow-sm dark:border-slate-600 dark:bg-slate-900 ${
-                                        snapshot.isDragging ? 'ring-2 ring-emerald-500/40' : ''
->>>>>>> fix/stokveLogic
                                       }`}
                                     >
                                       <button
