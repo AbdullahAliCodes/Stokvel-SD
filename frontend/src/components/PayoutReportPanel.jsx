@@ -120,7 +120,7 @@ export default function PayoutReportPanel({ stokvelId, accessToken, enabled = tr
   return (
     <section id="payout-report" className={`${cardLight} mb-8 scroll-mt-6 p-5`}>
       <h2 className="mb-4 text-lg font-bold text-emerald-800 dark:text-emerald-300">
-        Payout history &amp; projections
+        Payout History and Projections
       </h2>
 
       {loading ? (

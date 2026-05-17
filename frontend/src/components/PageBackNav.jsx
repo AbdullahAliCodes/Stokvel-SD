@@ -1,8 +1,12 @@
-import { Link } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { Link } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 
-export default function PageBackNav({ to, label = 'Back to dashboard', className = '' }) {
-  if (!to) return null
+export default function PageBackNav({
+  to,
+  label = "Back to dashboard",
+  className = "",
+}) {
+  if (!to) return null;
 
   return (
     <Link
@@ -12,5 +16,5 @@ export default function PageBackNav({ to, label = 'Back to dashboard', className
       <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
       {label}
     </Link>
-  )
+  );
 }

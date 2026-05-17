@@ -113,7 +113,7 @@ describe("PublicStokvels", () => {
           {
             id: "s2",
             name: "Future Savers",
-            type: "Investment",
+            type: "Fixed",
             cycle_length: 3,
             contribution_amount: 1250,
             members_count: 8,
@@ -130,7 +130,7 @@ describe("PublicStokvels", () => {
     expect(screen.getByText("Members:0")).toBeInTheDocument();
 
     expect(screen.getByText("Future Savers")).toBeInTheDocument();
-    expect(screen.getByText("Investment · 3 month cycle")).toBeInTheDocument();
+    expect(screen.getByText("Fixed · 3 month cycle")).toBeInTheDocument();
     expect(screen.getByText(/Contribution:\s*R 1.*250/)).toBeInTheDocument();
     expect(screen.getByText("Members:8")).toBeInTheDocument();
   });

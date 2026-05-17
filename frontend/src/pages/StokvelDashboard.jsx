@@ -60,6 +60,7 @@ export default function StokvelDashboard() {
   const [members, setMembers] = useState([])
   const [totalContribution, setTotalContribution] = useState(0)
   const [meetings, setMeetings] = useState([])
+  const [fixedPool, setFixedPool] = useState(null)
   const [quickPayOpen, setQuickPayOpen] = useState(false)
 
   useEffect(() => {
@@ -104,6 +105,7 @@ export default function StokvelDashboard() {
         const nextMembers = Array.isArray(json.members) ? json.members : []
         setMembers(nextMembers)
         setTotalContribution(Number(json.totalContribution ?? 0))
+        setFixedPool(json.fixedPool ?? null)
         setMeetingsError('')
         let nextMeetings = []
         try {
@@ -154,7 +156,24 @@ export default function StokvelDashboard() {
   const groupName = effectiveStokvel?.name ?? 'Stokvel'
   const monthlyContribution = Number(effectiveStokvel?.contribution_amount) || 0
   const memberCount = members.length
-  const expectedPayout = monthlyContribution * memberCount
+  const isFixedStokvel = String(effectiveStokvel?.type ?? '') === 'Fixed'
+  const fixedCycleLength = Math.max(
+    1,
+    Number(effectiveStokvel?.cycle_length) || memberCount,
+  )
+  const maturityPayoutEstimate =
+    isFixedStokvel && fixedPool?.expected_payout_per_member != null
+      ? Number(fixedPool.expected_payout_per_member)
+      : isFixedStokvel
+        ? monthlyContribution * fixedCycleLength
+        : monthlyContribution * memberCount
+  const estimatedAmountMade =
+    isFixedStokvel && fixedPool?.estimated_amount_made != null
+      ? Number(fixedPool.estimated_amount_made)
+      : null
+  const expectedPayout = isFixedStokvel
+    ? estimatedAmountMade ?? 0
+    : maturityPayoutEstimate
   const myGroupRole =
     members.find((m) => m.user_id === session?.user?.id)?.group_role || membership?.group_role
   const isAdminAccess =
@@ -206,7 +225,7 @@ export default function StokvelDashboard() {
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <LayoutDashboard className="h-7 w-7 shrink-0 text-emerald-700" aria-hidden />
             <h1 className="text-2xl font-bold tracking-tight text-emerald-800 dark:text-emerald-300 sm:text-3xl">
-              {groupName}
+              Dashboard
             </h1>
             {isAdminAccess ? (
               <span className="rounded-full border border-amber-700 bg-amber-700 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-white">
@@ -223,6 +242,10 @@ export default function StokvelDashboard() {
               </span>
             ) : null}
           </div>
+          <p className={`${pageSubtitle} mb-1 text-stone-600 dark:text-stone-300`}>
+            Stokvel:{' '}
+            <span className="font-medium text-stone-800 dark:text-stone-100">{groupName}</span>
+          </p>
           <p className={pageSubtitle}>
             Summary for this group. Your ML health score preview is below; full financial health
             details are on the Financial Health tab. Meetings, Payments, and Reports have the rest.
@@ -250,11 +273,17 @@ export default function StokvelDashboard() {
           </div>
           <div className={`${cardLight} border-t-4 border-stone-300 p-4`}>
             <p className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
-              Expected payout (cycle)
+              {isFixedStokvel ? 'Estimated Amount Made' : 'Expected payout (cycle)'}
             </p>
             <p className="mt-2 text-2xl font-bold text-stone-800 dark:text-stone-100">{formatZAR(expectedPayout)}</p>
             <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
-              Monthly × {memberCount} member{memberCount === 1 ? '' : 's'}
+              {isFixedStokvel &&
+              fixedPool?.member_contributions_to_date != null &&
+              fixedPool?.member_interest_share_to_date != null
+                ? `${formatZAR(Number(fixedPool.member_contributions_to_date))} contributed + ${formatZAR(Number(fixedPool.member_interest_share_to_date))} est. interest share`
+                : isFixedStokvel
+                  ? 'Your approved contributions plus an equal share of pool interest to date'
+                  : `Monthly × ${memberCount} member${memberCount === 1 ? '' : 's'}`}
             </p>
           </div>
           <div className={`${cardLight} border-t-4 border-emerald-600/70 p-4`}>

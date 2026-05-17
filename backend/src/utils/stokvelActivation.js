@@ -1,4 +1,10 @@
-import { generatePayoutSchedule } from './dates.js'
+import {
+  computeFixedMaturityFromCycle,
+  fixedMaturityDateIsoFromAnchor,
+  generateFixedMaturityPayoutSchedule,
+  generatePayoutSchedule,
+  paymentWindowFromStokvel,
+} from './dates.js'
 import { normalizeInviteEmail } from './invitations.js'
 
 const UUID_RE =
@@ -67,7 +73,7 @@ export async function activateStokvel(stokvelId, serviceSupabase, opts = {}) {
   const { data: stokvel, error: selErr } = await serviceSupabase
     .from('stokvels')
     .select(
-      'id, status, type, cycle_length, payout_order_type, proposed_payout_sequence, payout_sequence',
+      'id, status, type, cycle_length, maturity_date, payout_order_type, proposed_payout_sequence, payout_sequence, payment_window_start_day, payment_window_end_day',
     )
     .eq('id', stokvelId)
     .maybeSingle()
@@ -90,6 +96,9 @@ export async function activateStokvel(stokvelId, serviceSupabase, opts = {}) {
   } else if (stokvel.status !== 'pending') {
     return { ok: false, error: `Cannot activate stokvel in status "${stokvel.status}".` }
   }
+
+  const stokvelType = String(stokvel.type || 'Rotating')
+  const isFixed = stokvelType === 'Fixed'
 
   const cycleLen = Number(stokvel.cycle_length)
   if (!Number.isInteger(cycleLen) || cycleLen < 1 || cycleLen > 240) {
@@ -158,12 +167,26 @@ export async function activateStokvel(stokvelId, serviceSupabase, opts = {}) {
     }
   }
 
+  const window = paymentWindowFromStokvel(stokvel)
+  const maturityAnchor = isFixed
+    ? computeFixedMaturityFromCycle(activationInstant, cycleLen, window)
+    : null
+
+  if (isFixed && !maturityAnchor) {
+    return { ok: false, error: 'Failed to compute Fixed maturity from cycle_length.' }
+  }
+
   const deferSchedule = pendingInviteCount > 0
 
   if (deferSchedule) {
+    const deferPatch = { status: 'active' }
+    if (isFixed && maturityAnchor) {
+      deferPatch.maturity_date = fixedMaturityDateIsoFromAnchor(maturityAnchor)
+    }
+
     const { error: deferUpErr } = await serviceSupabase
       .from('stokvels')
-      .update({ status: 'active' })
+      .update(deferPatch)
       .eq('id', stokvelId)
 
     if (deferUpErr) {
@@ -179,33 +202,56 @@ export async function activateStokvel(stokvelId, serviceSupabase, opts = {}) {
     }
   }
 
-  const orderType =
-    String(stokvel.payout_order_type || 'randomize').toLowerCase() === 'manual'
-      ? 'manual'
-      : 'randomize'
+  let scheduleRows
+  /** @type {Record<string, unknown>} */
+  const stokvelUpdate = { status: 'active' }
 
-  let finalSequence
-
-  if (orderType === 'manual') {
-    const proposed = normalizeUuidArray(stokvel.proposed_payout_sequence)
-    if (proposed.length !== cycleLen || !sameSet(proposed, memberIds)) {
-      return {
-        ok: false,
-        error:
-          'Manual payout order: proposed_payout_sequence must list every member exactly once.',
-      }
+  if (isFixed) {
+    const { rows, maturity_date_iso } = generateFixedMaturityPayoutSchedule(
+      activationInstant,
+      cycleLen,
+      memberIds,
+      window,
+    )
+    scheduleRows = rows
+    if (maturity_date_iso) {
+      stokvelUpdate.maturity_date = fixedMaturityDateIsoFromAnchor({
+        scheduled_payout_date: maturity_date_iso,
+      })
     }
-    finalSequence = proposed
   } else {
-    finalSequence = shuffleMemberIds(memberIds)
-  }
+    const orderType =
+      String(stokvel.payout_order_type || 'randomize').toLowerCase() === 'manual'
+        ? 'manual'
+        : 'randomize'
 
-  const { rows: scheduleRows } = generatePayoutSchedule(
-    activationInstant,
-    finalSequence,
-    cycleLen,
-    stokvel.type || 'Rotating',
-  )
+    let finalSequence
+
+    if (orderType === 'manual') {
+      const proposed = normalizeUuidArray(stokvel.proposed_payout_sequence)
+      if (proposed.length !== cycleLen || !sameSet(proposed, memberIds)) {
+        return {
+          ok: false,
+          error:
+            'Manual payout order: proposed_payout_sequence must list every member exactly once.',
+        }
+      }
+      finalSequence = proposed
+    } else {
+      finalSequence = shuffleMemberIds(memberIds)
+    }
+
+    const { rows } = generatePayoutSchedule(
+      activationInstant,
+      finalSequence,
+      cycleLen,
+      'Rotating',
+      window,
+    )
+    scheduleRows = rows
+    stokvelUpdate.payout_sequence = finalSequence
+    stokvelUpdate.payout_order_type = orderType
+  }
 
   if (scheduleRows.length === 0) {
     return { ok: false, error: 'Failed to compute payout schedule.' }
@@ -231,11 +277,7 @@ export async function activateStokvel(stokvelId, serviceSupabase, opts = {}) {
 
   const { error: upErr } = await serviceSupabase
     .from('stokvels')
-    .update({
-      status: 'active',
-      payout_sequence: finalSequence,
-      payout_order_type: orderType,
-    })
+    .update(stokvelUpdate)
     .eq('id', stokvelId)
 
   if (upErr) {

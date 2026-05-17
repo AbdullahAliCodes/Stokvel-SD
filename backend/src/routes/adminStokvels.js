@@ -14,6 +14,10 @@ import {
   sendInvitationEmail,
 } from "../utils/invitations.js";
 import { activateStokvel } from "../utils/stokvelActivation.js";
+import {
+  computeFixedMaturityFromCycle,
+  fixedMaturityDateIsoFromAnchor,
+} from "../utils/dates.js";
 
 const router = Router();
 
@@ -99,6 +103,37 @@ async function updateStokvelReturningRow(client, stokvelId, patch) {
 
 const ALLOWED_TYPES = new Set(["Rotating", "Fixed"]);
 const ALLOWED_STATUS = new Set(["pending", "active", "rejected"]);
+
+function normalizePaymentWindowDay(raw, fallback) {
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1 || n > 31) return fallback;
+  return n;
+}
+
+function paymentWindowFromBody(body) {
+  const b = body ?? {};
+  const startRaw =
+    b.paymentWindowStartDay ?? b.payment_window_start_day ?? undefined;
+  const endRaw = b.paymentWindowEndDay ?? b.payment_window_end_day ?? undefined;
+  return {
+    startDay: normalizePaymentWindowDay(startRaw, 25),
+    endDay: normalizePaymentWindowDay(endRaw, 5),
+  };
+}
+
+function parseMaturityDate(raw) {
+  if (raw == null || raw === "") return null;
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return null;
+  return d;
+}
+
+function normalizeTargetGoal(raw) {
+  if (raw == null || raw === "") return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
+}
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -465,6 +500,8 @@ router.post("/stokvels", requireAuth, requireAdmin, async (req, res) => {
       return res.status(400).json({ error: "Invalid stokvel type" });
     }
 
+    const isFixedPool = type === "Fixed";
+
     const cycle = Number(cycleLength);
     if (!Number.isInteger(cycle) || cycle < 1 || cycle > 240) {
       return res
@@ -509,6 +546,23 @@ router.post("/stokvels", requireAuth, requireAdmin, async (req, res) => {
       ? proposedRaw.filter((id) => typeof id === "string")
       : [];
 
+    const paymentWindow = paymentWindowFromBody(body);
+
+    let provisionalMaturityIso = null;
+    if (isFixedPool) {
+      const anchor = computeFixedMaturityFromCycle(
+        new Date(),
+        cycle,
+        paymentWindow,
+      );
+      if (!anchor) {
+        return res.status(400).json({
+          error: "Could not compute maturity from cycle length.",
+        });
+      }
+      provisionalMaturityIso = fixedMaturityDateIsoFromAnchor(anchor);
+    }
+
     const insertRow = {
       name: trimmedName,
       type,
@@ -523,7 +577,17 @@ router.post("/stokvels", requireAuth, requireAdmin, async (req, res) => {
       member_details: normalizedMemberDetails,
       documents: normalizeDocuments(documents),
       status: "active",
+      payment_window_start_day: paymentWindow.startDay,
+      payment_window_end_day: paymentWindow.endDay,
     };
+
+    if (isFixedPool) {
+      insertRow.maturity_date = provisionalMaturityIso;
+      const goal = normalizeTargetGoal(body.targetGoal ?? body.target_goal);
+      if (goal != null) {
+        insertRow.target_goal = goal;
+      }
+    }
 
     const { data: stokvel, error: stokvelError } = await client
       .from("stokvels")
@@ -1045,6 +1109,61 @@ router.patch(
             });
         }
         patch.cycle_length = cycle;
+      }
+
+      if (
+        body.maturityDate !== undefined ||
+        body.maturity_date !== undefined
+      ) {
+        const maturity = parseMaturityDate(
+          body.maturityDate ?? body.maturity_date,
+        );
+        if (!maturity) {
+          return res.status(400).json({ error: "Invalid maturityDate." });
+        }
+        patch.maturity_date = maturity.toISOString();
+      }
+
+      if (body.targetGoal !== undefined || body.target_goal !== undefined) {
+        const goal = normalizeTargetGoal(body.targetGoal ?? body.target_goal);
+        if (goal == null && body.targetGoal !== null && body.target_goal !== null) {
+          return res.status(400).json({
+            error: "targetGoal must be a non-negative number.",
+          });
+        }
+        patch.target_goal = goal;
+      }
+
+      if (
+        body.paymentWindowStartDay !== undefined ||
+        body.payment_window_start_day !== undefined
+      ) {
+        const startDay = normalizePaymentWindowDay(
+          body.paymentWindowStartDay ?? body.payment_window_start_day,
+          null,
+        );
+        if (startDay == null) {
+          return res.status(400).json({
+            error: "paymentWindowStartDay must be an integer between 1 and 31.",
+          });
+        }
+        patch.payment_window_start_day = startDay;
+      }
+
+      if (
+        body.paymentWindowEndDay !== undefined ||
+        body.payment_window_end_day !== undefined
+      ) {
+        const endDay = normalizePaymentWindowDay(
+          body.paymentWindowEndDay ?? body.payment_window_end_day,
+          null,
+        );
+        if (endDay == null) {
+          return res.status(400).json({
+            error: "paymentWindowEndDay must be an integer between 1 and 31.",
+          });
+        }
+        patch.payment_window_end_day = endDay;
       }
 
       if (Object.keys(patch).length === 0 && !activating) {
