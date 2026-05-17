@@ -14,6 +14,10 @@ import {
   sendInvitationEmail,
 } from "../utils/invitations.js";
 import { activateStokvel } from "../utils/stokvelActivation.js";
+import {
+  computeFixedMaturityFromCycle,
+  fixedMaturityDateIsoFromAnchor,
+} from "../utils/dates.js";
 
 const router = Router();
 
@@ -97,7 +101,7 @@ async function updateStokvelReturningRow(client, stokvelId, patch) {
   };
 }
 
-const ALLOWED_TYPES = new Set(["Rotating", "Fixed", "Investment"]);
+const ALLOWED_TYPES = new Set(["Rotating", "Fixed"]);
 const ALLOWED_STATUS = new Set(["pending", "active", "rejected"]);
 
 function normalizePaymentWindowDay(raw, fallback) {
@@ -496,33 +500,13 @@ router.post("/stokvels", requireAuth, requireAdmin, async (req, res) => {
       return res.status(400).json({ error: "Invalid stokvel type" });
     }
 
-    const isInvestment = type === "Investment";
-    let maturityInstant = null;
-    if (isInvestment) {
-      maturityInstant = parseMaturityDate(
-        body.maturityDate ?? body.maturity_date,
-      );
-      if (!maturityInstant) {
-        return res.status(400).json({
-          error: "Investment stokvels require a valid maturityDate.",
-        });
-      }
-    }
+    const isFixedPool = type === "Fixed";
 
-    let cycle;
-    if (isInvestment) {
-      const cycleOptional = Number(cycleLength);
-      cycle =
-        Number.isInteger(cycleOptional) && cycleOptional >= 1 && cycleOptional <= 240
-          ? cycleOptional
-          : 1;
-    } else {
-      cycle = Number(cycleLength);
-      if (!Number.isInteger(cycle) || cycle < 1 || cycle > 240) {
-        return res
-          .status(400)
-          .json({ error: "Cycle length must be an integer between 1 and 240" });
-      }
+    const cycle = Number(cycleLength);
+    if (!Number.isInteger(cycle) || cycle < 1 || cycle > 240) {
+      return res
+        .status(400)
+        .json({ error: "Cycle length must be an integer between 1 and 240" });
     }
 
     const { data: existing, error: existingError } = await client
@@ -564,6 +548,21 @@ router.post("/stokvels", requireAuth, requireAdmin, async (req, res) => {
 
     const paymentWindow = paymentWindowFromBody(body);
 
+    let provisionalMaturityIso = null;
+    if (isFixedPool) {
+      const anchor = computeFixedMaturityFromCycle(
+        new Date(),
+        cycle,
+        paymentWindow,
+      );
+      if (!anchor) {
+        return res.status(400).json({
+          error: "Could not compute maturity from cycle length.",
+        });
+      }
+      provisionalMaturityIso = fixedMaturityDateIsoFromAnchor(anchor);
+    }
+
     const insertRow = {
       name: trimmedName,
       type,
@@ -582,8 +581,8 @@ router.post("/stokvels", requireAuth, requireAdmin, async (req, res) => {
       payment_window_end_day: paymentWindow.endDay,
     };
 
-    if (isInvestment) {
-      insertRow.maturity_date = maturityInstant.toISOString();
+    if (isFixedPool) {
+      insertRow.maturity_date = provisionalMaturityIso;
       const goal = normalizeTargetGoal(body.targetGoal ?? body.target_goal);
       if (goal != null) {
         insertRow.target_goal = goal;

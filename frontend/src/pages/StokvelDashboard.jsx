@@ -60,6 +60,7 @@ export default function StokvelDashboard() {
   const [members, setMembers] = useState([])
   const [totalContribution, setTotalContribution] = useState(0)
   const [meetings, setMeetings] = useState([])
+  const [fixedPool, setFixedPool] = useState(null)
   const [quickPayOpen, setQuickPayOpen] = useState(false)
 
   useEffect(() => {
@@ -104,6 +105,7 @@ export default function StokvelDashboard() {
         const nextMembers = Array.isArray(json.members) ? json.members : []
         setMembers(nextMembers)
         setTotalContribution(Number(json.totalContribution ?? 0))
+        setFixedPool(json.fixedPool ?? null)
         setMeetingsError('')
         let nextMeetings = []
         try {
@@ -154,7 +156,11 @@ export default function StokvelDashboard() {
   const groupName = effectiveStokvel?.name ?? 'Stokvel'
   const monthlyContribution = Number(effectiveStokvel?.contribution_amount) || 0
   const memberCount = members.length
-  const expectedPayout = monthlyContribution * memberCount
+  const isFixedStokvel = String(effectiveStokvel?.type ?? '') === 'Fixed'
+  const expectedPayout =
+    isFixedStokvel && fixedPool?.expected_payout_per_member != null
+      ? Number(fixedPool.expected_payout_per_member)
+      : monthlyContribution * memberCount
   const myGroupRole =
     members.find((m) => m.user_id === session?.user?.id)?.group_role || membership?.group_role
   const isAdminAccess =
@@ -254,11 +260,13 @@ export default function StokvelDashboard() {
           </div>
           <div className={`${cardLight} border-t-4 border-stone-300 p-4`}>
             <p className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
-              Expected payout (cycle)
+              {isFixedStokvel ? 'Equal share (est.)' : 'Expected payout (cycle)'}
             </p>
             <p className="mt-2 text-2xl font-bold text-stone-800 dark:text-stone-100">{formatZAR(expectedPayout)}</p>
             <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
-              Monthly × {memberCount} member{memberCount === 1 ? '' : 's'}
+              {isFixedStokvel
+                ? `Pool split across ${memberCount} member${memberCount === 1 ? '' : 's'} (prime + approved principal)`
+                : `Monthly × ${memberCount} member${memberCount === 1 ? '' : 's'}`}
             </p>
           </div>
           <div className={`${cardLight} border-t-4 border-emerald-600/70 p-4`}>

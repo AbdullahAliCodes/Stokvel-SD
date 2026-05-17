@@ -1,5 +1,7 @@
 import {
-  generateInvestmentPayoutSchedule,
+  computeFixedMaturityFromCycle,
+  fixedMaturityDateIsoFromAnchor,
+  generateFixedMaturityPayoutSchedule,
   generatePayoutSchedule,
   paymentWindowFromStokvel,
 } from './dates.js'
@@ -96,13 +98,11 @@ export async function activateStokvel(stokvelId, serviceSupabase, opts = {}) {
   }
 
   const stokvelType = String(stokvel.type || 'Rotating')
-  const isInvestment = stokvelType === 'Investment'
+  const isFixed = stokvelType === 'Fixed'
 
   const cycleLen = Number(stokvel.cycle_length)
-  if (!isInvestment) {
-    if (!Number.isInteger(cycleLen) || cycleLen < 1 || cycleLen > 240) {
-      return { ok: false, error: 'Invalid cycle_length on stokvel.' }
-    }
+  if (!Number.isInteger(cycleLen) || cycleLen < 1 || cycleLen > 240) {
+    return { ok: false, error: 'Invalid cycle_length on stokvel.' }
   }
 
   const { data: memberRows, error: memErr } = await serviceSupabase
@@ -160,31 +160,33 @@ export async function activateStokvel(stokvelId, serviceSupabase, opts = {}) {
   const pendingInviteCount = pendingInviteRows.length
   const totalSeats = registeredCount + pendingInviteCount
 
-  if (!isInvestment && totalSeats !== cycleLen) {
+  if (totalSeats !== cycleLen) {
     return {
       ok: false,
       error: `Total roster (${registeredCount} registered + ${pendingInviteCount} pending) must equal cycle_length (${cycleLen}).`,
     }
   }
 
-  if (isInvestment && registeredCount < 1) {
-    return { ok: false, error: 'Investment stokvel requires at least one registered member.' }
-  }
+  const window = paymentWindowFromStokvel(stokvel)
+  const maturityAnchor = isFixed
+    ? computeFixedMaturityFromCycle(activationInstant, cycleLen, window)
+    : null
 
-  const maturityInstant =
-    stokvel.maturity_date != null ? new Date(stokvel.maturity_date) : null
-  if (isInvestment) {
-    if (!maturityInstant || Number.isNaN(maturityInstant.getTime())) {
-      return { ok: false, error: 'Investment stokvel requires a valid maturity_date.' }
-    }
+  if (isFixed && !maturityAnchor) {
+    return { ok: false, error: 'Failed to compute Fixed maturity from cycle_length.' }
   }
 
   const deferSchedule = pendingInviteCount > 0
 
   if (deferSchedule) {
+    const deferPatch = { status: 'active' }
+    if (isFixed && maturityAnchor) {
+      deferPatch.maturity_date = fixedMaturityDateIsoFromAnchor(maturityAnchor)
+    }
+
     const { error: deferUpErr } = await serviceSupabase
       .from('stokvels')
-      .update({ status: 'active' })
+      .update(deferPatch)
       .eq('id', stokvelId)
 
     if (deferUpErr) {
@@ -204,9 +206,19 @@ export async function activateStokvel(stokvelId, serviceSupabase, opts = {}) {
   /** @type {Record<string, unknown>} */
   const stokvelUpdate = { status: 'active' }
 
-  if (isInvestment) {
-    const { rows } = generateInvestmentPayoutSchedule(maturityInstant, memberIds)
+  if (isFixed) {
+    const { rows, maturity_date_iso } = generateFixedMaturityPayoutSchedule(
+      activationInstant,
+      cycleLen,
+      memberIds,
+      window,
+    )
     scheduleRows = rows
+    if (maturity_date_iso) {
+      stokvelUpdate.maturity_date = fixedMaturityDateIsoFromAnchor({
+        scheduled_payout_date: maturity_date_iso,
+      })
+    }
   } else {
     const orderType =
       String(stokvel.payout_order_type || 'randomize').toLowerCase() === 'manual'
@@ -229,12 +241,11 @@ export async function activateStokvel(stokvelId, serviceSupabase, opts = {}) {
       finalSequence = shuffleMemberIds(memberIds)
     }
 
-    const window = paymentWindowFromStokvel(stokvel)
     const { rows } = generatePayoutSchedule(
       activationInstant,
       finalSequence,
       cycleLen,
-      stokvelType,
+      'Rotating',
       window,
     )
     scheduleRows = rows

@@ -295,16 +295,15 @@ describe('activateStokvel', () => {
     expect(result.payoutCount).toBe(2)
   })
 
-  it('activates Investment stokvel without cycle_length roster match', async () => {
+  it('activates Fixed stokvel and sets maturity from cycle_length', async () => {
     const m1 = '123e4567-e89b-12d3-a456-426614174040'
     const m2 = '987f6543-a21b-12d3-a456-426614174041'
     const svc = createServiceSupabaseMock({
       stokvel: {
-        id: 'stokvel-inv',
+        id: 'stokvel-fixed',
         status: 'pending',
-        type: 'Investment',
-        cycle_length: 99,
-        maturity_date: '2027-06-15T00:00:00.000Z',
+        type: 'Fixed',
+        cycle_length: 2,
         payout_order_type: 'randomize',
       },
       memberRows: [{ user_id: m1 }, { user_id: m2 }],
@@ -314,11 +313,16 @@ describe('activateStokvel', () => {
       ],
     })
 
-    const result = await activateStokvel('stokvel-inv', svc)
+    const result = await activateStokvel('stokvel-fixed', svc, {
+      activationInstant: new Date('2026-01-15T00:00:00.000Z'),
+    })
 
     expect(result.ok).toBe(true)
     expect(result.payoutCount).toBe(2)
-    const updateArg = svc._mocks.stokvelUpdateEqMock.mock.calls[0]
-    expect(updateArg).toBeDefined()
+    const payoutRows = svc._mocks.payoutInsertMock.mock.calls[0]?.[0]
+    expect(payoutRows).toHaveLength(2)
+    expect(payoutRows[0].scheduled_payout_date).toBe('2026-03-05')
+    expect(payoutRows[1].scheduled_payout_date).toBe('2026-03-05')
+    expect(svc._mocks.stokvelUpdateEqMock).toHaveBeenCalledWith('id', 'stokvel-fixed')
   })
 })

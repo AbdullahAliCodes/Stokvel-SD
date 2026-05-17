@@ -210,6 +210,8 @@ export default function Payments() {
   const [payoutActionLoadingId, setPayoutActionLoadingId] = useState("");
   const [payoutActionError, setPayoutActionError] = useState("");
   const [payoutActionOk, setPayoutActionOk] = useState("");
+  const [fixedPool, setFixedPool] = useState(null);
+  const [ratesStale, setRatesStale] = useState(false);
 
   const showLedgerToast = useCallback((msg) => {
     if (ledgerToastTimer.current) clearTimeout(ledgerToastTimer.current);
@@ -244,6 +246,8 @@ export default function Payments() {
     setMissedPayments(
       Array.isArray(json.missedPayments) ? json.missedPayments : [],
     );
+    setFixedPool(json.fixedPool ?? null);
+    setRatesStale(Boolean(json.rates_stale));
   }, []);
 
   const silentReloadDetail = useCallback(async () => {
@@ -286,6 +290,8 @@ export default function Payments() {
       missedPayments: Array.isArray(json.missedPayments)
         ? json.missedPayments
         : [],
+      fixedPool: json.fixedPool ?? null,
+      rates_stale: Boolean(json.rates_stale),
     });
   }, [
     session?.access_token,
@@ -325,6 +331,8 @@ export default function Payments() {
         setMissedPayments(
           Array.isArray(cached.missedPayments) ? cached.missedPayments : [],
         );
+        setFixedPool(cached.fixedPool ?? null);
+        setRatesStale(Boolean(cached.rates_stale));
         setLoading(false);
       }
       try {
@@ -373,6 +381,8 @@ export default function Payments() {
             missedPayments: Array.isArray(json.missedPayments)
               ? json.missedPayments
               : [],
+            fixedPool: json.fixedPool ?? null,
+            rates_stale: Boolean(json.rates_stale),
           });
         }
       } catch (e) {
@@ -405,9 +415,13 @@ export default function Payments() {
   const memberCount = members.length;
   const monthlyContribution =
     Number(effectiveStokvel?.contribution_amount) || 0;
-  const expectedPayout = monthlyContribution * memberCount;
   const stokvelType = String(effectiveStokvel?.type ?? "");
+  const isFixedStokvel = stokvelType === "Fixed";
   const isRotatingStokvel = stokvelType === "Rotating";
+  const expectedPayout =
+    isFixedStokvel && fixedPool?.expected_payout_per_member != null
+      ? Number(fixedPool.expected_payout_per_member)
+      : monthlyContribution * memberCount;
   const myRole = String(
     members.find((m) => m.user_id === session?.user?.id)?.group_role ??
       membership?.group_role ??
@@ -714,7 +728,10 @@ export default function Payments() {
 
   const statCards = [
     { label: "Total contribution", value: formatZAR(totalContribution) },
-    { label: "Expected payout", value: formatZAR(expectedPayout) },
+    {
+      label: isFixedStokvel ? "Equal share (est.)" : "Expected payout",
+      value: ratesStale && isFixedStokvel ? "—" : formatZAR(expectedPayout),
+    },
     { label: "Monthly contribution", value: formatZAR(monthlyContribution) },
     { label: "Members", value: String(memberCount) },
   ];
@@ -973,13 +990,17 @@ export default function Payments() {
             ))}
           </div>
 
-          <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-stretch">
-            <div className="h-full">
-              <MarketRatesWidget
-                memberMonthlyContribution={monthlyContribution}
-                className="h-full"
-              />
-            </div>
+          <div
+            className={`mb-8 grid grid-cols-1 gap-6 lg:items-stretch ${isFixedStokvel ? "lg:grid-cols-2" : ""}`}
+          >
+            {isFixedStokvel ? (
+              <div className="h-full">
+                <MarketRatesWidget
+                  memberMonthlyContribution={monthlyContribution}
+                  className="h-full"
+                />
+              </div>
+            ) : null}
             <div className="flex h-full flex-col gap-4">
               <div className={`${cardLight} p-4`}>
                 <span className="text-sm font-bold text-stone-800 dark:text-stone-100">
@@ -1019,10 +1040,11 @@ export default function Payments() {
                   />
                 </div>
                 <p className="mb-3 text-xs text-stone-500 dark:text-stone-400">
-                  Scheduled payouts from the group roster (amount ≈ pool for
-                  that cycle).
+                  {isFixedStokvel
+                    ? "All members are scheduled for the same maturity payout (equal share estimate)."
+                    : "Scheduled payouts from the group roster (amount ≈ pool for that cycle)."}
                 </p>
-                {canManagePayoutOrder ? (
+                {canManagePayoutOrder && !isFixedStokvel ? (
                   <p className="mb-3 text-xs text-stone-600 dark:text-stone-300">
                     Treasurers can reorder upcoming payouts only. Completed
                     payouts are locked.
@@ -1079,7 +1101,7 @@ export default function Payments() {
                     </tbody>
                   </table>
                 </div>
-                {canManagePayoutOrder && upcomingPayouts.length > 1 ? (
+                {canManagePayoutOrder && !isFixedStokvel && upcomingPayouts.length > 1 ? (
                   <div className="mt-4">
                     <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
                       Reorder upcoming disbursements

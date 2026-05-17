@@ -185,37 +185,88 @@ export function cyclePayoutDateIso(ym) {
  */
 
 /**
- * @param {Date | string | number} maturityDate
- * @param {string[]} memberIds
- * @returns {{ rows: PayoutScheduleRow[], firstCycleMonth: string | null }}
+ * Maturity = payout on the 5th of the final contribution cycle month (SAST).
+ *
+ * @param {Date | string | number} activationDate
+ * @param {number} cycleLength Number of monthly contribution cycles
+ * @param {{ startDay?: number, endDay?: number } | null} [windowConfig]
+ * @returns {{ firstCycleMonth: string, lastCycleMonth: string, scheduled_payout_date: string } | null}
  */
-export function generateInvestmentPayoutSchedule(maturityDate, memberIds) {
-  const t = maturityDate instanceof Date ? maturityDate : new Date(maturityDate)
-  if (Number.isNaN(t.getTime())) {
-    return { rows: [], firstCycleMonth: null }
+export function computeFixedMaturityFromCycle(
+  activationDate,
+  cycleLength,
+  windowConfig = null,
+) {
+  const cycleLen = Number(cycleLength)
+  if (!Number.isInteger(cycleLen) || cycleLen < 1) {
+    return null
   }
 
-  const firstCycleMonth = formatInTimeZone(t, SAST_TZ, 'yyyy-MM')
-  const scheduled_payout_date = formatInTimeZone(t, SAST_TZ, 'yyyy-MM-dd')
+  const firstCycleMonth = getFirstPayoutCycleMonth(activationDate, windowConfig)
+  if (!firstCycleMonth) {
+    return null
+  }
+
+  const lastCycleMonth = addCalendarMonthsYm(firstCycleMonth, cycleLen - 1)
+  const scheduled_payout_date = cyclePayoutDateIso(lastCycleMonth)
+
+  return { firstCycleMonth, lastCycleMonth, scheduled_payout_date }
+}
+
+/**
+ * ISO timestamp for `stokvels.maturity_date` from a schedule anchor.
+ *
+ * @param {{ scheduled_payout_date: string }} anchor
+ */
+export function fixedMaturityDateIsoFromAnchor(anchor) {
+  return `${anchor.scheduled_payout_date}T12:00:00.000Z`
+}
+
+/**
+ * @param {Date | string | number} activationDate
+ * @param {number} cycleLength
+ * @param {string[]} memberIds
+ * @param {{ startDay?: number, endDay?: number } | null} [windowConfig]
+ * @returns {{ rows: PayoutScheduleRow[], firstCycleMonth: string | null, maturity_date_iso: string | null }}
+ */
+export function generateFixedMaturityPayoutSchedule(
+  activationDate,
+  cycleLength,
+  memberIds,
+  windowConfig = null,
+) {
+  const anchor = computeFixedMaturityFromCycle(
+    activationDate,
+    cycleLength,
+    windowConfig,
+  )
+  if (!anchor) {
+    return { rows: [], firstCycleMonth: null, maturity_date_iso: null }
+  }
+
   const seq = (Array.isArray(memberIds) ? memberIds : []).filter(
     (id) => typeof id === 'string' && id.length > 0,
   )
 
   const rows = seq.map((user_id, cycle_index) => ({
     user_id,
-    target_month: firstCycleMonth,
-    scheduled_payout_date,
+    target_month: anchor.lastCycleMonth,
+    scheduled_payout_date: anchor.scheduled_payout_date,
     cycle_index,
   }))
 
-  return { rows, firstCycleMonth }
+  return {
+    rows,
+    firstCycleMonth: anchor.firstCycleMonth,
+    maturity_date_iso: anchor.scheduled_payout_date,
+  }
 }
 
 /**
  * @param {Date | string | number} activationDate
  * @param {string[]} payoutSequence User UUIDs in payout order
  * @param {number} cycleLength
- * @param {string} type Stokvel type: `Rotating`, `Fixed`, or `Investment`
+ * @param {string} type Stokvel type: `Rotating` (only Rotating uses staggered schedule here)
  * @param {{ startDay?: number, endDay?: number } | null} [windowConfig]
  * @returns {{ rows: PayoutScheduleRow[], firstCycleMonth: string | null }}
  */
@@ -226,12 +277,6 @@ export function generatePayoutSchedule(
   type,
   windowConfig = null,
 ) {
-  const typ = String(type || 'Rotating')
-
-  if (typ === 'Investment') {
-    return generateInvestmentPayoutSchedule(activationDate, payoutSequence)
-  }
-
   const seq = (Array.isArray(payoutSequence) ? payoutSequence : []).filter(
     (id) => typeof id === 'string' && id.length > 0,
   )
@@ -242,20 +287,6 @@ export function generatePayoutSchedule(
   }
 
   const rows = []
-
-  if (typ === 'Fixed') {
-    const lastYm = addCalendarMonthsYm(firstCycleMonth, cycleLength - 1)
-    const scheduled = cyclePayoutDateIso(lastYm)
-    for (let i = 0; i < len; i++) {
-      rows.push({
-        user_id: seq[i],
-        target_month: lastYm,
-        scheduled_payout_date: scheduled,
-        cycle_index: i,
-      })
-    }
-    return { rows, firstCycleMonth }
-  }
 
   for (let i = 0; i < len; i++) {
     const target_month = addCalendarMonthsYm(firstCycleMonth, i)

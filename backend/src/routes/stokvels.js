@@ -19,6 +19,8 @@ import {
   zonedYmdParts,
 } from "../utils/dates.js";
 import { buildPayoutReport } from "../utils/payoutReport.js";
+import { getMarketRates } from "../services/marketDataService.js";
+import { computeFixedPoolProjection } from "../services/projectionService.js";
 
 const router = Router();
 
@@ -406,6 +408,31 @@ router.get("/:id", requireAuth, async (req, res) => {
       0,
     );
 
+    let fixedPool = null;
+    let ratesStale = false;
+    if (String(stokvel?.type ?? "") === "Fixed") {
+      try {
+        const rates = await getMarketRates();
+        const prime = rates?.prime?.value;
+        fixedPool = computeFixedPoolProjection({
+          stokvel,
+          contributions: contributionsWithProfiles,
+          members: members ?? [],
+          primeRate: prime,
+          now: new Date(),
+        });
+        if (!fixedPool) {
+          ratesStale = true;
+        }
+      } catch (rateErr) {
+        console.warn(
+          "GET /api/stokvels/:id: market rates unavailable for Fixed projection:",
+          rateErr?.message ?? rateErr,
+        );
+        ratesStale = true;
+      }
+    }
+
     res.json({
       success: true,
       membership: access.membership,
@@ -416,6 +443,8 @@ router.get("/:id", requireAuth, async (req, res) => {
       currentCycle,
       payouts,
       missedPayments,
+      fixedPool,
+      rates_stale: ratesStale,
     });
   } catch (err) {
     console.error("GET /api/stokvels/:id:", err);
@@ -528,7 +557,9 @@ router.get("/:id/payout-report", requireAuth, async (req, res) => {
 
     const { data: stokvel, error: stokvelError } = await access.reader
       .from("stokvels")
-      .select("id, name, contribution_amount, status, type, cycle_length")
+      .select(
+        "id, name, contribution_amount, status, type, cycle_length, created_at, maturity_date",
+      )
       .eq("id", stokvelId)
       .single();
 
@@ -585,6 +616,38 @@ router.get("/:id/payout-report", requireAuth, async (req, res) => {
       profileById = toProfileMap(profiles);
     }
 
+    const { data: contributionRows, error: contribErr } = await access.reader
+      .from("contributions")
+      .select("amount, paid_at, treasurer_approval_status")
+      .eq("stokvel_id", stokvelId);
+
+    if (contribErr) {
+      console.error(
+        "GET /api/stokvels/:id/payout-report contributions:",
+        contribErr,
+      );
+      return res.status(500).json({ error: contribErr.message });
+    }
+
+    let fixedPoolProjection = null;
+    if (String(stokvel?.type ?? "") === "Fixed") {
+      try {
+        const rates = await getMarketRates();
+        fixedPoolProjection = computeFixedPoolProjection({
+          stokvel,
+          contributions: contributionRows ?? [],
+          members: members ?? [],
+          primeRate: rates?.prime?.value,
+          now: new Date(),
+        });
+      } catch (rateErr) {
+        console.warn(
+          "GET /api/stokvels/:id/payout-report: market rates unavailable:",
+          rateErr?.message ?? rateErr,
+        );
+      }
+    }
+
     const todayIso = todayIsoSast();
     const report = buildPayoutReport({
       stokvel,
@@ -593,6 +656,7 @@ router.get("/:id/payout-report", requireAuth, async (req, res) => {
       profileById,
       viewerUserId: req.user.id,
       todayIso,
+      fixedPoolProjection,
     });
 
     return res.json({

@@ -22,6 +22,10 @@ import cron from 'node-cron'
 import { fetchRepoRateFromFred } from './jobs/fetchRates.js'
 import marketRatesRouter from './routes/marketRates.js'
 import { searchProfilesForMemberInvite } from './utils/profileUserSearch.js'
+import {
+  computeFixedMaturityFromCycle,
+  fixedMaturityDateIsoFromAnchor,
+} from './utils/dates.js'
 import { fileURLToPath } from 'url'
 
 const app = express()
@@ -74,6 +78,19 @@ function writeDashboardCache(kind, userId, payload) {
 function clearDashboardCacheForUser(userId) {
   dashboardCache.delete(cacheKey('my-stokvels', userId))
   dashboardCache.delete(cacheKey('my-meetings', userId))
+}
+
+function normalizePaymentWindowDayMemberApply(raw, fallback) {
+  const n = Number(raw)
+  if (!Number.isInteger(n) || n < 1 || n > 31) return fallback
+  return n
+}
+
+function normalizeTargetGoalMemberApply(raw) {
+  if (raw == null || raw === '') return null
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n < 0) return null
+  return n
 }
 
 export function normalizeMembersCount(raw) {
@@ -488,6 +505,13 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
       ? proposedPayoutRaw.filter((x) => typeof x === 'string')
       : null
 
+    const body = req.body ?? {}
+    const stokvelType =
+      typeof type === 'string' && (type === 'Rotating' || type === 'Fixed')
+        ? type
+        : 'Rotating'
+    const isFixedPool = stokvelType === 'Fixed'
+
     const insertRow = {
       name: name.trim(),
       status: 'pending',
@@ -500,13 +524,44 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
       member_details: parsedDetails,
       documents: parsedDocuments,
       is_public: Boolean(isPublic),
+      type: stokvelType,
+      payment_window_start_day: normalizePaymentWindowDayMemberApply(
+        body.paymentWindowStartDay ?? body.payment_window_start_day,
+        25,
+      ),
+      payment_window_end_day: normalizePaymentWindowDayMemberApply(
+        body.paymentWindowEndDay ?? body.payment_window_end_day,
+        5,
+      ),
     }
-    if (typeof type === 'string' && (type === 'Rotating' || type === 'Fixed')) {
-      insertRow.type = type
-    }
+
     const cyc = Number(cycleLength)
     if (Number.isInteger(cyc) && cyc >= 1 && cyc <= 240) {
       insertRow.cycle_length = cyc
+    } else if (isFixedPool) {
+      insertRow.cycle_length = parsedMembersCount
+    }
+
+    if (isFixedPool) {
+      const window = {
+        startDay: insertRow.payment_window_start_day,
+        endDay: insertRow.payment_window_end_day,
+      }
+      const anchor = computeFixedMaturityFromCycle(
+        new Date(),
+        insertRow.cycle_length,
+        window,
+      )
+      if (!anchor) {
+        return res.status(400).json({
+          error: 'Could not compute maturity from cycle length.',
+        })
+      }
+      insertRow.maturity_date = fixedMaturityDateIsoFromAnchor(anchor)
+      const goal = normalizeTargetGoalMemberApply(body.targetGoal ?? body.target_goal)
+      if (goal != null) {
+        insertRow.target_goal = goal
+      }
     }
 
     const { data: newStokvel, error: stokvelError } = await userSupabase

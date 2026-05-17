@@ -3,11 +3,12 @@ import {
   addCalendarMonthsYm,
   cyclePayoutDateIso,
   DEFAULT_PAYMENT_WINDOW,
+  computeFixedMaturityFromCycle,
   getCurrentPaymentCycle,
   getFirstPayoutCycleMonth,
   getTargetMonthForPaidAt,
   isPaidAtInWindowForTargetMonth,
-  generateInvestmentPayoutSchedule,
+  generateFixedMaturityPayoutSchedule,
   generatePayoutSchedule,
 } from './dates.js'
 
@@ -71,16 +72,6 @@ describe('dates.js payment cycles (Africa/Johannesburg)', () => {
     expect(rows[0].user_id).toBe('u1')
   })
 
-  it('generatePayoutSchedule Fixed pays all on last cycle month', () => {
-    const activation = new Date('2026-03-03T12:00:00+02:00')
-    const seq = ['a', 'b']
-    const { rows } = generatePayoutSchedule(activation, seq, 4, 'Fixed')
-    expect(rows).toHaveLength(2)
-    expect(rows[0].target_month).toBe('2026-06')
-    expect(rows[1].target_month).toBe('2026-06')
-    expect(rows[0].scheduled_payout_date).toBe('2026-06-05')
-  })
-
   it('getCurrentPaymentCycle uses custom window (25→1)', () => {
     const win = { startDay: 25, endDay: 1 }
     expect(getCurrentPaymentCycle(new Date('2026-03-01T12:00:00+02:00'), win)).toEqual({
@@ -97,24 +88,26 @@ describe('dates.js payment cycles (Africa/Johannesburg)', () => {
     expect(DEFAULT_PAYMENT_WINDOW).toEqual({ startDay: 25, endDay: 5 })
   })
 
-  it('generateInvestmentPayoutSchedule assigns all members same maturity date', () => {
-    const maturity = new Date('2027-06-15T10:00:00+02:00')
-    const { rows, firstCycleMonth } = generateInvestmentPayoutSchedule(maturity, [
-      'u1',
-      'u2',
-    ])
-    expect(firstCycleMonth).toBe('2027-06')
-    expect(rows).toHaveLength(2)
-    expect(rows[0].scheduled_payout_date).toBe('2027-06-15')
-    expect(rows[1].scheduled_payout_date).toBe('2027-06-15')
-    expect(rows[0].target_month).toBe('2027-06')
-    expect(rows[1].user_id).toBe('u2')
+  it('computeFixedMaturityFromCycle: 6 cycles ends on 5th of 6th month', () => {
+    const activation = new Date('2026-03-03T12:00:00+02:00')
+    const anchor = computeFixedMaturityFromCycle(activation, 6)
+    expect(anchor).not.toBeNull()
+    expect(anchor.firstCycleMonth).toBe('2026-03')
+    expect(anchor.lastCycleMonth).toBe('2026-08')
+    expect(anchor.scheduled_payout_date).toBe('2026-08-05')
   })
 
-  it('generatePayoutSchedule delegates Investment to maturity schedule', () => {
-    const maturity = new Date('2027-12-01T12:00:00+02:00')
-    const { rows } = generatePayoutSchedule(maturity, ['a'], 99, 'Investment')
-    expect(rows).toHaveLength(1)
-    expect(rows[0].target_month).toBe('2027-12')
+  it('generateFixedMaturityPayoutSchedule pays all members on final cycle date', () => {
+    const activation = new Date('2026-03-03T12:00:00+02:00')
+    const { rows, maturity_date_iso } = generateFixedMaturityPayoutSchedule(
+      activation,
+      6,
+      ['u1', 'u2'],
+    )
+    expect(rows).toHaveLength(2)
+    expect(maturity_date_iso).toBe('2026-08-05')
+    expect(rows[0].scheduled_payout_date).toBe('2026-08-05')
+    expect(rows[0].target_month).toBe('2026-08')
+    expect(rows[1].user_id).toBe('u2')
   })
 })
