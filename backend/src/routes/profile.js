@@ -1,22 +1,16 @@
 import { Router } from 'express'
-import { createClient } from '@supabase/supabase-js'
 import { requireAuth } from '../middleware/auth.js'
-import { getServiceSupabase } from '../utils/supabaseAdmin.js'
+import {
+  getServiceSupabase,
+  createUserJwtSupabase,
+} from '../utils/supabaseAdmin.js'
+import { sendSupabaseFailure } from '../utils/supabaseErrors.js'
 import { normalizeUsername } from '../utils/username.js'
 
 const router = Router()
 
-function createUserScopedClient(req) {
-  const token = req.headers.authorization.split(' ')[1]
-  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
-    global: {
-      headers: { Authorization: `Bearer ${token}` },
-    },
-  })
-}
-
 function dbClient(req) {
-  return getServiceSupabase() ?? createUserScopedClient(req)
+  return getServiceSupabase() ?? createUserJwtSupabase(req, 'profile')
 }
 
 function normalizeEmail(value) {
@@ -28,6 +22,16 @@ function normalizeEmail(value) {
 router.get('/me', requireAuth, async (req, res) => {
   try {
     const client = dbClient(req)
+    if (!client) {
+      sendSupabaseFailure(
+        res,
+        Object.assign(new Error('Supabase client unavailable'), {
+          code: 'SUPABASE_CLIENT_UNAVAILABLE',
+        }),
+        'GET /api/profile/me',
+      )
+      return
+    }
     const { data, error } = await client
       .from('profiles')
       .select('first_name, last_name, username, email')
@@ -35,8 +39,8 @@ router.get('/me', requireAuth, async (req, res) => {
       .maybeSingle()
 
     if (error) {
-      console.error('GET /api/profile/me:', error)
-      return res.status(500).json({ error: error.message })
+      sendSupabaseFailure(res, error, 'GET /api/profile/me')
+      return
     }
 
     return res.json({
@@ -50,13 +54,23 @@ router.get('/me', requireAuth, async (req, res) => {
     })
   } catch (err) {
     console.error('GET /api/profile/me:', err)
-    return res.status(500).json({ error: 'Internal Server Error' })
+    sendSupabaseFailure(res, err, 'GET /api/profile/me')
   }
 })
 
 router.patch('/me', requireAuth, async (req, res) => {
   try {
     const client = dbClient(req)
+    if (!client) {
+      sendSupabaseFailure(
+        res,
+        Object.assign(new Error('Supabase client unavailable'), {
+          code: 'SUPABASE_CLIENT_UNAVAILABLE',
+        }),
+        'PATCH /api/profile/me',
+      )
+      return
+    }
     const body = req.body ?? {}
     const updates = {}
     let touched = false
@@ -96,8 +110,8 @@ router.patch('/me', requireAuth, async (req, res) => {
           .neq('id', req.user.id)
           .maybeSingle()
         if (takenErr) {
-          console.error('PATCH /api/profile/me username check:', takenErr)
-          return res.status(500).json({ error: takenErr.message })
+          sendSupabaseFailure(res, takenErr, 'PATCH /api/profile/me username check')
+          return
         }
         if (taken) {
           return res.status(409).json({ error: 'That username is already taken.' })
@@ -121,8 +135,8 @@ router.patch('/me', requireAuth, async (req, res) => {
       .maybeSingle()
 
     if (exErr) {
-      console.error('PATCH /api/profile/me lookup:', exErr)
-      return res.status(500).json({ error: exErr.message })
+      sendSupabaseFailure(res, exErr, 'PATCH /api/profile/me lookup')
+      return
     }
 
     if (!existing) {
@@ -137,14 +151,14 @@ router.patch('/me', requireAuth, async (req, res) => {
       }
       const { error: insErr } = await client.from('profiles').insert(insertRow)
       if (insErr) {
-        console.error('PATCH /api/profile/me insert:', insErr)
-        return res.status(500).json({ error: insErr.message })
+        sendSupabaseFailure(res, insErr, 'PATCH /api/profile/me insert')
+        return
       }
     } else {
       const { error: upErr } = await client.from('profiles').update(updates).eq('id', req.user.id)
       if (upErr) {
-        console.error('PATCH /api/profile/me update:', upErr)
-        return res.status(500).json({ error: upErr.message })
+        sendSupabaseFailure(res, upErr, 'PATCH /api/profile/me update')
+        return
       }
     }
 
@@ -169,7 +183,7 @@ router.patch('/me', requireAuth, async (req, res) => {
     })
   } catch (err) {
     console.error('PATCH /api/profile/me:', err)
-    return res.status(500).json({ error: 'Internal Server Error' })
+    sendSupabaseFailure(res, err, 'PATCH /api/profile/me')
   }
 })
 
@@ -196,14 +210,14 @@ router.get('/username-available', async (req, res) => {
       .maybeSingle()
 
     if (error) {
-      console.error('GET /api/profile/username-available:', error)
-      return res.status(500).json({ error: error.message })
+      sendSupabaseFailure(res, error, 'GET /api/profile/username-available')
+      return
     }
 
     return res.json({ available: !data })
   } catch (err) {
     console.error('GET /api/profile/username-available:', err)
-    return res.status(500).json({ error: 'Internal Server Error' })
+    sendSupabaseFailure(res, err, 'GET /api/profile/username-available')
   }
 })
 
@@ -217,6 +231,16 @@ router.post('/username', requireAuth, async (req, res) => {
     }
 
     const client = dbClient(req)
+    if (!client) {
+      sendSupabaseFailure(
+        res,
+        Object.assign(new Error('Supabase client unavailable'), {
+          code: 'SUPABASE_CLIENT_UNAVAILABLE',
+        }),
+        'POST /api/profile/username',
+      )
+      return
+    }
 
     const { data: taken, error: takenErr } = await client
       .from('profiles')
@@ -226,8 +250,8 @@ router.post('/username', requireAuth, async (req, res) => {
       .maybeSingle()
 
     if (takenErr) {
-      console.error('POST /api/profile/username taken check:', takenErr)
-      return res.status(500).json({ error: takenErr.message })
+      sendSupabaseFailure(res, takenErr, 'POST /api/profile/username taken check')
+      return
     }
 
     if (taken) {
@@ -241,8 +265,8 @@ router.post('/username', requireAuth, async (req, res) => {
       .maybeSingle()
 
     if (exErr) {
-      console.error('POST /api/profile/username profile lookup:', exErr)
-      return res.status(500).json({ error: exErr.message })
+      sendSupabaseFailure(res, exErr, 'POST /api/profile/username profile lookup')
+      return
     }
 
     if (!existing) {
@@ -253,8 +277,8 @@ router.post('/username', requireAuth, async (req, res) => {
         role: 'user',
       })
       if (insErr) {
-        console.error('POST /api/profile/username insert:', insErr)
-        return res.status(500).json({ error: insErr.message || 'Failed to create profile' })
+        sendSupabaseFailure(res, insErr, 'POST /api/profile/username insert')
+        return
       }
     } else {
       const { error: upErr } = await client
@@ -266,15 +290,15 @@ router.post('/username', requireAuth, async (req, res) => {
         })
         .eq('id', req.user.id)
       if (upErr) {
-        console.error('POST /api/profile/username update:', upErr)
-        return res.status(500).json({ error: upErr.message || 'Failed to save username' })
+        sendSupabaseFailure(res, upErr, 'POST /api/profile/username update')
+        return
       }
     }
 
     return res.json({ success: true, username: normalized })
   } catch (err) {
     console.error('POST /api/profile/username:', err)
-    return res.status(500).json({ error: 'Internal Server Error' })
+    sendSupabaseFailure(res, err, 'POST /api/profile/username')
   }
 })
 

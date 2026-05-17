@@ -73,4 +73,17 @@ describe('supabase module', () => {
     )
     expect(mod.supabase).toBe(fakeClient)
   })
+
+  it('exports null when createClient throws', async () => {
+    process.env.SUPABASE_URL = 'https://example.supabase.co'
+    process.env.SUPABASE_ANON_KEY = 'anon-key'
+    mockCreateClient.mockImplementation(() => {
+      throw new Error('invalid client options')
+    })
+
+    const mod = await importSupabaseModule()
+
+    expect(mod.supabase).toBeNull()
+    expect(mockCreateClient).toHaveBeenCalledTimes(1)
+  })
 })

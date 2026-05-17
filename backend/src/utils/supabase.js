@@ -16,4 +16,18 @@ if (missingVars.length > 0) {
   )
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+let supabase = null
+try {
+  supabase = createClient(
+    typeof supabaseUrl === 'string' ? supabaseUrl.trim() : supabaseUrl,
+    typeof supabaseAnonKey === 'string' ? supabaseAnonKey.trim() : supabaseAnonKey,
+  )
+} catch (err) {
+  console.warn(
+    '[supabase] Anon createClient failed:',
+    err instanceof Error ? err.message : err,
+  )
+  if (err instanceof Error && err.stack) console.warn(err.stack)
+}
+
+export { supabase }

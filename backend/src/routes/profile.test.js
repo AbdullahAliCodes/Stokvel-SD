@@ -3,10 +3,6 @@ import express from 'express'
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals'
 
 // ESM-safe mocks
-jest.unstable_mockModule('@supabase/supabase-js', () => ({
-  createClient: jest.fn(),
-}))
-
 jest.unstable_mockModule('../middleware/auth.js', () => ({
   requireAuth: (req, _res, next) => {
     req.user = { id: 'test-user-id' }
@@ -18,6 +14,7 @@ jest.unstable_mockModule('../middleware/auth.js', () => ({
 
 jest.unstable_mockModule('../utils/supabaseAdmin.js', () => ({
   getServiceSupabase: jest.fn(),
+  createUserJwtSupabase: jest.fn(),
 }))
 
 jest.unstable_mockModule('../utils/username.js', () => ({
@@ -29,8 +26,7 @@ jest.unstable_mockModule('../utils/username.js', () => ({
 
 // Import AFTER mocks
 const { default: profileRouter } = await import('./profile.js')
-const { createClient } = await import('@supabase/supabase-js')
-const { getServiceSupabase } = await import('../utils/supabaseAdmin.js')
+const { getServiceSupabase, createUserJwtSupabase } = await import('../utils/supabaseAdmin.js')
 const { normalizeUsername } = await import('../utils/username.js')
 
 // Helper: fluent supabase chain with configurable responses
@@ -83,7 +79,7 @@ describe('Profile Router', () => {
 
     mockClient = makeChain()
     getServiceSupabase.mockReturnValue(mockClient)
-    createClient.mockReturnValue(mockClient)
+    createUserJwtSupabase.mockReturnValue(mockClient)
 
     jest.spyOn(console, 'error').mockImplementation(() => {})
   })

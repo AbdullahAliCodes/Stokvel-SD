@@ -3,6 +3,7 @@ import express from 'express'
 import { jest, describe, it, expect, beforeEach } from '@jest/globals'
 
 const mockCreateClient = jest.fn()
+const mockCreateUserJwtSupabase = jest.fn()
 const mockGetServiceSupabase = jest.fn()
 const mockNormalizeInviteEmail = jest.fn()
 const mockSendMeetingScheduledEmail = jest.fn()
@@ -36,6 +37,7 @@ jest.unstable_mockModule('../utils/invitations.js', () => ({
 
 jest.unstable_mockModule('../utils/supabaseAdmin.js', () => ({
   getServiceSupabase: mockGetServiceSupabase,
+  createUserJwtSupabase: mockCreateUserJwtSupabase,
 }))
 
 jest.unstable_mockModule('../utils/profileUserSearch.js', () => ({
@@ -193,6 +195,7 @@ function makeApp() {
 beforeEach(() => {
   jest.resetAllMocks()
   mockGetServiceSupabase.mockReturnValue(null)
+  mockCreateUserJwtSupabase.mockImplementation(() => mockCreateClient())
   mockSearchProfilesForMemberInvite.mockImplementation((_req, res) =>
     res.json({ success: true, users: [] }),
   )

@@ -4,9 +4,9 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "nodemon src/index.js",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
+    "start": "node --use-system-ca src/index.js",
+    "dev": "node --use-system-ca --watch-path=src src/index.js",
+    "test": "node --use-system-ca --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand"
   },
   "keywords": [],
   "author": "",

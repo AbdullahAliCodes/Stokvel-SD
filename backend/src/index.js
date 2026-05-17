@@ -2,13 +2,14 @@ import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
 import multer from 'multer'
-import { createClient } from '@supabase/supabase-js'
 import { requireAuth } from './middleware/auth.js'
+import { getServiceSupabase, createUserJwtSupabase } from './utils/supabaseAdmin.js'
+import { sendSupabaseFailure } from './utils/supabaseErrors.js'
 import stokvelsRouter from './routes/stokvels.js'
 import adminStokvelsRouter from './routes/adminStokvels.js'
 import profileRouter from './routes/profile.js'
 import invitationsRouter from './routes/invitations.js'
-import { getServiceSupabase } from './utils/supabaseAdmin.js'
+import healthScoreRouter from './routes/healthScore.js'
 import {
   normalizeUuid,
 } from './utils/platformAdminStokvelMembers.js'
@@ -42,16 +43,13 @@ function elapsedMs(start) {
 }
 
 function createUserSupabaseFromReq(req) {
-  const token = req.headers.authorization.split(' ')[1]
-  return createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_ANON_KEY,
-    {
-      global: {
-        headers: { Authorization: `Bearer ${token}` },
-      },
-    },
-  )
+  const c = createUserJwtSupabase(req, 'index')
+  if (!c) {
+    const e = new Error('Could not initialize Supabase client.')
+    e.code = 'SUPABASE_CLIENT_UNAVAILABLE'
+    throw e
+  }
+  return c
 }
 
 function cacheKey(kind, userId) {
@@ -205,8 +203,22 @@ app.get('/api/public/stokvels', async (_req, res) => {
   try {
     const svc = getServiceSupabase()
     if (!svc) {
-      return res.status(500).json({
-        error: 'Server configuration error: missing service role key.',
+      const missingUrl = !String(process.env.SUPABASE_URL ?? '').trim()
+      const missingKey = !String(
+        process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',
+      ).trim()
+      console.error(
+        '[GET /api/public/stokvels] service client unavailable — check env:',
+        [
+          missingUrl && 'SUPABASE_URL',
+          missingKey && 'SUPABASE_SERVICE_ROLE_KEY',
+        ]
+          .filter(Boolean)
+          .join(', ') || 'createClient failed (see earlier logs)',
+      )
+      return res.status(503).json({
+        error:
+          'Public stokvel directory is unavailable (server configuration).',
       })
     }
 
@@ -218,14 +230,18 @@ app.get('/api/public/stokvels', async (_req, res) => {
       .order('created_at', { ascending: false })
 
     if (error) {
-      console.error('GET /api/public/stokvels:', error)
-      return res.status(500).json({ error: error.message || 'Failed to load public stokvels.' })
+      sendSupabaseFailure(res, error, 'GET /api/public/stokvels')
+      return
     }
 
     return res.json(Array.isArray(data) ? data : [])
   } catch (err) {
-    console.error('GET /api/public/stokvels:', err)
-    return res.status(500).json({ error: 'Internal Server Error' })
+    console.error('[GET /api/public/stokvels] unexpected:', err?.message ?? err)
+    if (err?.cause != null) {
+      console.error('[GET /api/public/stokvels] cause:', err.cause?.message ?? err.cause)
+    }
+    if (err?.stack) console.error(err.stack)
+    sendSupabaseFailure(res, err, 'GET /api/public/stokvels')
   }
 })
 
@@ -237,7 +253,7 @@ app.post('/api/uploads/documents', requireAuth, (req, res) => {
     try {
       const svc = getServiceSupabase()
       if (!svc) {
-        return res.status(500).json({
+        return res.status(503).json({
           error: 'Document upload requires SUPABASE_SERVICE_ROLE_KEY on the API server.',
         })
       }
@@ -251,7 +267,8 @@ app.post('/api/uploads/documents', requireAuth, (req, res) => {
         fileSizeLimit: 10 * 1024 * 1024,
       })
       if (bucketError && !String(bucketError.message || '').toLowerCase().includes('already')) {
-        return res.status(500).json({ error: bucketError.message })
+        sendSupabaseFailure(res, bucketError, 'POST /api/uploads/documents bucket')
+        return
       }
 
       const uploaded = []
@@ -265,7 +282,8 @@ app.post('/api/uploads/documents', requireAuth, (req, res) => {
             upsert: false,
           })
         if (uploadError) {
-          return res.status(500).json({ error: uploadError.message })
+          sendSupabaseFailure(res, uploadError, 'POST /api/uploads/documents upload')
+          return
         }
         const { data: pub } = svc.storage.from(DOCUMENTS_BUCKET).getPublicUrl(key)
         uploaded.push(pub?.publicUrl || key)
@@ -274,7 +292,7 @@ app.post('/api/uploads/documents', requireAuth, (req, res) => {
       return res.status(201).json({ success: true, documents: uploaded })
     } catch (uploadErr) {
       console.error('POST /api/uploads/documents:', uploadErr)
-      return res.status(500).json({ error: 'Internal Server Error' })
+      sendSupabaseFailure(res, uploadErr, 'POST /api/uploads/documents')
     }
   })
 })
@@ -282,6 +300,7 @@ app.post('/api/uploads/documents', requireAuth, (req, res) => {
 app.use('/api/admin', adminStokvelsRouter)
 app.use('/api/profile', profileRouter)
 app.use('/api/invitations', invitationsRouter)
+app.use('/api/members', healthScoreRouter)
 app.use('/api/market-rates', marketRatesRouter)
 app.use('/api/v1/market-rates', marketRatesRouter)
 
@@ -296,8 +315,9 @@ app.get('/api/me', requireAuth, (req, res) => {
       },
     })
   } catch (err) {
-    console.error('Route Error:', err)
-    res.status(500).json({ error: 'Internal Server Error' })
+    console.error('[GET /api/me] Route Error:', err?.message ?? err)
+    if (err?.stack) console.error(err.stack)
+    sendSupabaseFailure(res, err, 'GET /api/me')
   }
 })
 
@@ -320,8 +340,8 @@ app.get('/api/my-stokvels', requireAuth, async (req, res) => {
       .eq('user_id', req.user.id)
 
     if (error) {
-      console.error('GET /api/my-stokvels:', error)
-      return res.status(500).json({ error: error.message })
+      sendSupabaseFailure(res, error, 'GET /api/my-stokvels')
+      return
     }
 
     const memberships = (data ?? []).filter((row) => row?.stokvels?.id)
@@ -332,7 +352,7 @@ app.get('/api/my-stokvels', requireAuth, async (req, res) => {
     console.log(`[perf] GET /api/my-stokvels ${elapsedMs(started).toFixed(1)}ms user=${req.user.id}`)
   } catch (err) {
     console.error('GET /api/my-stokvels:', err)
-    res.status(500).json({ error: 'Internal Server Error' })
+    sendSupabaseFailure(res, err, 'GET /api/my-stokvels')
   }
 })
 
@@ -352,8 +372,8 @@ app.get('/api/my-meetings', requireAuth, async (req, res) => {
       .select('stokvel_id')
       .eq('user_id', req.user.id)
     if (memberErr) {
-      console.error('GET /api/my-meetings memberships:', memberErr)
-      return res.status(500).json({ error: memberErr.message })
+      sendSupabaseFailure(res, memberErr, 'GET /api/my-meetings memberships')
+      return
     }
 
     const stokvelIds = [...new Set((memberships ?? []).map((m) => m.stokvel_id).filter(Boolean))]
@@ -372,12 +392,12 @@ app.get('/api/my-meetings', requireAuth, async (req, res) => {
     ])
 
     if (meetingsRes.error) {
-      console.error('GET /api/my-meetings meetings:', meetingsRes.error)
-      return res.status(500).json({ error: meetingsRes.error.message })
+      sendSupabaseFailure(res, meetingsRes.error, 'GET /api/my-meetings meetings')
+      return
     }
     if (groupsRes.error) {
-      console.error('GET /api/my-meetings groups:', groupsRes.error)
-      return res.status(500).json({ error: groupsRes.error.message })
+      sendSupabaseFailure(res, groupsRes.error, 'GET /api/my-meetings groups')
+      return
     }
 
     const groupNameById = new Map((groupsRes.data ?? []).map((g) => [g.id, g.name || 'Unnamed group']))
@@ -394,11 +414,9 @@ app.get('/api/my-meetings', requireAuth, async (req, res) => {
     return res.json(payload)
   } catch (err) {
     console.error('GET /api/my-meetings:', err)
-    return res.status(500).json({ error: 'Internal Server Error' })
+    sendSupabaseFailure(res, err, 'GET /api/my-meetings')
   }
 })
-
-app.get('/api/users', requireAuth, searchProfilesForMemberInvite)
 
 app.post('/api/stokvels', requireAuth, async (req, res) => {
   const started = hrNow()
@@ -498,10 +516,8 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
       .single()
 
     if (stokvelError) {
-      console.error('stokvels insert:', stokvelError)
-      return res.status(500).json({
-        error: stokvelError.message || 'Failed to create stokvel',
-      })
+      sendSupabaseFailure(res, stokvelError, 'POST /api/stokvels insert stokvel')
+      return
     }
 
     const stokvelId = newStokvel.id
@@ -518,9 +534,12 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
     if (creatorMemberErr) {
       console.error('stokvel_members creator insert:', creatorMemberErr)
       await userSupabase.from('stokvels').delete().eq('id', stokvelId)
-      return res.status(500).json({
-        error: creatorMemberErr.message || 'Failed to assign creator as group admin.',
-      })
+      sendSupabaseFailure(
+        res,
+        creatorMemberErr,
+        'POST /api/stokvels creator membership',
+      )
+      return
     }
 
     const svc = getServiceSupabase()
@@ -528,7 +547,7 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
       console.error('POST /api/stokvels: SUPABASE_SERVICE_ROLE_KEY required for SoD member setup.')
       await userSupabase.from('stokvel_members').delete().eq('stokvel_id', stokvelId)
       await userSupabase.from('stokvels').delete().eq('id', stokvelId)
-      return res.status(500).json({
+      return res.status(503).json({
         error:
           'Server configuration error: cannot complete group membership (missing service role key).',
       })
@@ -633,12 +652,8 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
     } catch (pipelineErr) {
       console.error('POST /api/stokvels membership pipeline:', pipelineErr)
       await deleteStokvelCascade(svc, stokvelId)
-      return res.status(500).json({
-        error:
-          pipelineErr?.message ||
-          String(pipelineErr) ||
-          'Failed to complete group membership setup.',
-      })
+      sendSupabaseFailure(res, pipelineErr, 'POST /api/stokvels membership pipeline')
+      return
     }
 
     clearDashboardCacheForUser(req.user.id)
@@ -656,7 +671,7 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
     console.log(`[perf] POST /api/stokvels ${elapsedMs(started).toFixed(1)}ms user=${req.user.id}`)
   } catch (err) {
     console.error('POST /api/stokvels:', err)
-    res.status(500).json({ error: 'Internal Server Error' })
+    sendSupabaseFailure(res, err, 'POST /api/stokvels')
   }
 })
 
@@ -679,7 +694,8 @@ app.post('/api/stokvels/:id/join', requireAuth, async (req, res) => {
 
     if (stokvelErr) {
       console.error('POST /api/stokvels/:id/join stokvel lookup:', stokvelErr)
-      return res.status(500).json({ error: stokvelErr.message || 'Failed to verify stokvel.' })
+      sendSupabaseFailure(res, stokvelErr, 'POST /api/stokvels/:id/join stokvel lookup')
+      return
     }
     if (!stokvelRow?.id) {
       return res
@@ -696,9 +712,8 @@ app.post('/api/stokvels/:id/join', requireAuth, async (req, res) => {
 
     if (memberLookupErr) {
       console.error('POST /api/stokvels/:id/join membership lookup:', memberLookupErr)
-      return res
-        .status(500)
-        .json({ error: memberLookupErr.message || 'Failed to verify membership.' })
+      sendSupabaseFailure(res, memberLookupErr, 'POST /api/stokvels/:id/join membership lookup')
+      return
     }
     if (existingMembership?.user_id) {
       return res.status(400).json({ error: 'You are already a member of this group.' })
@@ -713,20 +728,18 @@ app.post('/api/stokvels/:id/join', requireAuth, async (req, res) => {
     ])
     if (insertErr) {
       console.error('POST /api/stokvels/:id/join insert:', insertErr)
-      return res
-        .status(500)
-        .json({ error: insertErr.message || 'Failed to join group.' })
+      sendSupabaseFailure(res, insertErr, 'POST /api/stokvels/:id/join insert')
+      return
     }
 
     clearDashboardCacheForUser(req.user.id)
     return res.status(201).json({ success: true, stokvelId })
   } catch (err) {
     console.error('POST /api/stokvels/:id/join:', err)
-    return res.status(500).json({ error: 'Internal Server Error' })
+    sendSupabaseFailure(res, err, 'POST /api/stokvels/:id/join')
   }
 })
 
-// GET /api/stokvels (list), GET /api/stokvels/:id, POST /api/stokvels/:id/contributions
 app.use('/api/stokvels', stokvelsRouter)
 
 const entryPath = process.argv[1]
@@ -740,14 +753,18 @@ if (entryPath && entryPath === currentFilePath) {
       cron.schedule(
         '0 6 * * *',
         () => {
-          void fetchRepoRateFromFred()
+          fetchRepoRateFromFred().catch((e) => {
+            console.error('[FRED] Scheduled sync failed:', e?.message ?? e)
+          })
         },
         { timezone: 'Africa/Johannesburg' },
       )
       console.log(
         '[FRED] Scheduled daily SA policy rate sync (06:00 Africa/Johannesburg)',
       )
-      void fetchRepoRateFromFred()
+      fetchRepoRateFromFred().catch((e) => {
+        console.error('[FRED] Initial sync failed:', e?.message ?? e)
+      })
     } else {
       console.warn(
         '[FRED] FRED_API_KEY not set; market_data will not auto-sync (set key in .env)',

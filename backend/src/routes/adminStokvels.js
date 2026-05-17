@@ -1,8 +1,7 @@
 import { Router } from 'express'
-import { createClient } from '@supabase/supabase-js'
 import { requireAuth } from '../middleware/auth.js'
 import { requireAdmin } from '../middleware/requireAdmin.js'
-import { getServiceSupabase } from '../utils/supabaseAdmin.js'
+import { getServiceSupabase, createUserJwtSupabase } from '../utils/supabaseAdmin.js'
 import {
   groupRoleForUserProfile,
 } from '../utils/platformAdminStokvelMembers.js'
@@ -19,12 +18,7 @@ import { activateStokvel } from '../utils/stokvelActivation.js'
 const router = Router()
 
 function createUserScopedClient(req) {
-  const token = req.headers.authorization.split(' ')[1]
-  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
-    global: {
-      headers: { Authorization: `Bearer ${token}` },
-    },
-  })
+  return createUserJwtSupabase(req, 'adminStokvels')
 }
 
 /** Prefer service role so admin inserts succeed under typical RLS; else fall back to the caller's JWT. */

@@ -1,20 +1,11 @@
-import { createClient } from '@supabase/supabase-js'
-import { getServiceSupabase } from './supabaseAdmin.js'
+import { getServiceSupabase, createUserJwtSupabase } from './supabaseAdmin.js'
+import { sendSupabaseFailure } from './supabaseErrors.js'
 
 function escapeIlikePattern(s) {
   return String(s || '')
     .replace(/\\/g, '\\\\')
     .replace(/%/g, '\\%')
     .replace(/_/g, '\\_')
-}
-
-function createUserSupabaseFromReq(req) {
-  const token = req.headers.authorization.split(' ')[1]
-  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
-    global: {
-      headers: { Authorization: `Bearer ${token}` },
-    },
-  })
 }
 
 /** Search profiles for inviting members (used by GET /api/users and GET /api/stokvels/members/search). */
@@ -26,7 +17,17 @@ export async function searchProfilesForMemberInvite(req, res) {
       return res.json({ users: [] })
     }
 
-    const client = getServiceSupabase() ?? createUserSupabaseFromReq(req)
+    const client = getServiceSupabase() ?? createUserJwtSupabase(req, 'profile search')
+    if (!client) {
+      sendSupabaseFailure(
+        res,
+        Object.assign(new Error('Supabase client unavailable'), {
+          code: 'SUPABASE_CLIENT_UNAVAILABLE',
+        }),
+        'profile user search',
+      )
+      return
+    }
     const pattern = `%${escapeIlikePattern(q)}%`
     const sel = 'id, first_name, last_name, username, email'
 
@@ -42,12 +43,8 @@ export async function searchProfilesForMemberInvite(req, res) {
 
     const firstErr = byFirst.error || byLast.error || byUsername.error || byEmail.error
     if (firstErr) {
-      console.error('profile user search:', firstErr)
-      return res.status(500).json({
-        error:
-          firstErr.message ||
-          'Profile search failed. Ensure profiles.username exists and use SUPABASE_SERVICE_ROLE_KEY if RLS blocks reads.',
-      })
+      sendSupabaseFailure(res, firstErr, 'profile user search')
+      return
     }
 
     const byId = new Map()
@@ -77,6 +74,6 @@ export async function searchProfilesForMemberInvite(req, res) {
     return res.json({ users })
   } catch (err) {
     console.error('profile user search:', err)
-    return res.status(500).json({ error: 'Internal Server Error' })
+    sendSupabaseFailure(res, err, 'profile user search')
   }
 }

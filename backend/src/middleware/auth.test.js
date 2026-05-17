@@ -59,6 +59,16 @@ describe('requireAuth middleware', () => {
     expect(res.status).toHaveBeenCalledWith(401)
   })
 
+  it('returns 401 if Bearer token is empty', async () => {
+    req.headers.authorization = 'Bearer   '
+    await requireAuth(req, res, next)
+    expect(res.status).toHaveBeenCalledWith(401)
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'Missing or malformed authorization header',
+    })
+    expect(next).not.toHaveBeenCalled()
+  })
+
   it('returns 401 if token is invalid', async () => {
     req.headers.authorization = 'Bearer badtoken'
 
@@ -70,6 +80,24 @@ describe('requireAuth middleware', () => {
     await requireAuth(req, res, next)
 
     expect(res.status).toHaveBeenCalledWith(401)
+    expect(next).not.toHaveBeenCalled()
+  })
+
+  it('returns 503 when Supabase Auth transport fails (fetch failed)', async () => {
+    req.headers.authorization = 'Bearer valid-looking-token'
+
+    supabase.auth.getUser.mockResolvedValue({
+      data: { user: null },
+      error: { message: 'fetch failed' },
+    })
+
+    await requireAuth(req, res, next)
+
+    expect(res.status).toHaveBeenCalledWith(503)
+    expect(res.json).toHaveBeenCalledWith({
+      error:
+        'Authentication service temporarily unavailable (network or TLS). Check API logs.',
+    })
     expect(next).not.toHaveBeenCalled()
   })
 
@@ -148,6 +176,24 @@ describe('requireAuth middleware', () => {
     await requireAuth(req, res, next)
 
     expect(next).toHaveBeenCalled()
+  })
+
+  it('returns 503 when Supabase Auth is unreachable (e.g. TLS/network)', async () => {
+    req.headers.authorization = 'Bearer validtoken'
+    const tlsErr = new Error('fetch failed')
+    tlsErr.cause = Object.assign(new Error('cert'), {
+      code: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+    })
+    supabase.auth.getUser.mockRejectedValue(tlsErr)
+
+    await requireAuth(req, res, next)
+
+    expect(res.status).toHaveBeenCalledWith(503)
+    expect(res.json).toHaveBeenCalledWith({
+      error:
+        'Authentication service temporarily unavailable (network or TLS). Check API logs.',
+    })
+    expect(next).not.toHaveBeenCalled()
   })
 
   it('returns 500 on unexpected error', async () => {

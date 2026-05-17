@@ -1,11 +1,14 @@
 import { Router } from "express";
-import { createClient } from "@supabase/supabase-js";
 import { requireAuth } from "../middleware/auth.js";
 import {
   normalizeInviteEmail,
   sendMeetingScheduledEmail,
 } from "../utils/invitations.js";
-import { getServiceSupabase } from "../utils/supabaseAdmin.js";
+import {
+  getServiceSupabase,
+  createUserJwtSupabase,
+} from "../utils/supabaseAdmin.js";
+import { sendSupabaseFailure, isTransportLayerFailure } from "../utils/supabaseErrors.js";
 import axios from "axios";
 import { searchProfilesForMemberInvite } from "../utils/profileUserSearch.js";
 import {
@@ -27,12 +30,13 @@ const UUID_RE_STOKVEL_PARAM =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function userScopedSupabase(req) {
-  const token = req.headers.authorization.split(" ")[1];
-  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
-    global: {
-      headers: { Authorization: `Bearer ${token}` },
-    },
-  });
+  const client = createUserJwtSupabase(req, "stokvels");
+  if (!client) {
+    const err = new Error("Could not initialize Supabase client.");
+    err.code = "SUPABASE_CLIENT_UNAVAILABLE";
+    throw err;
+  }
+  return client;
 }
 
 /** Tries joins in order so we still return rows if some columns are missing in your DB. */
@@ -43,7 +47,11 @@ async function fetchStokvelMembers(userSupabase, stokvelId) {
     .eq("stokvel_id", stokvelId);
 
   if (error) {
-    console.error("fetchStokvelMembers error:", error.message);
+    if (isTransportLayerFailure(error)) {
+      console.warn("fetchStokvelMembers transport:", error.message);
+    } else {
+      console.error("fetchStokvelMembers error:", error.message);
+    }
     return { data: [], error };
   }
 
@@ -156,14 +164,14 @@ router.get("/", requireAuth, async (req, res) => {
       .eq("user_id", req.user.id);
 
     if (error) {
-      console.error("GET /api/stokvels:", error);
-      return res.status(500).json({ error: error.message });
+      sendSupabaseFailure(res, error, "GET /api/stokvels");
+      return;
     }
 
     res.json({ success: true, memberships: data });
   } catch (err) {
     console.error("GET /api/stokvels:", err);
-    res.status(500).json({ error: "Internal Server Error" });
+    sendSupabaseFailure(res, err, "GET /api/stokvels");
   }
 });
 
@@ -200,8 +208,8 @@ router.post("/:id/missed-payments", requireAuth, async (req, res) => {
       if (access.error.message === "Not found") {
         return res.status(404).json({ error: "Not found" });
       }
-      console.error("POST missed-payments membership:", access.error);
-      return res.status(500).json({ error: access.error.message });
+      sendSupabaseFailure(res, access.error, "stokvels");
+      return;
     }
     if (!requireGroupRole(access, ["admin", "treasurer"])) {
       return res.status(403).json({
@@ -217,8 +225,8 @@ router.post("/:id/missed-payments", requireAuth, async (req, res) => {
       .maybeSingle();
 
     if (tmErr) {
-      console.error("POST missed-payments target member:", tmErr);
-      return res.status(500).json({ error: tmErr.message });
+      sendSupabaseFailure(res, tmErr, "POST missed-payments target member");
+      return;
     }
     if (!targetMember?.user_id) {
       return res
@@ -228,7 +236,7 @@ router.post("/:id/missed-payments", requireAuth, async (req, res) => {
 
     const svc = getServiceSupabase();
     if (!svc) {
-      return res.status(500).json({
+      return res.status(503).json({
         error:
           "Server configuration error: cannot record flags without service role access.",
       });
@@ -247,14 +255,14 @@ router.post("/:id/missed-payments", requireAuth, async (req, res) => {
       if (insErr.code === "23505") {
         return res.status(200).json({ success: true, alreadyFlagged: true });
       }
-      console.error("POST missed-payments insert:", insErr);
-      return res.status(500).json({ error: insErr.message });
+      sendSupabaseFailure(res, insErr, "POST missed-payments insert");
+      return;
     }
 
     return res.status(201).json({ success: true, alreadyFlagged: false });
   } catch (err) {
     console.error("POST /api/stokvels/:id/missed-payments:", err);
-    return res.status(500).json({ error: "Internal Server Error" });
+    sendSupabaseFailure(res, err, "POST /api/stokvels/:id/missed-payments");
   }
 });
 
@@ -269,8 +277,8 @@ router.get("/:id", requireAuth, async (req, res) => {
     if (access.error) {
       if (access.error.message === "Not found")
         return res.status(404).json({ error: "Not found" });
-      console.error("GET /api/stokvels/:id membership:", access.error);
-      return res.status(500).json({ error: access.error.message });
+      sendSupabaseFailure(res, access.error, "stokvels");
+      return;
     }
 
     const { data: stokvel, error: stokvelError } = await access.reader
@@ -280,11 +288,11 @@ router.get("/:id", requireAuth, async (req, res) => {
       .single();
 
     if (stokvelError) {
-      console.error("GET /api/stokvels/:id stokvel:", stokvelError);
       if (stokvelError.code === "PGRST116") {
         return res.status(404).json({ error: "Not found" });
       }
-      return res.status(500).json({ error: stokvelError.message });
+      sendSupabaseFailure(res, stokvelError, "GET /api/stokvels/:id stokvel");
+      return;
     }
 
     const { data: members, error: membersError } = await fetchStokvelMembers(
@@ -293,8 +301,8 @@ router.get("/:id", requireAuth, async (req, res) => {
     );
 
     if (membersError) {
-      console.error("GET /api/stokvels/:id members:", membersError);
-      return res.status(500).json({ error: membersError.message });
+      sendSupabaseFailure(res, membersError, "GET /api/stokvels/:id members");
+      return;
     }
 
     const { data: contributions, error: contributionsError } =
@@ -307,8 +315,12 @@ router.get("/:id", requireAuth, async (req, res) => {
         .order("paid_at", { ascending: false });
 
     if (contributionsError) {
-      console.error("GET /api/stokvels/:id contributions:", contributionsError);
-      return res.status(500).json({ error: contributionsError.message });
+      sendSupabaseFailure(
+        res,
+        contributionsError,
+        "GET /api/stokvels/:id contributions",
+      );
+      return;
     }
 
     const currentCycle = getCurrentPaymentCycle(new Date());
@@ -326,8 +338,8 @@ router.get("/:id", requireAuth, async (req, res) => {
         .eq("stokvel_id", stokvelId);
 
       if (payoutErr) {
-        console.error("GET /api/stokvels/:id payouts:", payoutErr);
-        return res.status(500).json({ error: payoutErr.message });
+        sendSupabaseFailure(res, payoutErr, "GET /api/stokvels/:id payouts");
+        return;
       }
       payouts = (payoutRows ?? []).slice().sort((a, b) => {
         const da = String(a.scheduled_payout_date ?? "");
@@ -345,8 +357,12 @@ router.get("/:id", requireAuth, async (req, res) => {
         .is("resolved_at", null);
 
       if (missedErr) {
-        console.error("GET /api/stokvels/:id missed_payments:", missedErr);
-        return res.status(500).json({ error: missedErr.message });
+        sendSupabaseFailure(
+          res,
+          missedErr,
+          "GET /api/stokvels/:id missed_payments",
+        );
+        return;
       }
       missedPayments = missedRows ?? [];
     } else {
@@ -365,11 +381,12 @@ router.get("/:id", requireAuth, async (req, res) => {
         .select("id, first_name, last_name")
         .in("id", contributorIds);
       if (profileError) {
-        console.error(
-          "GET /api/stokvels/:id contributor profiles:",
+        sendSupabaseFailure(
+          res,
           profileError,
+          "GET /api/stokvels/:id contributor profiles",
         );
-        return res.status(500).json({ error: profileError.message });
+        return;
       }
       profileById = toProfileMap(profileRows);
     }
@@ -397,7 +414,7 @@ router.get("/:id", requireAuth, async (req, res) => {
     });
   } catch (err) {
     console.error("GET /api/stokvels/:id:", err);
-    res.status(500).json({ error: "Internal Server Error" });
+    sendSupabaseFailure(res, err, "GET /api/stokvels/:id");
   }
 });
 
@@ -415,7 +432,8 @@ router.get("/:id/payouts", requireAuth, async (req, res) => {
       if (access.error.message === "Not found") {
         return res.status(404).json({ error: "Not found" });
       }
-      return res.status(500).json({ error: access.error.message });
+      sendSupabaseFailure(res, access.error, "stokvels");
+      return;
     }
     if (!isTreasurer(access)) {
       return res
@@ -425,7 +443,7 @@ router.get("/:id/payouts", requireAuth, async (req, res) => {
 
     const svc = getServiceSupabase();
     if (!svc) {
-      return res.status(500).json({
+      return res.status(503).json({
         error:
           "Server configuration error: cannot load payouts without service role access.",
       });
@@ -438,8 +456,8 @@ router.get("/:id/payouts", requireAuth, async (req, res) => {
       )
       .eq("stokvel_id", stokvelId);
     if (payoutErr) {
-      console.error("GET /api/stokvels/:id/payouts:", payoutErr);
-      return res.status(500).json({ error: payoutErr.message });
+      sendSupabaseFailure(res, payoutErr, "GET /api/stokvels/:id/payouts");
+      return;
     }
 
     const userIds = [
@@ -452,8 +470,12 @@ router.get("/:id/payouts", requireAuth, async (req, res) => {
         .select("id, first_name, last_name, email")
         .in("id", userIds);
       if (profileErr) {
-        console.error("GET /api/stokvels/:id/payouts profiles:", profileErr);
-        return res.status(500).json({ error: profileErr.message });
+        sendSupabaseFailure(
+          res,
+          profileErr,
+          "GET /api/stokvels/:id/payouts profiles",
+        );
+        return;
       }
       profileById = new Map((profiles ?? []).map((p) => [p.id, p]));
     }
@@ -477,7 +499,7 @@ router.get("/:id/payouts", requireAuth, async (req, res) => {
     return res.json({ success: true, payouts });
   } catch (err) {
     console.error("GET /api/stokvels/:id/payouts:", err);
-    return res.status(500).json({ error: "Internal Server Error" });
+    sendSupabaseFailure(res, err, "GET /api/stokvels/:id/payouts");
   }
 });
 
@@ -502,7 +524,8 @@ router.post(
         if (access.error.message === "Not found") {
           return res.status(404).json({ error: "Not found" });
         }
-        return res.status(500).json({ error: access.error.message });
+        sendSupabaseFailure(res, access.error, "stokvels");
+        return;
       }
       if (!isTreasurer(access)) {
         return res
@@ -512,7 +535,7 @@ router.post(
 
       const svc = getServiceSupabase();
       if (!svc) {
-        return res.status(500).json({
+        return res.status(503).json({
           error:
             "Server configuration error: cannot disburse payouts without service role access.",
         });
@@ -527,11 +550,12 @@ router.post(
         .eq("stokvel_id", stokvelId)
         .maybeSingle();
       if (payoutErr) {
-        console.error(
-          "POST /api/stokvels/:id/payouts/:payoutId/disburse lookup:",
+        sendSupabaseFailure(
+          res,
           payoutErr,
+          "POST /api/stokvels/:id/payouts/:payoutId/disburse lookup",
         );
-        return res.status(500).json({ error: payoutErr.message });
+        return;
       }
       if (!payout?.id) {
         return res.status(404).json({ error: "Payout not found." });
@@ -574,11 +598,12 @@ router.post(
         )
         .maybeSingle();
       if (updateErr) {
-        console.error(
-          "POST /api/stokvels/:id/payouts/:payoutId/disburse update:",
+        sendSupabaseFailure(
+          res,
           updateErr,
+          "POST /api/stokvels/:id/payouts/:payoutId/disburse update",
         );
-        return res.status(500).json({ error: updateErr.message });
+        return;
       }
       if (!updated?.id) {
         return res.status(404).json({ error: "Payout not found." });
@@ -587,7 +612,11 @@ router.post(
       return res.json({ success: true, payout: updated });
     } catch (err) {
       console.error("POST /api/stokvels/:id/payouts/:payoutId/disburse:", err);
-      return res.status(500).json({ error: "Internal Server Error" });
+      sendSupabaseFailure(
+        res,
+        err,
+        "POST /api/stokvels/:id/payouts/:payoutId/disburse",
+      );
     }
   },
 );
@@ -605,8 +634,8 @@ router.patch("/:id", requireAuth, async (req, res) => {
       if (access.error.message === "Not found") {
         return res.status(404).json({ error: "Not found" });
       }
-      console.error("PATCH /api/stokvels/:id membership:", access.error);
-      return res.status(500).json({ error: access.error.message });
+      sendSupabaseFailure(res, access.error, "stokvels");
+      return;
     }
     if (!requireGroupRole(access, ["admin"])) {
       return res.status(403).json({ error: "Forbidden" });
@@ -673,15 +702,15 @@ router.patch("/:id", requireAuth, async (req, res) => {
       .maybeSingle();
 
     if (updateError) {
-      console.error("PATCH /api/stokvels/:id update:", updateError);
-      return res.status(500).json({ error: updateError.message });
+      sendSupabaseFailure(res, updateError, "PATCH /api/stokvels/:id update");
+      return;
     }
     if (!stokvel) return res.status(404).json({ error: "Not found" });
 
     return res.json({ success: true, stokvel });
   } catch (err) {
     console.error("PATCH /api/stokvels/:id:", err);
-    return res.status(500).json({ error: "Internal Server Error" });
+    sendSupabaseFailure(res, err, "PATCH /api/stokvels/:id");
   }
 });
 
@@ -693,7 +722,8 @@ router.get("/:id/meetings", requireAuth, async (req, res) => {
     if (access.error) {
       if (access.error.message === "Not found")
         return res.status(404).json({ error: "Not found" });
-      return res.status(500).json({ error: access.error.message });
+      sendSupabaseFailure(res, access.error, "stokvels");
+      return;
     }
 
     const { data, error } = await access.reader
@@ -703,12 +733,15 @@ router.get("/:id/meetings", requireAuth, async (req, res) => {
       )
       .eq("stokvel_id", stokvelId)
       .order("meeting_date", { ascending: true });
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) {
+      sendSupabaseFailure(res, error, "GET /api/stokvels/:id/meetings");
+      return;
+    }
 
     return res.json({ success: true, meetings: data ?? [] });
   } catch (err) {
     console.error("GET /api/stokvels/:id/meetings:", err);
-    return res.status(500).json({ error: "Internal Server Error" });
+    sendSupabaseFailure(res, err, "GET /api/stokvels/:id/meetings");
   }
 });
 
@@ -721,7 +754,8 @@ router.post("/:id/meetings", requireAuth, async (req, res) => {
       if (access.error.message === "Not found") {
         return res.status(404).json({ error: "Not found" });
       }
-      return res.status(500).json({ error: access.error.message });
+      sendSupabaseFailure(res, access.error, "stokvels");
+      return;
     }
     if (!canManageMeetingsForGroup(access.membership)) {
       return res
@@ -762,8 +796,10 @@ router.post("/:id/meetings", requireAuth, async (req, res) => {
         "id, stokvel_id, title, meeting_date, notes, meeting_link, agenda, minutes, created_at",
       )
       .single();
-    if (createError)
-      return res.status(500).json({ error: createError.message });
+    if (createError) {
+      sendSupabaseFailure(res, createError, "POST /api/stokvels/:id/meetings");
+      return;
+    }
 
     const { data: stokvel } = await userSupabase
       .from("stokvels")
@@ -830,7 +866,7 @@ router.post("/:id/meetings", requireAuth, async (req, res) => {
     return res.status(201).json({ success: true, meeting: created });
   } catch (err) {
     console.error("POST /api/stokvels/:id/meetings:", err);
-    return res.status(500).json({ error: "Internal Server Error" });
+    sendSupabaseFailure(res, err, "POST /api/stokvels/:id/meetings");
   }
 });
 
@@ -844,7 +880,8 @@ router.patch("/:id/meetings/:meetingId", requireAuth, async (req, res) => {
       if (access.error.message === "Not found") {
         return res.status(404).json({ error: "Not found" });
       }
-      return res.status(500).json({ error: access.error.message });
+      sendSupabaseFailure(res, access.error, "stokvels");
+      return;
     }
     if (!canManageMeetingsForGroup(access.membership)) {
       return res
@@ -877,13 +914,24 @@ router.patch("/:id/meetings/:meetingId", requireAuth, async (req, res) => {
         "id, stokvel_id, title, meeting_date, notes, meeting_link, agenda, minutes, created_at",
       )
       .maybeSingle();
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) {
+      sendSupabaseFailure(
+        res,
+        error,
+        "PATCH /api/stokvels/:id/meetings/:meetingId",
+      );
+      return;
+    }
     if (!data) return res.status(404).json({ error: "Meeting not found." });
 
     return res.json({ success: true, meeting: data });
   } catch (err) {
     console.error("PATCH /api/stokvels/:id/meetings/:meetingId:", err);
-    return res.status(500).json({ error: "Internal Server Error" });
+    sendSupabaseFailure(
+      res,
+      err,
+      "PATCH /api/stokvels/:id/meetings/:meetingId",
+    );
   }
 });
 
@@ -900,7 +948,8 @@ router.patch(
         if (access.error.message === "Not found") {
           return res.status(404).json({ error: "Not found" });
         }
-        return res.status(500).json({ error: access.error.message });
+        sendSupabaseFailure(res, access.error, "stokvels");
+        return;
       }
       if (!canManageMeetingsForGroup(access.membership)) {
         return res
@@ -922,7 +971,14 @@ router.patch(
           "id, stokvel_id, title, meeting_date, notes, meeting_link, agenda, minutes, created_at",
         )
         .maybeSingle();
-      if (error) return res.status(500).json({ error: error.message });
+      if (error) {
+        sendSupabaseFailure(
+          res,
+          error,
+          "PATCH /api/stokvels/:id/meetings/:meetingId/minutes",
+        );
+        return;
+      }
       if (!data) return res.status(404).json({ error: "Meeting not found." });
 
       return res.json({ success: true, meeting: data });
@@ -931,7 +987,11 @@ router.patch(
         "PATCH /api/stokvels/:id/meetings/:meetingId/minutes:",
         err,
       );
-      return res.status(500).json({ error: "Internal Server Error" });
+      sendSupabaseFailure(
+        res,
+        err,
+        "PATCH /api/stokvels/:id/meetings/:meetingId/minutes",
+      );
     }
   },
 );
@@ -946,7 +1006,8 @@ router.delete("/:id/meetings/:meetingId", requireAuth, async (req, res) => {
       if (access.error.message === "Not found") {
         return res.status(404).json({ error: "Not found" });
       }
-      return res.status(500).json({ error: access.error.message });
+      sendSupabaseFailure(res, access.error, "stokvels");
+      return;
     }
     if (!canManageMeetingsForGroup(access.membership)) {
       return res.status(403).json({
@@ -961,12 +1022,23 @@ router.delete("/:id/meetings/:meetingId", requireAuth, async (req, res) => {
       .eq("stokvel_id", stokvelId)
       .select("id")
       .maybeSingle();
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) {
+      sendSupabaseFailure(
+        res,
+        error,
+        "DELETE /api/stokvels/:id/meetings/:meetingId",
+      );
+      return;
+    }
     if (!data) return res.status(404).json({ error: "Meeting not found." });
     return res.json({ success: true, meetingId });
   } catch (err) {
     console.error("DELETE /api/stokvels/:id/meetings/:meetingId:", err);
-    return res.status(500).json({ error: "Internal Server Error" });
+    sendSupabaseFailure(
+      res,
+      err,
+      "DELETE /api/stokvels/:id/meetings/:meetingId",
+    );
   }
 });
 
@@ -985,7 +1057,8 @@ router.patch("/:id/treasurer", requireAuth, async (req, res) => {
       if (access.error.message === "Not found") {
         return res.status(404).json({ error: "Not found" });
       }
-      return res.status(500).json({ error: access.error.message });
+      sendSupabaseFailure(res, access.error, "stokvels");
+      return;
     }
     if (!requireGroupRole(access, ["admin", "treasurer"])) {
       return res
@@ -1002,7 +1075,12 @@ router.patch("/:id/treasurer", requireAuth, async (req, res) => {
         .maybeSingle();
 
     if (targetMembershipError) {
-      return res.status(500).json({ error: targetMembershipError.message });
+      sendSupabaseFailure(
+        res,
+        targetMembershipError,
+        "PATCH /api/stokvels/:id/treasurer target member",
+      );
+      return;
     }
     if (!targetMembership) {
       return res
@@ -1017,7 +1095,12 @@ router.patch("/:id/treasurer", requireAuth, async (req, res) => {
       .eq("group_role", "treasurer")
       .neq("user_id", targetUserId);
     if (demoteError) {
-      return res.status(500).json({ error: demoteError.message });
+      sendSupabaseFailure(
+        res,
+        demoteError,
+        "PATCH /api/stokvels/:id/treasurer demote",
+      );
+      return;
     }
 
     const { error: assignError } = await access.writer
@@ -1026,13 +1109,18 @@ router.patch("/:id/treasurer", requireAuth, async (req, res) => {
       .eq("stokvel_id", stokvelId)
       .eq("user_id", targetUserId);
     if (assignError) {
-      return res.status(500).json({ error: assignError.message });
+      sendSupabaseFailure(
+        res,
+        assignError,
+        "PATCH /api/stokvels/:id/treasurer assign",
+      );
+      return;
     }
 
     return res.json({ success: true, userId: targetUserId });
   } catch (err) {
     console.error("PATCH /api/stokvels/:id/treasurer:", err);
-    return res.status(500).json({ error: "Internal Server Error" });
+    sendSupabaseFailure(res, err, "PATCH /api/stokvels/:id/treasurer");
   }
 });
 
@@ -1062,7 +1150,8 @@ router.patch("/:id/payout-order", requireAuth, async (req, res) => {
       if (access.error.message === "Not found") {
         return res.status(404).json({ error: "Not found" });
       }
-      return res.status(500).json({ error: access.error.message });
+      sendSupabaseFailure(res, access.error, "stokvels");
+      return;
     }
     if (!requireGroupRole(access, ["admin", "treasurer"])) {
       return res.status(403).json({
@@ -1072,7 +1161,7 @@ router.patch("/:id/payout-order", requireAuth, async (req, res) => {
 
     const svc = getServiceSupabase();
     if (!svc) {
-      return res.status(500).json({
+      return res.status(503).json({
         error:
           "Server configuration error: cannot reorder payouts without service role access.",
       });
@@ -1085,7 +1174,12 @@ router.patch("/:id/payout-order", requireAuth, async (req, res) => {
       )
       .eq("stokvel_id", stokvelId);
     if (payoutErr) {
-      return res.status(500).json({ error: payoutErr.message });
+      sendSupabaseFailure(
+        res,
+        payoutErr,
+        "PATCH /api/stokvels/:id/payout-order list",
+      );
+      return;
     }
 
     const sortedPayouts = (payoutRows ?? []).slice().sort((a, b) => {
@@ -1143,7 +1237,12 @@ router.patch("/:id/payout-order", requireAuth, async (req, res) => {
         .eq("id", originalSlot.id)
         .eq("stokvel_id", stokvelId);
       if (updErr) {
-        return res.status(500).json({ error: updErr.message });
+        sendSupabaseFailure(
+          res,
+          updErr,
+          "PATCH /api/stokvels/:id/payout-order update",
+        );
+        return;
       }
     }
 
@@ -1154,7 +1253,12 @@ router.patch("/:id/payout-order", requireAuth, async (req, res) => {
       )
       .eq("stokvel_id", stokvelId);
     if (refreshErr) {
-      return res.status(500).json({ error: refreshErr.message });
+      sendSupabaseFailure(
+        res,
+        refreshErr,
+        "PATCH /api/stokvels/:id/payout-order refresh",
+      );
+      return;
     }
 
     const payouts = (refreshedRows ?? []).slice().sort((a, b) => {
@@ -1167,7 +1271,7 @@ router.patch("/:id/payout-order", requireAuth, async (req, res) => {
     return res.json({ success: true, payouts });
   } catch (err) {
     console.error("PATCH /api/stokvels/:id/payout-order:", err);
-    return res.status(500).json({ error: "Internal Server Error" });
+    sendSupabaseFailure(res, err, "PATCH /api/stokvels/:id/payout-order");
   }
 });
 
@@ -1191,7 +1295,15 @@ router.post("/:id/contributions", requireAuth, async (req, res) => {
       .eq("stokvel_id", stokvelId)
       .maybeSingle();
 
-    if (membershipError || !membership) {
+    if (membershipError) {
+      sendSupabaseFailure(
+        res,
+        membershipError,
+        "POST contributions membership lookup",
+      );
+      return;
+    }
+    if (!membership) {
       return res.status(403).json({ error: "Not a member of this stokvel" });
     }
 
@@ -1202,14 +1314,14 @@ router.post("/:id/contributions", requireAuth, async (req, res) => {
       .single();
 
     if (error) {
-      console.error("POST contributions:", error);
-      return res.status(500).json({ error: error.message });
+      sendSupabaseFailure(res, error, "POST contributions insert");
+      return;
     }
 
     res.status(201).json({ success: true, contribution: data });
   } catch (err) {
     console.error("POST contributions:", err);
-    res.status(500).json({ error: "Internal Server Error" });
+    sendSupabaseFailure(res, err, "POST /api/stokvels/:id/contributions");
   }
 });
 
@@ -1246,7 +1358,7 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
 
     const svc = getServiceSupabase();
     if (!svc) {
-      return res.status(500).json({
+      return res.status(503).json({
         error:
           "Server configuration error: cannot verify payments without service role access.",
       });
@@ -1259,8 +1371,12 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
       .maybeSingle();
 
     if (dupLookupErr) {
-      console.error("POST payments/verify dup lookup:", dupLookupErr);
-      return res.status(500).json({ error: dupLookupErr.message });
+      sendSupabaseFailure(
+        res,
+        dupLookupErr,
+        "POST payments/verify dup lookup",
+      );
+      return;
     }
     if (existingRef?.id) {
       return res
@@ -1340,8 +1456,8 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
       .maybeSingle();
 
     if (stErr) {
-      console.error("POST payments/verify stokvel:", stErr);
-      return res.status(500).json({ error: stErr.message });
+      sendSupabaseFailure(res, stErr, "POST payments/verify stokvel");
+      return;
     }
     if (!stokvel?.id || stokvel.status !== "active") {
       return res
@@ -1357,8 +1473,8 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
       .maybeSingle();
 
     if (memErr) {
-      console.error("POST payments/verify membership:", memErr);
-      return res.status(500).json({ error: memErr.message });
+      sendSupabaseFailure(res, memErr, "POST payments/verify membership");
+      return;
     }
     if (!membership) {
       return res.status(403).json({ error: "Not a member of this stokvel." });
@@ -1376,8 +1492,12 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
         .limit(1);
 
       if (missErr) {
-        console.error("POST payments/verify missed_payments:", missErr);
-        return res.status(500).json({ error: missErr.message });
+        sendSupabaseFailure(
+          res,
+          missErr,
+          "POST payments/verify missed_payments",
+        );
+        return;
       }
       console.log(
         "[VERIFY] missedPayment flags found:",
@@ -1404,8 +1524,8 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
         .maybeSingle();
 
       if (recvErr) {
-        console.error("POST payments/verify payouts:", recvErr);
-        return res.status(500).json({ error: recvErr.message });
+        sendSupabaseFailure(res, recvErr, "POST payments/verify payouts");
+        return;
       }
       if (recvRow?.id) {
         return res.status(403).json({
@@ -1448,8 +1568,8 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
           .status(409)
           .json({ error: "This payment reference was already recorded." });
       }
-      console.error("POST payments/verify insert:", insErr);
-      return res.status(500).json({ error: msg });
+      sendSupabaseFailure(res, insErr, "POST payments/verify insert");
+      return;
     }
     console.log(
       "[VERIFY] SUCCESS: contribution inserted, id:",
@@ -1474,11 +1594,10 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
     return res.json({ success: true, contribution });
   } catch (err) {
     console.error("POST payments/verify:", err);
-    return res.status(500).json({ error: "Verification failed" });
+    sendSupabaseFailure(res, err, "POST payments/verify");
   }
 });
 
-/** Treasurer / group admin confirms or rejects a recorded payment after bank check. */
 router.patch(
   "/:id/contributions/:contributionId/treasurer-approval",
   requireAuth,
@@ -1514,8 +1633,8 @@ router.patch(
         if (access.error.message === "Not found") {
           return res.status(404).json({ error: "Not found" });
         }
-        console.error("PATCH treasurer-approval membership:", access.error);
-        return res.status(500).json({ error: access.error.message });
+        sendSupabaseFailure(res, access.error, "stokvels");
+        return;
       }
       if (!requireGroupRole(access, ["admin", "treasurer"])) {
         return res.status(403).json({
@@ -1532,8 +1651,12 @@ router.patch(
         .maybeSingle();
 
       if (fetchErr) {
-        console.error("PATCH treasurer-approval fetch:", fetchErr);
-        return res.status(500).json({ error: fetchErr.message });
+        sendSupabaseFailure(
+          res,
+          fetchErr,
+          "PATCH treasurer-approval fetch contribution",
+        );
+        return;
       }
       if (!row?.id) {
         return res.status(404).json({ error: "Contribution not found." });
@@ -1569,8 +1692,12 @@ router.patch(
         .maybeSingle();
 
       if (updErr) {
-        console.error("PATCH treasurer-approval update:", updErr);
-        return res.status(500).json({ error: updErr.message });
+        sendSupabaseFailure(
+          res,
+          updErr,
+          "PATCH treasurer-approval update contribution",
+        );
+        return;
       }
       if (!updated?.id) {
         return res.status(404).json({ error: "Contribution not found." });
@@ -1595,7 +1722,11 @@ router.patch(
         "PATCH /api/stokvels/:id/contributions/:contributionId/treasurer-approval:",
         err,
       );
-      return res.status(500).json({ error: "Internal Server Error" });
+      sendSupabaseFailure(
+        res,
+        err,
+        "PATCH /api/stokvels/:id/contributions/:contributionId/treasurer-approval",
+      );
     }
   },
 );

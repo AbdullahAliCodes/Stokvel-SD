@@ -4,6 +4,7 @@ process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'https://example.supabase
 process.env.SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'anon-key'
 
 const mockCreateClient = jest.fn()
+const mockCreateUserJwtSupabase = jest.fn(() => mockCreateClient())
 const mockRequireAuth = jest.fn((req, _res, next) => {
   req.user = req.user || {
     id: '123e4567-e89b-12d3-a456-426614174000',
@@ -71,10 +72,6 @@ jest.unstable_mockModule('node-cron', () => ({
   default: { schedule: jest.fn() },
 }))
 
-jest.unstable_mockModule('@supabase/supabase-js', () => ({
-  createClient: mockCreateClient,
-}))
-
 jest.unstable_mockModule('./middleware/auth.js', () => ({
   requireAuth: mockRequireAuth,
 }))
@@ -83,10 +80,12 @@ jest.unstable_mockModule('./routes/stokvels.js', () => ({ default: jest.fn() }))
 jest.unstable_mockModule('./routes/adminStokvels.js', () => ({ default: jest.fn() }))
 jest.unstable_mockModule('./routes/profile.js', () => ({ default: jest.fn() }))
 jest.unstable_mockModule('./routes/invitations.js', () => ({ default: jest.fn() }))
+jest.unstable_mockModule('./routes/healthScore.js', () => ({ default: jest.fn() }))
 jest.unstable_mockModule('./routes/marketRates.js', () => ({ default: jest.fn() }))
 
 jest.unstable_mockModule('./utils/supabaseAdmin.js', () => ({
   getServiceSupabase: mockGetServiceSupabase,
+  createUserJwtSupabase: mockCreateUserJwtSupabase,
 }))
 
 jest.unstable_mockModule('./utils/platformAdminStokvelMembers.js', () => ({
