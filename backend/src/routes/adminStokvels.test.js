@@ -5,6 +5,7 @@ import { jest, describe, it, expect, beforeEach } from '@jest/globals'
  * ---- Dependency mocks (ESM-safe) ----
  */
 const mockCreateClient = jest.fn()
+const mockCreateUserJwtSupabase = jest.fn()
 const mockGetServiceSupabase = jest.fn()
 const mockEnsurePlatformAdminsInStokvel = jest.fn()
 const mockGroupRoleForUserProfile = jest.fn()
@@ -14,10 +15,6 @@ const mockNormalizeInviteEmail = jest.fn()
 const mockSendGroupAddedEmail = jest.fn()
 const mockSendGroupStatusEmail = jest.fn()
 const mockSendInvitationEmail = jest.fn()
-
-jest.unstable_mockModule('@supabase/supabase-js', () => ({
-  createClient: mockCreateClient,
-}))
 
 jest.unstable_mockModule('../middleware/auth.js', () => ({
   requireAuth: (_req, _res, next) => next(),
@@ -29,6 +26,7 @@ jest.unstable_mockModule('../middleware/requireAdmin.js', () => ({
 
 jest.unstable_mockModule('../utils/supabaseAdmin.js', () => ({
   getServiceSupabase: mockGetServiceSupabase,
+  createUserJwtSupabase: mockCreateUserJwtSupabase,
 }))
 
 jest.unstable_mockModule('../utils/platformAdminStokvelMembers.js', () => ({
@@ -205,6 +203,7 @@ function getHandler(method, path) {
 
 beforeEach(() => {
   jest.clearAllMocks()
+  mockCreateUserJwtSupabase.mockImplementation(() => mockCreateClient())
   mockNormalizeUsername.mockImplementation((v) => String(v || '').trim().toLowerCase())
   mockNormalizeInviteEmail.mockImplementation((v) =>
     typeof v === 'string' && v.includes('@') ? v.trim().toLowerCase() : '',
@@ -924,7 +923,7 @@ describe('adminStokvels routes', () => {
 
       await handler(req, res)
 
-      expect(mockCreateClient).toHaveBeenCalled()
+      expect(mockCreateUserJwtSupabase).toHaveBeenCalled()
       expect(res.json).toHaveBeenCalledWith({ success: true, stokvels: [] })
     })
   })

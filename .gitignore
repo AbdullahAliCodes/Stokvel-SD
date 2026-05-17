@@ -6,7 +6,7 @@ dist/
 build/
 *.tsbuildinfo
 
-# Environment
+# Environment (never commit secrets — use `.env.example` / `frontend/.env.example`)
 .env
 .env.local
 .env.*.local

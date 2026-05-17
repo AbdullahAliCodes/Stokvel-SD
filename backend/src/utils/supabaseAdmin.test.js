@@ -67,9 +67,9 @@ describe('getServiceSupabase', () => {
     expect(mockCreateClient).toHaveBeenCalledWith(
       'https://example.supabase.co',
       'service-role-key',
-      {
+      expect.objectContaining({
         auth: { persistSession: false, autoRefreshToken: false },
-      },
+      }),
     )
     expect(result).toBe(fakeClient)
   })
@@ -86,6 +86,18 @@ describe('getServiceSupabase', () => {
 
     expect(first).toBe(fakeClient)
     expect(second).toBe(fakeClient)
+    expect(mockCreateClient).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns null when createClient throws', async () => {
+    process.env.SUPABASE_URL = 'https://example.supabase.co'
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key'
+    mockCreateClient.mockImplementation(() => {
+      throw new Error('invalid client options')
+    })
+    const getServiceSupabase = await loadGetServiceSupabase()
+
+    expect(getServiceSupabase()).toBeNull()
     expect(mockCreateClient).toHaveBeenCalledTimes(1)
   })
 })

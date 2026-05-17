@@ -1,14 +1,11 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals'
 
-const mockCreateClient = jest.fn()
+const mockCreateUserJwtSupabase = jest.fn()
 const mockGetServiceSupabase = jest.fn()
-
-jest.unstable_mockModule('@supabase/supabase-js', () => ({
-  createClient: mockCreateClient,
-}))
 
 jest.unstable_mockModule('./supabaseAdmin.js', () => ({
   getServiceSupabase: mockGetServiceSupabase,
+  createUserJwtSupabase: mockCreateUserJwtSupabase,
 }))
 
 const { searchProfilesForMemberInvite } = await import('./profileUserSearch.js')
@@ -59,6 +56,7 @@ describe('searchProfilesForMemberInvite', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     mockGetServiceSupabase.mockReturnValue(null)
+    mockCreateUserJwtSupabase.mockReturnValue(null)
   })
 
   it('returns empty users when query length is less than 2', async () => {
@@ -68,7 +66,7 @@ describe('searchProfilesForMemberInvite', () => {
     await searchProfilesForMemberInvite(req, res)
 
     expect(res.json).toHaveBeenCalledWith({ users: [] })
-    expect(mockCreateClient).not.toHaveBeenCalled()
+    expect(mockCreateUserJwtSupabase).not.toHaveBeenCalled()
   })
 
   it('uses service client when available', async () => {
@@ -80,24 +78,20 @@ describe('searchProfilesForMemberInvite', () => {
 
     await searchProfilesForMemberInvite(req, res)
 
-    expect(mockCreateClient).not.toHaveBeenCalled()
+    expect(mockCreateUserJwtSupabase).not.toHaveBeenCalled()
     expect(res.json).toHaveBeenCalledWith({ users: [] })
   })
 
   it('falls back to user-scoped client when service client is unavailable', async () => {
     const client = makeClient()
-    mockCreateClient.mockReturnValue(client)
+    mockCreateUserJwtSupabase.mockReturnValue(client)
 
     const req = makeReq({ q: 'john' })
     const res = makeRes()
 
     await searchProfilesForMemberInvite(req, res)
 
-    expect(mockCreateClient).toHaveBeenCalledWith(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_ANON_KEY,
-      { global: { headers: { Authorization: 'Bearer token-123' } } },
-    )
+    expect(mockCreateUserJwtSupabase).toHaveBeenCalledWith(req, 'profile search')
     expect(res.json).toHaveBeenCalledWith({ users: [] })
   })
 
@@ -119,7 +113,7 @@ describe('searchProfilesForMemberInvite', () => {
     expect(res.json).toHaveBeenCalledWith({ error: 'db failed' })
   })
 
-  it('returns fallback error message when search error has no message', async () => {
+  it('returns database failure message when search error has no message', async () => {
     const client = makeClient({
       first_name: { data: [], error: {} },
       last_name: { data: [], error: null },
@@ -135,8 +129,7 @@ describe('searchProfilesForMemberInvite', () => {
 
     expect(res.status).toHaveBeenCalledWith(500)
     expect(res.json).toHaveBeenCalledWith({
-      error:
-        'Profile search failed. Ensure profiles.username exists and use SUPABASE_SERVICE_ROLE_KEY if RLS blocks reads.',
+      error: 'Database request failed.',
     })
   })
 
@@ -249,7 +242,7 @@ describe('searchProfilesForMemberInvite', () => {
     })
   })
 
-  it('returns 500 with generic message on unexpected exception', async () => {
+  it('returns 500 with error message on unexpected exception inside query', async () => {
     const client = makeClient({}, 'first_name')
     mockGetServiceSupabase.mockReturnValue(client)
 
@@ -259,6 +252,6 @@ describe('searchProfilesForMemberInvite', () => {
     await searchProfilesForMemberInvite(req, res)
 
     expect(res.status).toHaveBeenCalledWith(500)
-    expect(res.json).toHaveBeenCalledWith({ error: 'Internal Server Error' })
+    expect(res.json).toHaveBeenCalledWith({ error: 'boom:first_name' })
   })
 })

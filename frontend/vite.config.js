@@ -17,6 +17,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
+        // Must match backend PORT (this project uses 5001 locally — see backend/.env PORT).
         target: 'http://localhost:5001',
         changeOrigin: true,
       },

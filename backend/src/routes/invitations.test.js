@@ -3,13 +3,10 @@ import express from 'express'
 import { jest, describe, it, expect, beforeEach } from '@jest/globals'
 
 const mockCreateClient = jest.fn()
+const mockCreateUserJwtSupabase = jest.fn()
 const mockGetServiceSupabase = jest.fn()
 const mockGroupRoleForUserProfile = jest.fn()
 const mockNormalizeInviteEmail = jest.fn()
-
-jest.unstable_mockModule('@supabase/supabase-js', () => ({
-  createClient: mockCreateClient,
-}))
 
 jest.unstable_mockModule('../middleware/auth.js', () => ({
   requireAuth: (req, _res, next) => {
@@ -25,6 +22,7 @@ jest.unstable_mockModule('../middleware/auth.js', () => ({
 
 jest.unstable_mockModule('../utils/supabaseAdmin.js', () => ({
   getServiceSupabase: mockGetServiceSupabase,
+  createUserJwtSupabase: mockCreateUserJwtSupabase,
 }))
 
 jest.unstable_mockModule('../utils/platformAdminStokvelMembers.js', () => ({
@@ -94,6 +92,7 @@ function makeApp() {
 
 beforeEach(() => {
   jest.clearAllMocks()
+  mockCreateUserJwtSupabase.mockImplementation(() => mockCreateClient())
   mockNormalizeInviteEmail.mockImplementation((v) =>
     typeof v === 'string' && v.includes('@') ? v.trim().toLowerCase() : '',
   )
@@ -320,7 +319,7 @@ describe('Invitations router', () => {
         .set('authorization', 'Bearer fallback-token')
         .send({ token: 'abc' })
 
-      expect(mockCreateClient).toHaveBeenCalled()
+      expect(mockCreateUserJwtSupabase).toHaveBeenCalled()
       expect(res.status).toBe(200)
       expect(res.body).toEqual({ success: true })
     })

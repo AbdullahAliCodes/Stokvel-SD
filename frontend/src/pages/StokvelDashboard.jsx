@@ -6,6 +6,7 @@ import { apiUrl } from '../utils/api'
 import { btnPrimary, cardLight, errorBox, pageSubtitle } from '../ui'
 import { readViewCache, writeViewCache } from '../utils/viewCache'
 import QuickPayModal from '../components/QuickPayModal'
+import MemberHealthScore from '../components/HealthScore/MemberHealthScore'
 
 function formatZAR(n) {
   const num = Number(n)
@@ -234,6 +235,10 @@ export default function StokvelDashboard() {
 
       {meetingsError ? (
         <p className={`text-sm ${errorBox}`}>Meetings could not be loaded: {meetingsError}</p>
+      ) : null}
+
+      {session?.user?.id && stokvel_id ? (
+        <MemberHealthScore userId={session.user.id} groupId={stokvel_id} />
       ) : null}
 
       <section>

@@ -14,7 +14,27 @@ jest.unstable_mockModule('../services/marketDataService.js', () => ({
   updateMarketRates: mockUpdateMarketRates,
 }))
 
-const { fetchRepoRateFromFred } = await import('./fetchRates.js')
+const { fetchRepoRateFromFred, fredTlsCertificateError } = await import('./fetchRates.js')
+
+describe('fredTlsCertificateError', () => {
+  it('detects UNABLE_TO_VERIFY_LEAF_SIGNATURE', () => {
+    const e = new Error('tls failed')
+    e.code = 'UNABLE_TO_VERIFY_LEAF_SIGNATURE'
+    expect(fredTlsCertificateError(e)).toBe(true)
+  })
+
+  it('detects nested cause', () => {
+    const inner = new Error('deep')
+    inner.code = 'UNABLE_TO_VERIFY_LEAF_SIGNATURE'
+    const outer = new Error('wrapper')
+    outer.cause = inner
+    expect(fredTlsCertificateError(outer)).toBe(true)
+  })
+
+  it('returns false for unrelated errors', () => {
+    expect(fredTlsCertificateError(new Error('ECONNREFUSED'))).toBe(false)
+  })
+})
 
 describe('fetchRepoRateFromFred', () => {
   const originalEnv = process.env
@@ -48,6 +68,21 @@ describe('fetchRepoRateFromFred', () => {
       '[FRED] FRED_API_KEY not set; skipping rate fetch',
     )
     expect(mockAxiosGet).not.toHaveBeenCalled()
+    expect(mockUpdateMarketRates).not.toHaveBeenCalled()
+  })
+
+  it('logs certificate warning and skips update on TLS verification failure', async () => {
+    process.env.FRED_API_KEY = 'fred-key'
+    const tlsErr = new Error('unable to verify the first certificate')
+    tlsErr.code = 'UNABLE_TO_VERIFY_LEAF_SIGNATURE'
+    mockAxiosGet.mockRejectedValueOnce(tlsErr)
+
+    await fetchRepoRateFromFred()
+
+    expect(console.warn).toHaveBeenCalledWith(
+      'FRED sync skipped: certificate error',
+    )
+    expect(mockAxiosGet).toHaveBeenCalledTimes(1)
     expect(mockUpdateMarketRates).not.toHaveBeenCalled()
   })
 
