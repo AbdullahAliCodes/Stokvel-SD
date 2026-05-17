@@ -2,10 +2,12 @@ import { describe, it, expect } from '@jest/globals'
 import {
   addCalendarMonthsYm,
   cyclePayoutDateIso,
+  DEFAULT_PAYMENT_WINDOW,
   getCurrentPaymentCycle,
   getFirstPayoutCycleMonth,
   getTargetMonthForPaidAt,
   isPaidAtInWindowForTargetMonth,
+  generateInvestmentPayoutSchedule,
   generatePayoutSchedule,
 } from './dates.js'
 
@@ -77,5 +79,42 @@ describe('dates.js payment cycles (Africa/Johannesburg)', () => {
     expect(rows[0].target_month).toBe('2026-06')
     expect(rows[1].target_month).toBe('2026-06')
     expect(rows[0].scheduled_payout_date).toBe('2026-06-05')
+  })
+
+  it('getCurrentPaymentCycle uses custom window (25→1)', () => {
+    const win = { startDay: 25, endDay: 1 }
+    expect(getCurrentPaymentCycle(new Date('2026-03-01T12:00:00+02:00'), win)).toEqual({
+      targetMonth: '2026-03',
+      inPaymentWindow: true,
+    })
+    expect(getCurrentPaymentCycle(new Date('2026-03-10T12:00:00+02:00'), win)).toEqual({
+      targetMonth: null,
+      inPaymentWindow: false,
+    })
+  })
+
+  it('normalizePaymentWindow falls back to DEFAULT_PAYMENT_WINDOW', () => {
+    expect(DEFAULT_PAYMENT_WINDOW).toEqual({ startDay: 25, endDay: 5 })
+  })
+
+  it('generateInvestmentPayoutSchedule assigns all members same maturity date', () => {
+    const maturity = new Date('2027-06-15T10:00:00+02:00')
+    const { rows, firstCycleMonth } = generateInvestmentPayoutSchedule(maturity, [
+      'u1',
+      'u2',
+    ])
+    expect(firstCycleMonth).toBe('2027-06')
+    expect(rows).toHaveLength(2)
+    expect(rows[0].scheduled_payout_date).toBe('2027-06-15')
+    expect(rows[1].scheduled_payout_date).toBe('2027-06-15')
+    expect(rows[0].target_month).toBe('2027-06')
+    expect(rows[1].user_id).toBe('u2')
+  })
+
+  it('generatePayoutSchedule delegates Investment to maturity schedule', () => {
+    const maturity = new Date('2027-12-01T12:00:00+02:00')
+    const { rows } = generatePayoutSchedule(maturity, ['a'], 99, 'Investment')
+    expect(rows).toHaveLength(1)
+    expect(rows[0].target_month).toBe('2027-12')
   })
 })

@@ -15,6 +15,7 @@ import {
   getCurrentPaymentCycle,
   getTargetMonthForPaidAt,
   isPaidAtInWindowForTargetMonth,
+  paymentWindowFromStokvel,
   zonedYmdParts,
 } from "../utils/dates.js";
 import { buildPayoutReport } from "../utils/payoutReport.js";
@@ -324,7 +325,10 @@ router.get("/:id", requireAuth, async (req, res) => {
       return;
     }
 
-    const currentCycle = getCurrentPaymentCycle(new Date());
+    const currentCycle = getCurrentPaymentCycle(
+      new Date(),
+      paymentWindowFromStokvel(stokvel),
+    );
 
     const svc = getServiceSupabase();
     let payouts = [];
@@ -1539,23 +1543,11 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
       });
     }
 
-    const targetMonth = getTargetMonthForPaidAt(paidAt);
-    console.log(
-      "[VERIFY] paidAt:",
-      paidAt.toISOString(),
-      "targetMonth:",
-      targetMonth,
-    );
-    if (!targetMonth) {
-      console.log("[VERIFY] REJECTED: Could not derive target_month");
-      return res
-        .status(400)
-        .json({ error: "Could not derive contribution cycle (target_month)." });
-    }
-
     const { data: stokvel, error: stErr } = await svc
       .from("stokvels")
-      .select("id, type, status")
+      .select(
+        "id, type, status, payment_window_start_day, payment_window_end_day",
+      )
       .eq("id", stokvel_id)
       .maybeSingle();
 
@@ -1567,6 +1559,21 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
       return res
         .status(400)
         .json({ error: "Stokvel is not active or was not found." });
+    }
+
+    const payWindow = paymentWindowFromStokvel(stokvel);
+    const targetMonth = getTargetMonthForPaidAt(paidAt, payWindow);
+    console.log(
+      "[VERIFY] paidAt:",
+      paidAt.toISOString(),
+      "targetMonth:",
+      targetMonth,
+    );
+    if (!targetMonth) {
+      console.log("[VERIFY] REJECTED: Could not derive target_month");
+      return res
+        .status(400)
+        .json({ error: "Could not derive contribution cycle (target_month)." });
     }
 
     const { data: membership, error: memErr } = await svc
@@ -1584,7 +1591,11 @@ router.post("/:id/payments/verify", requireAuth, async (req, res) => {
       return res.status(403).json({ error: "Not a member of this stokvel." });
     }
 
-    const inWindow = isPaidAtInWindowForTargetMonth(paidAt, targetMonth);
+    const inWindow = isPaidAtInWindowForTargetMonth(
+      paidAt,
+      targetMonth,
+      payWindow,
+    );
     console.log("[VERIFY] inPaymentWindow:", inWindow);
     if (!inWindow) {
       const { data: missedRows, error: missErr } = await svc

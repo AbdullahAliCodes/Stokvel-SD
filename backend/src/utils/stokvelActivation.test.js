@@ -294,4 +294,31 @@ describe('activateStokvel', () => {
     expect(result.deferred).toBe(false)
     expect(result.payoutCount).toBe(2)
   })
+
+  it('activates Investment stokvel without cycle_length roster match', async () => {
+    const m1 = '123e4567-e89b-12d3-a456-426614174040'
+    const m2 = '987f6543-a21b-12d3-a456-426614174041'
+    const svc = createServiceSupabaseMock({
+      stokvel: {
+        id: 'stokvel-inv',
+        status: 'pending',
+        type: 'Investment',
+        cycle_length: 99,
+        maturity_date: '2027-06-15T00:00:00.000Z',
+        payout_order_type: 'randomize',
+      },
+      memberRows: [{ user_id: m1 }, { user_id: m2 }],
+      profileRows: [
+        { id: m1, email: 'a@example.com' },
+        { id: m2, email: 'b@example.com' },
+      ],
+    })
+
+    const result = await activateStokvel('stokvel-inv', svc)
+
+    expect(result.ok).toBe(true)
+    expect(result.payoutCount).toBe(2)
+    const updateArg = svc._mocks.stokvelUpdateEqMock.mock.calls[0]
+    expect(updateArg).toBeDefined()
+  })
 })

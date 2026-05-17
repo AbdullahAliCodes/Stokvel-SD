@@ -228,7 +228,9 @@ export default function Reports() {
       ) : null}
 
       {session && !loading && !membership && !error ? (
-        <p className={`${cardLight} p-4 text-sm text-stone-600 dark:text-stone-300`}>
+        <p
+          className={`${cardLight} p-4 text-sm text-stone-600 dark:text-stone-300`}
+        >
           You are not a member of this stokvel.
         </p>
       ) : null}

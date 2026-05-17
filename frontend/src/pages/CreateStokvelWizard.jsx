@@ -75,6 +75,21 @@ function formatFileSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+/** @returns {string} YYYY-MM-DD for `<input type="date" min>` */
+function todayDateInputMin() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function clampPaymentWindowDay(value, fallback) {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1 || n > 31) return fallback;
+  return n;
+}
+
 function buildMemberDetailsFromSelected(selectedMembers, isAdminWizard = true) {
   return selectedMembers.map((m) => {
     const userId = UUID_RE.test(m.id) ? m.id : "";
@@ -240,6 +255,10 @@ export function CreateStokvelWizard({ variant = "admin" }) {
   );
   const [meetingFrequency, setMeetingFrequency] = useState("monthly");
   const [cycleLength, setCycleLength] = useState("1");
+  const [maturityDate, setMaturityDate] = useState("");
+  const [targetGoal, setTargetGoal] = useState("");
+  const [paymentWindowStartDay, setPaymentWindowStartDay] = useState("25");
+  const [paymentWindowEndDay, setPaymentWindowEndDay] = useState("5");
   const [isPublic, setIsPublic] = useState(false);
   const [documentFiles, setDocumentFiles] = useState([]);
   const [uploadingDocs, setUploadingDocs] = useState(false);
@@ -267,6 +286,9 @@ export function CreateStokvelWizard({ variant = "admin" }) {
   const [inviteUsername, setInviteUsername] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteOk, setInviteOk] = useState("");
+
+  const maturityDateMin = useMemo(() => todayDateInputMin(), []);
+  const isInvestment = type === "Investment";
   const [createdStokvel, setCreatedStokvel] = useState(null);
 
   const myUserId = session?.user?.id;
@@ -769,6 +791,37 @@ export function CreateStokvelWizard({ variant = "admin" }) {
       return setFormError("Enter a valid contribution amount.");
     if (!Number.isInteger(cycleNum) || cycleNum < 1)
       return setFormError("Invalid group size for cycle length.");
+
+    const windowStart = clampPaymentWindowDay(paymentWindowStartDay, 25);
+    const windowEnd = clampPaymentWindowDay(paymentWindowEndDay, 5);
+    if (
+      windowStart !== Number(paymentWindowStartDay) ||
+      windowEnd !== Number(paymentWindowEndDay)
+    ) {
+      return setFormError(
+        "Payment window days must be whole numbers between 1 and 31.",
+      );
+    }
+
+    if (isInvestment) {
+      if (!maturityDate.trim()) {
+        return setFormError("Maturity date is required for Investment stokvels.");
+      }
+      const maturity = new Date(`${maturityDate}T12:00:00`);
+      if (Number.isNaN(maturity.getTime())) {
+        return setFormError("Enter a valid maturity date.");
+      }
+      const today = new Date(`${maturityDateMin}T00:00:00`);
+      if (maturity < today) {
+        return setFormError("Maturity date cannot be in the past.");
+      }
+      if (targetGoal.trim() !== "") {
+        const goalNum = Number(targetGoal);
+        if (!Number.isFinite(goalNum) || goalNum < 0) {
+          return setFormError("Target goal must be a non-negative number.");
+        }
+      }
+    }
     if (selectedMembers.length > MAX_GROUP_MEMBERS) {
       return setFormError(
         `A group can have at most ${MAX_GROUP_MEMBERS} members including you.`,
@@ -820,7 +873,7 @@ export function CreateStokvelWizard({ variant = "admin" }) {
       return;
 
     const rosterUuidList = rosterRegisteredUuidsInOrder(selectedMembers);
-    if (payoutOrderType === "manual") {
+    if (!isInvestment && payoutOrderType === "manual") {
       if (proposedPayoutSequence.length !== rosterUuidList.length) {
         return setFormError(
           `Manual payout order must list every registered member once (${rosterUuidList.length} expected, ${proposedPayoutSequence.length} in order). Use the Members tab to fix the list or choose Randomize.`,
@@ -879,9 +932,20 @@ export function CreateStokvelWizard({ variant = "admin" }) {
           memberDetails: memberDetailsPayload,
           documents: documentUrls,
           isPublic,
-          payout_order_type: payoutOrderType,
-          proposed_payout_sequence:
-            payoutOrderType === "manual" ? proposedPayoutSequence : [],
+          maturityDate: isInvestment ? maturityDate : null,
+          targetGoal:
+            isInvestment && targetGoal.trim() !== ""
+              ? Number(targetGoal)
+              : null,
+          paymentWindowStartDay: windowStart,
+          paymentWindowEndDay: windowEnd,
+          ...(isInvestment
+            ? {}
+            : {
+                payout_order_type: payoutOrderType,
+                proposed_payout_sequence:
+                  payoutOrderType === "manual" ? proposedPayoutSequence : [],
+              }),
           initialMemberIds,
           ...(isAdmin
             ? { treasurerUserId: treasurerIdForAdmin }
@@ -1116,9 +1180,7 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                     >
                       <option value="Rotating">Rotating</option>
                       <option value="Fixed">Fixed</option>
-                      <option value="Investment" disabled>
-                        Investment (Coming soon)
-                      </option>
+                      <option value="Investment">Investment</option>
                     </select>
                   </label>
                   <label className={labelLight}>
@@ -1149,6 +1211,62 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                       <option value="bi-annually">Bi-Annually</option>
                     </select>
                   </label>
+
+                  <div className="sm:col-span-2 rounded-xl border border-stone-200 bg-stone-50/80 p-4 dark:border-slate-700 dark:bg-slate-800/40">
+                    <p className="text-sm font-medium text-stone-800 dark:text-stone-100">
+                      Payment window rules
+                    </p>
+                    <p className="mt-1 text-xs text-stone-600 dark:text-stone-300">
+                      Select the calendar days when members are expected to make
+                      their monthly contributions (South African time). For
+                      example, start day 25 and end day 5 means payments are due
+                      from the 25th of the prior month through the 5th of the
+                      cycle month.
+                    </p>
+                    <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                      <label className={labelLight}>
+                        Payment window start day
+                        <input
+                          type="number"
+                          min={1}
+                          max={31}
+                          className={inputLight}
+                          value={paymentWindowStartDay}
+                          onChange={(e) =>
+                            setPaymentWindowStartDay(e.target.value)
+                          }
+                          aria-describedby="payment-window-start-hint"
+                        />
+                        <span
+                          id="payment-window-start-hint"
+                          className="mt-1 block text-xs font-normal text-stone-500 dark:text-stone-400"
+                        >
+                          Day 1–31 (default 25)
+                        </span>
+                      </label>
+                      <label className={labelLight}>
+                        Payment window end day
+                        <input
+                          type="number"
+                          min={1}
+                          max={31}
+                          className={inputLight}
+                          value={paymentWindowEndDay}
+                          onChange={(e) =>
+                            setPaymentWindowEndDay(e.target.value)
+                          }
+                          aria-describedby="payment-window-end-hint"
+                        />
+                        <span
+                          id="payment-window-end-hint"
+                          className="mt-1 block text-xs font-normal text-stone-500 dark:text-stone-400"
+                        >
+                          Day 1–31 (default 5)
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+
                   <div className="sm:col-span-2">
                     <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-emerald-200/80 bg-emerald-50/70 px-4 py-3 transition-colors hover:border-emerald-300 hover:bg-emerald-50 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:hover:bg-emerald-900/30">
                       <input
@@ -1555,6 +1673,51 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                   </div>
                 ) : null}
 
+                {isInvestment ? (
+                  <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                    <p className="mb-1 text-sm font-medium text-stone-800 dark:text-stone-100">
+                      Investment payout
+                    </p>
+                    <p className="mb-3 text-xs font-normal text-stone-600 dark:text-stone-300">
+                      All members receive a proportional share of the pool on the
+                      maturity date. There is no monthly rotation order.
+                    </p>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <label className={labelLight}>
+                        Maturity date
+                        <span className="text-red-700"> *</span>
+                        <input
+                          type="date"
+                          required
+                          min={maturityDateMin}
+                          className={inputLight}
+                          value={maturityDate}
+                          onChange={(e) => setMaturityDate(e.target.value)}
+                        />
+                        <span className="mt-1 block text-xs font-normal text-stone-500 dark:text-stone-400">
+                          When the pooled funds are disbursed to all members.
+                        </span>
+                      </label>
+                      <label className={labelLight}>
+                        Target goal (ZAR)
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          className={inputLight}
+                          value={targetGoal}
+                          onChange={(e) => setTargetGoal(e.target.value)}
+                          placeholder="Optional"
+                        />
+                        <span className="mt-1 block text-xs font-normal text-stone-500 dark:text-stone-400">
+                          Optional savings target for the fund.
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                ) : null}
+
+                {!isInvestment ? (
                 <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
                   <p className="mb-1 text-sm font-medium text-stone-800 dark:text-stone-100">
                     Payout order
@@ -1659,6 +1822,7 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                     </div>
                   ) : null}
                 </div>
+                ) : null}
 
                 {selectedMembers.length === 0 ? (
                   <p className="text-xs text-stone-500 dark:text-stone-400">Loading your row…</p>

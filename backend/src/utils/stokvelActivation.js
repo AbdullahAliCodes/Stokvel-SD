@@ -1,4 +1,8 @@
-import { generatePayoutSchedule } from './dates.js'
+import {
+  generateInvestmentPayoutSchedule,
+  generatePayoutSchedule,
+  paymentWindowFromStokvel,
+} from './dates.js'
 import { normalizeInviteEmail } from './invitations.js'
 
 const UUID_RE =
@@ -67,7 +71,7 @@ export async function activateStokvel(stokvelId, serviceSupabase, opts = {}) {
   const { data: stokvel, error: selErr } = await serviceSupabase
     .from('stokvels')
     .select(
-      'id, status, type, cycle_length, payout_order_type, proposed_payout_sequence, payout_sequence',
+      'id, status, type, cycle_length, maturity_date, payout_order_type, proposed_payout_sequence, payout_sequence, payment_window_start_day, payment_window_end_day',
     )
     .eq('id', stokvelId)
     .maybeSingle()
@@ -91,9 +95,14 @@ export async function activateStokvel(stokvelId, serviceSupabase, opts = {}) {
     return { ok: false, error: `Cannot activate stokvel in status "${stokvel.status}".` }
   }
 
+  const stokvelType = String(stokvel.type || 'Rotating')
+  const isInvestment = stokvelType === 'Investment'
+
   const cycleLen = Number(stokvel.cycle_length)
-  if (!Number.isInteger(cycleLen) || cycleLen < 1 || cycleLen > 240) {
-    return { ok: false, error: 'Invalid cycle_length on stokvel.' }
+  if (!isInvestment) {
+    if (!Number.isInteger(cycleLen) || cycleLen < 1 || cycleLen > 240) {
+      return { ok: false, error: 'Invalid cycle_length on stokvel.' }
+    }
   }
 
   const { data: memberRows, error: memErr } = await serviceSupabase
@@ -151,10 +160,22 @@ export async function activateStokvel(stokvelId, serviceSupabase, opts = {}) {
   const pendingInviteCount = pendingInviteRows.length
   const totalSeats = registeredCount + pendingInviteCount
 
-  if (totalSeats !== cycleLen) {
+  if (!isInvestment && totalSeats !== cycleLen) {
     return {
       ok: false,
       error: `Total roster (${registeredCount} registered + ${pendingInviteCount} pending) must equal cycle_length (${cycleLen}).`,
+    }
+  }
+
+  if (isInvestment && registeredCount < 1) {
+    return { ok: false, error: 'Investment stokvel requires at least one registered member.' }
+  }
+
+  const maturityInstant =
+    stokvel.maturity_date != null ? new Date(stokvel.maturity_date) : null
+  if (isInvestment) {
+    if (!maturityInstant || Number.isNaN(maturityInstant.getTime())) {
+      return { ok: false, error: 'Investment stokvel requires a valid maturity_date.' }
     }
   }
 
@@ -179,33 +200,47 @@ export async function activateStokvel(stokvelId, serviceSupabase, opts = {}) {
     }
   }
 
-  const orderType =
-    String(stokvel.payout_order_type || 'randomize').toLowerCase() === 'manual'
-      ? 'manual'
-      : 'randomize'
+  let scheduleRows
+  /** @type {Record<string, unknown>} */
+  const stokvelUpdate = { status: 'active' }
 
-  let finalSequence
-
-  if (orderType === 'manual') {
-    const proposed = normalizeUuidArray(stokvel.proposed_payout_sequence)
-    if (proposed.length !== cycleLen || !sameSet(proposed, memberIds)) {
-      return {
-        ok: false,
-        error:
-          'Manual payout order: proposed_payout_sequence must list every member exactly once.',
-      }
-    }
-    finalSequence = proposed
+  if (isInvestment) {
+    const { rows } = generateInvestmentPayoutSchedule(maturityInstant, memberIds)
+    scheduleRows = rows
   } else {
-    finalSequence = shuffleMemberIds(memberIds)
-  }
+    const orderType =
+      String(stokvel.payout_order_type || 'randomize').toLowerCase() === 'manual'
+        ? 'manual'
+        : 'randomize'
 
-  const { rows: scheduleRows } = generatePayoutSchedule(
-    activationInstant,
-    finalSequence,
-    cycleLen,
-    stokvel.type || 'Rotating',
-  )
+    let finalSequence
+
+    if (orderType === 'manual') {
+      const proposed = normalizeUuidArray(stokvel.proposed_payout_sequence)
+      if (proposed.length !== cycleLen || !sameSet(proposed, memberIds)) {
+        return {
+          ok: false,
+          error:
+            'Manual payout order: proposed_payout_sequence must list every member exactly once.',
+        }
+      }
+      finalSequence = proposed
+    } else {
+      finalSequence = shuffleMemberIds(memberIds)
+    }
+
+    const window = paymentWindowFromStokvel(stokvel)
+    const { rows } = generatePayoutSchedule(
+      activationInstant,
+      finalSequence,
+      cycleLen,
+      stokvelType,
+      window,
+    )
+    scheduleRows = rows
+    stokvelUpdate.payout_sequence = finalSequence
+    stokvelUpdate.payout_order_type = orderType
+  }
 
   if (scheduleRows.length === 0) {
     return { ok: false, error: 'Failed to compute payout schedule.' }
@@ -231,11 +266,7 @@ export async function activateStokvel(stokvelId, serviceSupabase, opts = {}) {
 
   const { error: upErr } = await serviceSupabase
     .from('stokvels')
-    .update({
-      status: 'active',
-      payout_sequence: finalSequence,
-      payout_order_type: orderType,
-    })
+    .update(stokvelUpdate)
     .eq('id', stokvelId)
 
   if (upErr) {
