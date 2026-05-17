@@ -15,6 +15,7 @@ import { readViewCache, writeViewCache } from "../utils/viewCache";
 import { validateMeetingScheduleLocal } from "../utils/meetingScheduleValidation";
 import MeetingCalendar from "../components/meetings/MeetingCalendar";
 import MeetingDetailsPanel from "../components/meetings/MeetingDetailsPanel";
+import GroupPageHeader from "../components/GroupPageHeader";
 
 function parseApiError(text) {
   try {
@@ -575,34 +576,32 @@ export default function Meetings() {
 
   return (
     <div className="space-y-8">
-      <header className="flex flex-col gap-3 border-b border-stone-200 pb-4 dark:border-slate-700 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="mb-2 flex flex-wrap items-center gap-2 text-2xl font-bold tracking-tight text-emerald-800 dark:text-emerald-300 sm:text-3xl">
-            <i
-              className="fa-solid fa-calendar-days text-emerald-700"
-              aria-hidden
-            />
-            Meetings
-          </h1>
-          <p className={`${pageSubtitle} text-stone-600 dark:text-stone-300`}>
-            <span className="font-medium text-stone-800 dark:text-stone-100">{groupName}</span> —
+      <GroupPageHeader
+        title="Meetings"
+        iconClassName="fa-solid fa-calendar-days"
+        subtitle={
+          <>
+            <span className="font-medium text-stone-800 dark:text-stone-100">{groupName}</span>
+            {' — '}
             upcoming and past sessions. Agenda and minutes render as Markdown on each card.
-          </p>
-        </div>
-        {canManageMeetings ? (
-          <button
-            type="button"
-            onClick={() => {
-              setScheduleError("");
-              setScheduleForm({ title: "", meetingDate: "", meetingLink: "", agenda: "" });
-              setScheduleOpen(true);
-            }}
-            className={`${btnPrimary} shrink-0`}
-          >
-            Schedule new meeting
-          </button>
-        ) : null}
-      </header>
+          </>
+        }
+        actions={
+          canManageMeetings ? (
+            <button
+              type="button"
+              onClick={() => {
+                setScheduleError("");
+                setScheduleForm({ title: "", meetingDate: "", meetingLink: "", agenda: "" });
+                setScheduleOpen(true);
+              }}
+              className={`${btnPrimary} shrink-0`}
+            >
+              Schedule new meeting
+            </button>
+          ) : null
+        }
+      />
 
       <div className={`${cardLight} overflow-hidden border border-stone-200 dark:border-slate-700`}>
         <nav

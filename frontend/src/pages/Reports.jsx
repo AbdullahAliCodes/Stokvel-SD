@@ -3,19 +3,13 @@ import { useLocation, useParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { useSession } from "../context/SessionContext";
 import { apiUrl } from "../utils/api";
-import { cardLight, errorBox, pageSubtitle } from "../ui";
+import { cardLight, errorBox } from "../ui";
 import { readViewCache, writeViewCache } from "../utils/viewCache";
 import PayoutReportPanel from "../components/PayoutReportPanel";
 import ComplianceReportWidget from "../components/ComplianceReportWidget";
+import GroupPageHeader from "../components/GroupPageHeader";
 
 const TARGET_MONTH_RE = /^\d{4}-\d{2}$/;
-
-function formatGroupRole(role) {
-  if (!role) return "Member";
-  return (
-    String(role).charAt(0).toUpperCase() + String(role).slice(1).toLowerCase()
-  );
-}
 
 function yyyyMmLocal(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -156,9 +150,6 @@ export default function Reports() {
 
   const effectiveStokvel = stokvel ?? membership?.stokvels ?? null;
   const groupName = effectiveStokvel?.name;
-  const stokvelStatus = String(effectiveStokvel?.status ?? "").toLowerCase();
-  const isActiveStokvel = stokvelStatus === "active";
-
   const refMonth = useMemo(
     () => ledgerReferenceMonth(currentCycle),
     [currentCycle],
@@ -186,43 +177,24 @@ export default function Reports() {
   if (!stokvel_id) return null;
 
   return (
-    <>
-      <header
-        className={`mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between ${
-          isActiveStokvel
-            ? "rounded-xl border-t-4 border-emerald-700 pt-4"
-            : "rounded-xl border-t-4 border-stone-300 pt-4"
-        }`}
-      >
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-emerald-800 sm:text-3xl">
-            Reports
-          </h1>
-          {groupName || membership?.group_role ? (
-            <p className={`mt-1 ${pageSubtitle}`}>
-              {groupName ? (
-                <span className="font-medium text-stone-800 dark:text-stone-100">
-                  {groupName}
-                </span>
-              ) : null}
-              {stokvelStatus ? (
-                <span className="ml-2 capitalize text-stone-500 dark:text-stone-400">
-                  · {stokvelStatus}
-                </span>
-              ) : null}
-              {membership?.group_role ? (
-                <span className="ml-2 text-stone-500 dark:text-stone-400">
-                  · {formatGroupRole(membership.group_role)}
-                </span>
-              ) : null}
-            </p>
-          ) : (
-            <p className={`mt-1 ${pageSubtitle}`}>
+    <div className="space-y-8">
+      <GroupPageHeader
+        title="Reports"
+        iconClassName="fa-solid fa-chart-column"
+        subtitle={
+          groupName ? (
+            <>
+              <span className="font-medium text-stone-800 dark:text-stone-100">
+                {groupName}
+              </span>
+              {" — "}
               Payout history, projections, and contribution compliance.
-            </p>
-          )}
-        </div>
-      </header>
+            </>
+          ) : (
+            "Payout history, projections, and contribution compliance."
+          )
+        }
+      />
 
       {!session ? (
         <p className="mb-6 text-sm text-stone-500">Sign in to view reports.</p>
@@ -260,6 +232,6 @@ export default function Reports() {
           You are not a member of this stokvel.
         </p>
       ) : null}
-    </>
+    </div>
   );
 }

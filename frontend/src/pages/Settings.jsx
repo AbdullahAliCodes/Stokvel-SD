@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Settings as SettingsIcon } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import { useSession } from '../context/SessionContext'
 import { apiUrl } from '../utils/api'
@@ -8,8 +9,8 @@ import {
   inputLight,
   labelLight,
   pageSubtitle,
-  pageTitle,
 } from '../ui'
+import GroupPageHeader from '../components/GroupPageHeader'
 
 function parseApiError(text) {
   try {
@@ -122,12 +123,23 @@ export default function Settings() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl">
+    <div className="mx-auto w-full max-w-3xl space-y-8">
+      <GroupPageHeader
+        title="Group Settings"
+        icon={SettingsIcon}
+        subtitle={
+          name ? (
+            <>
+              <span className="font-medium text-stone-800 dark:text-stone-100">{name}</span>
+              {' — '}
+              Update configuration for members and public directory visibility.
+            </>
+          ) : (
+            'Update your group configuration for members and public directory visibility.'
+          )
+        }
+      />
       <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900 md:p-8">
-        <h1 className={pageTitle}>Group Settings</h1>
-        <p className={`${pageSubtitle} mt-1 mb-6`}>
-          Update your group configuration for members and public directory visibility.
-        </p>
 
         {loadError ? (
           <p className={`${errorBox} mb-4`} role="alert">

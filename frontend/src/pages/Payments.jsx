@@ -19,6 +19,7 @@ import { readViewCache, writeViewCache } from "../utils/viewCache";
 import MarketRatesWidget from "../components/MarketRatesWidget";
 import QuickPayModal from "../components/QuickPayModal";
 import ReportExportActions from "../components/ReportExportActions";
+import GroupPageHeader from "../components/GroupPageHeader";
 
 const TARGET_MONTH_RE = /^\d{4}-\d{2}$/;
 
@@ -854,7 +855,7 @@ export default function Payments() {
   }
 
   return (
-    <div>
+    <div className="space-y-8">
       {ledgerToast ? (
         <div
           className="fixed bottom-6 left-1/2 z-60 max-w-md -translate-x-1/2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-900 shadow-lg dark:border-emerald-800 dark:bg-emerald-950/90 dark:text-emerald-100"
@@ -890,49 +891,46 @@ export default function Payments() {
         </div>
       ) : null}
 
-      <div
-        className={`mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between ${
-          isActiveStokvel
-            ? "rounded-xl border-t-4 border-emerald-700 pt-4"
-            : "rounded-xl border-t-4 border-stone-300 pt-4"
-        }`}
-      >
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-emerald-800 sm:text-3xl">
-            <span className="flex items-center gap-2">
-              <i className="fa-solid fa-wallet text-emerald-700" aria-hidden />
-              Payments &amp; finances
-            </span>
-          </h1>
-          {groupName || membership?.group_role ? (
-            <p className={`mt-1 ${pageSubtitle}`}>
+      <GroupPageHeader
+        title="Payments & finances"
+        iconClassName="fa-solid fa-wallet"
+        subtitle={
+          groupName || membership?.group_role || stokvelStatus ? (
+            <>
               {groupName ? (
                 <span className="font-medium text-stone-800 dark:text-stone-100">
                   {groupName}
                 </span>
               ) : null}
               {stokvelStatus ? (
-                <span className="ml-2 capitalize text-stone-500 dark:text-stone-400">
-                  · {stokvelStatus}
+                <span className="capitalize text-stone-500 dark:text-stone-400">
+                  {groupName ? " · " : null}
+                  {stokvelStatus}
                 </span>
               ) : null}
               {membership?.group_role ? (
-                <span className="ml-2 text-stone-500 dark:text-stone-400">
-                  · {formatGroupRole(membership.group_role)}
+                <span className="text-stone-500 dark:text-stone-400">
+                  {" · "}
+                  {formatGroupRole(membership.group_role)}
                 </span>
               ) : null}
-            </p>
-          ) : null}
-          <div className="mt-2 inline-flex items-center gap-2 rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-100">
-            <span className="font-semibold uppercase tracking-wide">
-              Current treasurer
-            </span>
-            <span className="text-emerald-900 dark:text-emerald-50">
-              {currentTreasurerName}
-            </span>
-          </div>
+              {" — "}
+              Contributions, quick pay, payout schedule, and cycle ledger.
+            </>
+          ) : (
+            "Contributions, quick pay, payout schedule, and cycle ledger."
+          )
+        }
+      >
+        <div className="mt-2 inline-flex items-center gap-2 rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-100">
+          <span className="font-semibold uppercase tracking-wide">
+            Current treasurer
+          </span>
+          <span className="text-emerald-900 dark:text-emerald-50">
+            {currentTreasurerName}
+          </span>
         </div>
-      </div>
+      </GroupPageHeader>
 
       {!session ? (
         <p className="mb-6 text-sm text-stone-500">

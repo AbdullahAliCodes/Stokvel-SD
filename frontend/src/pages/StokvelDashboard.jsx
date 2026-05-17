@@ -209,7 +209,7 @@ export default function StokvelDashboard() {
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <LayoutDashboard className="h-7 w-7 shrink-0 text-emerald-700" aria-hidden />
             <h1 className="text-2xl font-bold tracking-tight text-emerald-800 dark:text-emerald-300 sm:text-3xl">
-              {groupName}
+              Dashboard
             </h1>
             {isAdminAccess ? (
               <span className="rounded-full border border-amber-700 bg-amber-700 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-white">
@@ -226,6 +226,10 @@ export default function StokvelDashboard() {
               </span>
             ) : null}
           </div>
+          <p className={`${pageSubtitle} mb-1 text-stone-600 dark:text-stone-300`}>
+            Stokvel:{' '}
+            <span className="font-medium text-stone-800 dark:text-stone-100">{groupName}</span>
+          </p>
           <p className={pageSubtitle}>
             Summary for this group. Your ML health score preview is below; full financial health
             details are on the Financial Health tab. Meetings, Payments, and Reports have the rest.
