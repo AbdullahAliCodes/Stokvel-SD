@@ -133,6 +133,7 @@ describe("StokvelDashboard", () => {
     );
 
     render(<StokvelDashboard />);
+    expect(screen.getByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
     expect(document.querySelector(".animate-pulse")).toBeInTheDocument();
   });
 

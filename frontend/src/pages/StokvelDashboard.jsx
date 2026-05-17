@@ -208,9 +208,7 @@ export default function StokvelDashboard() {
     return null
   }
 
-  if (loading && !stokvel && !error) {
-    return <SkeletonPage />
-  }
+  const showInitialSkeleton = loading && !stokvel && !error
 
   if (error && !effectiveStokvel) {
     return (
@@ -259,6 +257,10 @@ export default function StokvelDashboard() {
         </div>
       </header>
 
+      {showInitialSkeleton ? (
+        <SkeletonPage />
+      ) : (
+        <>
       {meetingsError ? (
         <p className={`text-sm ${errorBox}`}>Meetings could not be loaded: {meetingsError}</p>
       ) : null}
@@ -482,6 +484,8 @@ export default function StokvelDashboard() {
           }}
         />
       ) : null}
+        </>
+      )}
     </div>
   )
 }

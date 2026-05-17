@@ -395,9 +395,7 @@ export default function Meetings() {
 
   if (!stokvel_id) return null;
 
-  if (loading && !stokvel && !error) {
-    return <SkeletonPage />;
-  }
+  const showInitialSkeleton = loading && !stokvel && !error;
 
   if (error && !effectiveStokvel) {
     return (
@@ -584,7 +582,7 @@ export default function Meetings() {
           </>
         }
         actions={
-          canManageMeetings ? (
+          canManageMeetings && !showInitialSkeleton ? (
             <button
               type="button"
               onClick={() => {
@@ -600,6 +598,10 @@ export default function Meetings() {
         }
       />
 
+      {showInitialSkeleton ? (
+        <SkeletonPage />
+      ) : (
+        <>
       <div className={`${cardLight} overflow-hidden border border-stone-200 dark:border-slate-700`}>
         <nav
           className="flex border-b border-stone-200 bg-stone-50/90 dark:border-slate-700 dark:bg-slate-800/70"
@@ -805,6 +807,8 @@ export default function Meetings() {
         meetingBase={meetingBase}
         onClose={() => setDayPanel(null)}
       />
+        </>
+      )}
     </div>
   );
 }

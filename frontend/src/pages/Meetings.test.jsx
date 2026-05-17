@@ -200,6 +200,7 @@ describe("Meetings page", () => {
 
     renderMeetings();
 
+    expect(screen.getByRole("heading", { name: "Meetings" })).toBeInTheDocument();
     expect(document.querySelector(".animate-pulse")).toBeInTheDocument();
   });
 
