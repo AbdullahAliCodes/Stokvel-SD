@@ -40,9 +40,9 @@ describe('RequireMember', () => {
     expect(screen.getByText('Member Area')).toBeInTheDocument()
   })
 
-  it('shows loading state for null userRole', () => {
+  it('renders outlet while userRole is still loading', () => {
     mockUseSession.mockReturnValue({ userRole: null })
     renderGuard()
-    expect(screen.getByText('Loading your dashboard...')).toBeInTheDocument()
+    expect(screen.getByText('Member Area')).toBeInTheDocument()
   })
 })

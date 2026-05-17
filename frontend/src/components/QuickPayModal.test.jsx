@@ -19,7 +19,6 @@ function baseProps(overrides = {}) {
 describe('QuickPayModal', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
-    vi.spyOn(window, 'alert').mockImplementation(() => {})
     vi.spyOn(console, 'log').mockImplementation(() => {})
     vi.spyOn(console, 'error').mockImplementation(() => {})
     vi.stubGlobal('fetch', vi.fn())

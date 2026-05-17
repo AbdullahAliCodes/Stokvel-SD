@@ -31,6 +31,12 @@ vi.mock('../utils/api', () => ({
   apiUrl: (path) => `http://localhost${path}`,
 }))
 
+const confirmMock = vi.fn().mockResolvedValue(true)
+
+vi.mock('../context/ModalContext', () => ({
+  useConfirm: () => confirmMock,
+}))
+
 const renderWithProviders = (ui, { session = null } = {}) => {
   return render(
     <MemoryRouter>
@@ -45,11 +51,10 @@ describe('AdminEditStokvel', () => {
   const mockFetch = vi.fn()
   global.fetch = mockFetch
   
-  let confirmSpy
-
   beforeEach(() => {
     vi.clearAllMocks()
-    confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    confirmMock.mockReset()
+    confirmMock.mockResolvedValue(true)
   })
 
   const mockLoadSuccess = () => {
@@ -136,7 +141,7 @@ describe('AdminEditStokvel', () => {
       renderWithProviders(<AdminEditStokvel />, { session: { access_token: 'fake-token' } })
       const btn = await screen.findByRole('button', { name: 'Save changes' })
       
-      confirmSpy.mockReturnValueOnce(false)
+      confirmMock.mockResolvedValueOnce(false)
       fireEvent.click(btn)
 
       expect(mockFetch).toHaveBeenCalledTimes(2) // only the initial loads
@@ -193,7 +198,7 @@ describe('AdminEditStokvel', () => {
       renderWithProviders(<AdminEditStokvel />, { session: { access_token: 'fake-token' } })
       const btn = await screen.findByRole('button', { name: 'Delete stokvel' })
       
-      confirmSpy.mockReturnValueOnce(false)
+      confirmMock.mockResolvedValueOnce(false)
       fireEvent.click(btn)
 
       expect(mockFetch).toHaveBeenCalledTimes(2)
@@ -243,7 +248,7 @@ describe('AdminEditStokvel', () => {
       const btn = screen.getByRole('button', { name: 'Add member' })
       
       fireEvent.change(input, { target: { value: 'sipho' } })
-      confirmSpy.mockReturnValueOnce(false)
+      confirmMock.mockResolvedValueOnce(false)
       fireEvent.click(btn)
 
       expect(mockFetch).toHaveBeenCalledTimes(2)
@@ -295,7 +300,7 @@ describe('AdminEditStokvel', () => {
       fireEvent.change(screen.getByLabelText(/Meeting title/i), { target: { value: 'Test Meet' } })
       fireEvent.change(screen.getByLabelText(/Date & time/i), { target: { value: futureDatetimeLocal() } })
       
-      confirmSpy.mockReturnValueOnce(false)
+      confirmMock.mockResolvedValueOnce(false)
       fireEvent.click(btn)
 
       expect(mockFetch).toHaveBeenCalledTimes(2)
@@ -350,7 +355,7 @@ describe('AdminEditStokvel', () => {
       })
       fireEvent.click(btn)
 
-      expect(confirmSpy).not.toHaveBeenCalled()
+      expect(confirmMock).not.toHaveBeenCalled()
       expect(await screen.findByRole('alert')).toHaveTextContent(/already passed/i)
       expect(mockFetch).toHaveBeenCalledTimes(2)
     })
@@ -360,7 +365,7 @@ describe('AdminEditStokvel', () => {
       renderWithProviders(<AdminEditStokvel />, { session: { access_token: 'fake-token' } })
       const btn = await screen.findByRole('button', { name: 'Save minutes' })
       
-      confirmSpy.mockReturnValueOnce(false)
+      confirmMock.mockResolvedValueOnce(false)
       fireEvent.click(btn)
 
       expect(mockFetch).toHaveBeenCalledTimes(2)
@@ -403,7 +408,7 @@ describe('AdminEditStokvel', () => {
       renderWithProviders(<AdminEditStokvel />, { session: { access_token: 'fake-token' } })
       const btn = await screen.findByRole('button', { name: 'Delete meeting' })
       
-      confirmSpy.mockReturnValueOnce(false)
+      confirmMock.mockResolvedValueOnce(false)
       fireEvent.click(btn)
 
       expect(mockFetch).toHaveBeenCalledTimes(2)

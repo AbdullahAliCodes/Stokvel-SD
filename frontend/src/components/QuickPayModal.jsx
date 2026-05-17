@@ -159,9 +159,8 @@ export default function QuickPayModal({
         currency: "ZAR",
         ref,
         callback: (transaction) => {
-          // This alert CANNOT be missed — it proves the callback fired
-          window.alert(
-            `Paystack callback fired! ref: ${transaction?.reference || transaction?.trxref || "none"}`,
+          addDebug(
+            `Paystack callback fired — ref: ${transaction?.reference || transaction?.trxref || "none"}`,
           );
           addDebug(`CALLBACK fired: ${JSON.stringify(transaction)}`);
           callbackFiredRef.current = true;

@@ -7,6 +7,8 @@ import { btnPrimary, cardLight, errorBox, pageSubtitle } from '../ui'
 import { readViewCache, writeViewCache } from '../utils/viewCache'
 import QuickPayModal from '../components/QuickPayModal'
 import MemberHealthScoreCompact from '../components/HealthScore/MemberHealthScoreCompact'
+import SkeletonPage from '../components/ui/SkeletonPage'
+import Spinner from '../components/ui/Spinner'
 
 function formatZAR(n) {
   const num = Number(n)
@@ -61,6 +63,7 @@ export default function StokvelDashboard() {
   const [totalContribution, setTotalContribution] = useState(0)
   const [meetings, setMeetings] = useState([])
   const [fixedPool, setFixedPool] = useState(null)
+  const [ratesStale, setRatesStale] = useState(false)
   const [quickPayOpen, setQuickPayOpen] = useState(false)
 
   useEffect(() => {
@@ -88,6 +91,8 @@ export default function StokvelDashboard() {
         setStokvel(cached.stokvel ?? null)
         setMembers(Array.isArray(cached.members) ? cached.members : [])
         setTotalContribution(Number(cached.totalContribution ?? 0))
+        setFixedPool(cached.fixedPool ?? null)
+        setRatesStale(Boolean(cached.rates_stale))
         setMeetings(Array.isArray(cached.meetings) ? cached.meetings : [])
         setLoading(false)
       }
@@ -106,6 +111,7 @@ export default function StokvelDashboard() {
         setMembers(nextMembers)
         setTotalContribution(Number(json.totalContribution ?? 0))
         setFixedPool(json.fixedPool ?? null)
+        setRatesStale(Boolean(json.rates_stale))
         setMeetingsError('')
         let nextMeetings = []
         try {
@@ -130,6 +136,8 @@ export default function StokvelDashboard() {
           members: nextMembers,
           totalContribution: Number(json.totalContribution ?? 0),
           contributions: Array.isArray(json.contributions) ? json.contributions : [],
+          fixedPool: json.fixedPool ?? null,
+          rates_stale: Boolean(json.rates_stale),
           meetings: nextMeetings,
         })
       } catch (e) {
@@ -171,6 +179,8 @@ export default function StokvelDashboard() {
     isFixedStokvel && fixedPool?.estimated_amount_made != null
       ? Number(fixedPool.estimated_amount_made)
       : null
+  const fixedEstimateLoading =
+    isFixedStokvel && fixedPool == null && !ratesStale
   const expectedPayout = isFixedStokvel
     ? estimatedAmountMade ?? 0
     : maturityPayoutEstimate
@@ -198,13 +208,7 @@ export default function StokvelDashboard() {
     return null
   }
 
-  if (loading && !stokvel && !error) {
-    return (
-      <div className="flex min-h-[200px] items-center justify-center text-sm text-stone-500 dark:text-stone-400">
-        Loading dashboard…
-      </div>
-    )
-  }
+  const showInitialSkeleton = loading && !stokvel && !error
 
   if (error && !effectiveStokvel) {
     return (
@@ -253,6 +257,10 @@ export default function StokvelDashboard() {
         </div>
       </header>
 
+      {showInitialSkeleton ? (
+        <SkeletonPage />
+      ) : (
+        <>
       {meetingsError ? (
         <p className={`text-sm ${errorBox}`}>Meetings could not be loaded: {meetingsError}</p>
       ) : null}
@@ -275,15 +283,29 @@ export default function StokvelDashboard() {
             <p className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
               {isFixedStokvel ? 'Estimated Amount Made' : 'Expected payout (cycle)'}
             </p>
-            <p className="mt-2 text-2xl font-bold text-stone-800 dark:text-stone-100">{formatZAR(expectedPayout)}</p>
+            {fixedEstimateLoading ? (
+              <div className="mt-2">
+                <Spinner size="sm" className="h-6 w-6" label="Loading estimated amount" />
+              </div>
+            ) : (
+              <p className="mt-2 text-2xl font-bold text-stone-800 dark:text-stone-100">
+                {isFixedStokvel && ratesStale
+                  ? '—'
+                  : formatZAR(expectedPayout)}
+              </p>
+            )}
             <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
-              {isFixedStokvel &&
-              fixedPool?.member_contributions_to_date != null &&
-              fixedPool?.member_interest_share_to_date != null
-                ? `${formatZAR(Number(fixedPool.member_contributions_to_date))} contributed + ${formatZAR(Number(fixedPool.member_interest_share_to_date))} est. interest share`
-                : isFixedStokvel
-                  ? 'Your approved contributions plus an equal share of pool interest to date'
-                  : `Monthly × ${memberCount} member${memberCount === 1 ? '' : 's'}`}
+              {fixedEstimateLoading
+                ? 'Calculating your contributions and interest share…'
+                : isFixedStokvel &&
+                    fixedPool?.member_contributions_to_date != null &&
+                    fixedPool?.member_interest_share_to_date != null
+                  ? `${formatZAR(Number(fixedPool.member_contributions_to_date))} contributed + ${formatZAR(Number(fixedPool.member_interest_share_to_date))} est. interest share`
+                  : isFixedStokvel && ratesStale
+                    ? 'Market rates unavailable'
+                    : isFixedStokvel
+                      ? 'Your approved contributions plus an equal share of pool interest to date'
+                      : `Monthly × ${memberCount} member${memberCount === 1 ? '' : 's'}`}
             </p>
           </div>
           <div className={`${cardLight} border-t-4 border-emerald-600/70 p-4`}>
@@ -462,6 +484,8 @@ export default function StokvelDashboard() {
           }}
         />
       ) : null}
+        </>
+      )}
     </div>
   )
 }

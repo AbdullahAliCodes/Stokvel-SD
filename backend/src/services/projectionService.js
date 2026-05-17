@@ -1,5 +1,6 @@
 /**
  * Fixed-stokvel pool projections (read-only; not persisted to the ledger).
+ * Interest: monthly compound on pool balance at prime ÷ 12 (after each month's inflows).
  */
 
 const TARGET_MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/
@@ -66,6 +67,27 @@ export function listMonthKeysInclusive(from, to) {
   return out
 }
 
+/**
+ * @param {string} startMonth YYYY-MM
+ * @param {number} count
+ * @returns {string[]}
+ */
+export function cycleMonthKeysFromStart(startMonth, count) {
+  if (!TARGET_MONTH_RE.test(startMonth) || count < 1) return []
+
+  const months = []
+  let [y, m] = startMonth.split('-').map(Number)
+  for (let i = 0; i < count; i++) {
+    months.push(`${y}-${String(m).padStart(2, '0')}`)
+    m += 1
+    if (m > 12) {
+      m = 1
+      y += 1
+    }
+  }
+  return months
+}
+
 function isApprovedContribution(row) {
   return String(row?.treasurer_approval_status ?? '').toLowerCase() === 'approved'
 }
@@ -109,8 +131,51 @@ function sumMemberApprovedPrincipal(contributions, userId) {
   return round2(sum)
 }
 
+function earliestApprovedMonth(contributions) {
+  let earliest = null
+  for (const c of contributions ?? []) {
+    if (!isApprovedContribution(c)) continue
+    const month = normalizeTargetMonth(c)
+    if (!month) continue
+    if (!earliest || compareMonthKeys(month, earliest) < 0) earliest = month
+  }
+  return earliest
+}
+
 /**
- * Month-by-month: add cycle inflows, then one month of simple interest on the balance.
+ * Monthly compound on pool balance: each month add inflows, then interest = balance × (prime/12).
+ *
+ * @param {string[]} months YYYY-MM in order
+ * @param {(month: string) => number} inflowForMonth
+ * @param {number} primeRate annual prime % (e.g. 11.75)
+ */
+export function simulateFixedPoolCompound(months, inflowForMonth, primeRate) {
+  const monthlyRate = Number(primeRate) / 100 / 12
+  let balance = 0
+  let totalInflow = 0
+
+  for (const month of months) {
+    const inflow = round2(inflowForMonth(month))
+    if (inflow > 0) {
+      totalInflow = round2(totalInflow + inflow)
+      balance = round2(balance + inflow)
+    }
+    if (balance > 0 && monthlyRate > 0) {
+      balance = round2(balance * (1 + monthlyRate))
+    }
+  }
+
+  const pool_interest = round2(balance - totalInflow)
+  return {
+    pool_balance: balance,
+    pool_principal: totalInflow,
+    pool_interest,
+    months_accrued: months.length,
+  }
+}
+
+/**
+ * To-date compound accrual from approved contributions only.
  *
  * @param {{
  *   contributions?: Array<{ amount?: number, user_id?: string, target_month?: string, paid_at?: string, treasurer_approval_status?: string }>,
@@ -139,36 +204,42 @@ export function accrueFixedPoolInterestToDate({ contributions, primeRate, asOfMo
   }
 
   const months = listMonthKeysInclusive(firstMonth, endMonth)
-  const monthlyRate = Number(primeRate) / 100 / 12
-
-  let balance = 0
-  let poolInterest = 0
-
-  for (const month of months) {
-    balance = round2(balance + (inflowByMonth[month] ?? 0))
-    if (balance > 0 && monthlyRate > 0) {
-      const monthInterest = round2(balance * monthlyRate)
-      poolInterest = round2(poolInterest + monthInterest)
-      balance = round2(balance + monthInterest)
-    }
-  }
+  const { pool_balance, pool_interest, months_accrued } = simulateFixedPoolCompound(
+    months,
+    (month) => inflowByMonth[month] ?? 0,
+    primeRate,
+  )
 
   return {
-    pool_interest_to_date: poolInterest,
-    pool_balance: balance,
-    months_accrued: months.length,
+    pool_interest_to_date: pool_interest,
+    pool_balance,
+    months_accrued,
   }
 }
 
-function earliestApprovedMonth(contributions) {
-  let earliest = null
-  for (const c of contributions ?? []) {
-    if (!isApprovedContribution(c)) continue
-    const month = normalizeTargetMonth(c)
-    if (!month) continue
-    if (!earliest || compareMonthKeys(month, earliest) < 0) earliest = month
-  }
-  return earliest
+/**
+ * Full-cycle maturity projection: each month adds expected pool inflow, compounded monthly.
+ */
+function projectMaturityPoolCompound({
+  stokvel,
+  contributions,
+  memberCount,
+  cycleLength,
+  primeRate,
+  now,
+}) {
+  const monthlyContribution = Number(stokvel.contribution_amount) || 0
+  const projectedMonthlyInflow = round2(monthlyContribution * memberCount)
+  const createdAt = parseDate(stokvel.created_at) ?? now
+  const startMonth =
+    earliestApprovedMonth(contributions) ?? monthKeyFromDate(createdAt)
+  const months = cycleMonthKeysFromStart(startMonth, cycleLength)
+
+  return simulateFixedPoolCompound(
+    months,
+    () => projectedMonthlyInflow,
+    primeRate,
+  )
 }
 
 /**
@@ -237,20 +308,18 @@ export function computeFixedPoolProjection({
   const cycleLength = Math.max(1, Number(stokvel.cycle_length) || memberCount)
 
   const expected_principal_per_member = round2(monthlyContribution * cycleLength)
+  const maturitySim = projectMaturityPoolCompound({
+    stokvel,
+    contributions,
+    memberCount,
+    cycleLength,
+    primeRate: rate,
+    now,
+  })
+
   const pool_principal = round2(expected_principal_per_member * memberCount)
-
-  const createdAt = parseDate(stokvel.created_at) ?? now
-  const firstApprovedMonth = earliestApprovedMonth(contributions)
-  const accrualStart = firstApprovedMonth
-    ? parseDate(`${firstApprovedMonth}-01T12:00:00.000Z`) ?? createdAt
-    : createdAt
-  const maturity = parseDate(stokvel.maturity_date)
-  const months_active = maturity
-    ? calendarMonthsInclusive(accrualStart, maturity)
-    : cycleLength
-
-  const pool_interest = round2(pool_principal * (rate / 100) * (months_active / 12))
-  const pool_total = round2(pool_principal + pool_interest)
+  const pool_interest = maturitySim.pool_interest
+  const pool_total = maturitySim.pool_balance
   const expected_interest_per_member = round2(pool_interest / memberCount)
   const expected_payout_per_member = round2(
     expected_principal_per_member + expected_interest_per_member,
@@ -295,7 +364,7 @@ export function computeFixedPoolProjection({
     member_interest_share_to_date,
     estimated_amount_made,
     current_prime_rate: rate,
-    months_active,
+    months_active: maturitySim.months_accrued,
     cycle_length: cycleLength,
     as_of: now.toISOString(),
   }

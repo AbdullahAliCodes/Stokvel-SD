@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { DragDropContext, Draggable, Droppable } from "@hello-pangea/dnd";
-import { GripVertical, Loader2 } from "lucide-react";
+import { GripVertical } from "lucide-react";
 import { useSession } from "../context/SessionContext";
+import { useConfirm } from "../context/ModalContext";
+import Spinner from "../components/ui/Spinner";
+import SkeletonPage from "../components/ui/SkeletonPage";
 import { apiUrl } from "../utils/api";
 import {
   btnPrimary,
@@ -52,10 +55,6 @@ function parseApiError(text) {
   } catch {
     return text || "Request failed";
   }
-}
-
-function confirmAction(message) {
-  return window.confirm(message);
 }
 
 function yyyyMmLocal(d = new Date()) {
@@ -180,6 +179,7 @@ function memberFlaggedForMonth(missedPayments, userId, month) {
 export default function Payments() {
   const { stokvel_id } = useParams();
   const { session } = useSession();
+  const confirm = useConfirm();
   const [stokvel, setStokvel] = useState(null);
   const [membership, setMembership] = useState(null);
   const [members, setMembers] = useState([]);
@@ -436,8 +436,11 @@ export default function Payments() {
   const expectedPayout = isFixedStokvel
     ? maturityPayoutEstimate
     : monthlyContribution * memberCount;
+  const fixedEstimateLoading =
+    isFixedStokvel && fixedPool == null && !ratesStale;
   const estimatedAmountMadeHint =
     isFixedStokvel &&
+    !fixedEstimateLoading &&
     fixedPool?.member_contributions_to_date != null &&
     fixedPool?.member_interest_share_to_date != null
       ? `${formatZAR(Number(fixedPool.member_contributions_to_date))} contributed + ${formatZAR(Number(fixedPool.member_interest_share_to_date))} est. interest share`
@@ -571,7 +574,12 @@ export default function Payments() {
 
   async function handleTreasurerSave() {
     if (!session?.access_token || !stokvel_id || !treasurerUserId) return;
-    if (!confirmAction("Save this treasurer change for the group?")) return;
+    if (
+      !(await confirm({
+        message: "Save this treasurer change for the group?",
+      }))
+    )
+      return;
     setTreasurerSaving(true);
     setTreasurerError("");
     setTreasurerOk("");
@@ -671,7 +679,12 @@ export default function Payments() {
 
   async function handlePayoutOrderSave() {
     if (!session?.access_token || !stokvel_id || !canManagePayoutOrder) return;
-    if (!confirmAction("Save payout order for upcoming disbursements?")) return;
+    if (
+      !(await confirm({
+        message: "Save payout order for upcoming disbursements?",
+      }))
+    )
+      return;
     const payloadOrderIds =
       upcomingPayoutOrderIds.length > 0
         ? upcomingPayoutOrderIds
@@ -750,14 +763,17 @@ export default function Payments() {
     { label: "Total contribution", value: formatZAR(totalContribution) },
     {
       label: isFixedStokvel ? "Estimated Amount Made" : "Expected payout",
+      loading: fixedEstimateLoading,
       value:
         ratesStale && isFixedStokvel
           ? "—"
-          : isFixedStokvel && estimatedAmountMade != null
-            ? formatZAR(estimatedAmountMade)
-            : isFixedStokvel
-              ? formatZAR(0)
-              : formatZAR(expectedPayout),
+          : fixedEstimateLoading
+            ? null
+            : isFixedStokvel && estimatedAmountMade != null
+              ? formatZAR(estimatedAmountMade)
+              : isFixedStokvel
+                ? formatZAR(0)
+                : formatZAR(expectedPayout),
       hint: estimatedAmountMadeHint,
     },
     { label: "Monthly contribution", value: formatZAR(monthlyContribution) },
@@ -773,7 +789,10 @@ export default function Payments() {
   const financeSummaryExport = useMemo(
     () => ({
       headers: ["Metric", "Value"],
-      rows: statCards.map((card) => [card.label, card.value]),
+      rows: statCards.map((card) => [
+        card.label,
+        card.loading ? "Loading…" : (card.value ?? "—"),
+      ]),
     }),
     [statCards],
   );
@@ -985,11 +1004,7 @@ export default function Payments() {
 
       {error ? <p className={`mb-6 ${errorBox}`}>{error}</p> : null}
 
-      {session && loading ? (
-        <div className="flex justify-center p-8">
-          <Loader2 className="h-8 w-8 animate-spin text-green-600" />
-        </div>
-      ) : null}
+      {session && loading ? <SkeletonPage /> : null}
 
       {session && !loading && membership ? (
         <>
@@ -1011,9 +1026,17 @@ export default function Payments() {
                 <p className="mb-1 text-xs font-semibold uppercase text-stone-500 dark:text-stone-400">
                   {card.label}
                 </p>
-                <p className="text-xl font-semibold text-stone-800 dark:text-stone-100">
-                  {card.value}
-                </p>
+                {card.loading ? (
+                  <Spinner
+                    size="sm"
+                    className="h-6 w-6"
+                    label="Loading estimated amount"
+                  />
+                ) : (
+                  <p className="text-xl font-semibold text-stone-800 dark:text-stone-100">
+                    {card.value}
+                  </p>
+                )}
                 {card.hint ? (
                   <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
                     {card.hint}
@@ -1097,7 +1120,7 @@ export default function Payments() {
                         <tr className={tableRow}>
                           <td colSpan={3} className="p-6">
                             <div className="flex justify-center">
-                              <Loader2 className="h-8 w-8 animate-spin text-green-600" />
+                              <Spinner />
                             </div>
                           </td>
                         </tr>

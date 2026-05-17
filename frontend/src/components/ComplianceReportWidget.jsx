@@ -1,4 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
+import { BarChart3 } from 'lucide-react'
+import { useAlert } from '../context/ModalContext'
+import { EmptyState } from './ui'
 import {
   BarChart,
   Bar,
@@ -18,35 +21,27 @@ import {
 } from '../ui'
 import { jsPDF } from 'jspdf'
 import { toPng } from 'html-to-image'
+import {
+  aggregateMonthComplianceCounts,
+  computeWeightedCompliancePct,
+  paymentWindowFromStokvel,
+  resolveMemberMonthStatus,
+} from '../utils/complianceStatus.js'
 
-const TARGET_MONTH_RE = /^\d{4}-\d{2}$/
-
-// ---------------------------------------------------------------------------
-// Data helpers — mirror the logic in Payments.jsx so we stay in sync
-// ---------------------------------------------------------------------------
-
-/** Returns true when a member has at least one contribution row for that month. */
-function memberPaidForMonth(contributions, userId, month) {
-  return (contributions ?? []).some(
-    (c) =>
-      c?.user_id === userId &&
-      c?.target_month === month &&
-      TARGET_MONTH_RE.test(String(month)),
-  )
+const CHART_COLORS = {
+  Paid: '#10B981',
+  Late: '#F59E0B',
+  Missed: '#EF4444',
+  Unpaid: '#4B5563',
 }
 
-/** Returns true when a member has an unresolved missed-payment flag for that month. */
-function memberFlaggedForMonth(missedPayments, userId, month) {
-  return (missedPayments ?? []).some(
-    (r) =>
-      r?.user_id === userId &&
-      r?.target_month === month &&
-      r?.resolved_at == null &&
-      TARGET_MONTH_RE.test(String(month)),
-  )
+const STATUS_BADGE_CLASS = {
+  Paid: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200',
+  Late: 'bg-amber-500/20 text-amber-600 border border-amber-500/30 dark:bg-amber-900/30 dark:text-amber-300',
+  Missed: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200',
+  Unpaid: 'bg-stone-100 text-stone-500 dark:bg-slate-800 dark:text-stone-400',
 }
 
-/** Derive a readable display name from the member's profile object. */
 function memberDisplay(p) {
   const first = p?.first_name?.trim()
   const last = p?.last_name?.trim()
@@ -56,24 +51,33 @@ function memberDisplay(p) {
   return 'Member'
 }
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
+function compliancePctBadgeClass(pct) {
+  if (pct >= 75) {
+    return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200'
+  }
+  if (pct >= 50) {
+    return 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200'
+  }
+  return 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200'
+}
 
 export default function ComplianceReportWidget({
   members = [],
   contributions = [],
   missedPayments = [],
   ledgerMonths = [],
+  refMonth = null,
+  paymentWindow = null,
 }) {
-
-  // Toggle between "chart" and "table" views
+  const showAlert = useAlert()
   const [view, setView] = useState('chart')
-
-  // Ref attached to the snapshot container (chart OR table)
   const reportRef = useRef(null)
 
-  // --- Sort members alphabetically so table rows are consistent ---
+  const windowConfig = useMemo(
+    () => paymentWindowFromStokvel(paymentWindow),
+    [paymentWindow],
+  )
+
   const sortedMembers = useMemo(
     () =>
       [...members].sort((a, b) =>
@@ -82,65 +86,48 @@ export default function ComplianceReportWidget({
     [members],
   )
 
-  // ---------------------------------------------------------------------------
-  // Build per-month group compliance data (for the chart)
-  // ---------------------------------------------------------------------------
   const monthlyChartData = useMemo(() => {
     return ledgerMonths.map((month) => {
-      let paid = 0
-      let missed = 0
-
-      // Count how many members paid vs missed for this month
-      for (const m of members) {
-        if (memberPaidForMonth(contributions, m.user_id, month)) {
-          paid += 1
-        } else {
-          missed += 1
-        }
-      }
-
-      return { month, Paid: paid, Missed: missed }
+      const counts = aggregateMonthComplianceCounts({
+        members,
+        contributions,
+        missedPayments,
+        month,
+        refMonth,
+        paymentWindow,
+      })
+      return { month, ...counts }
     })
-  }, [ledgerMonths, members, contributions])
+  }, [ledgerMonths, members, contributions, missedPayments, refMonth, paymentWindow])
 
-  // ---------------------------------------------------------------------------
-  // Build per-member compliance grid  (for the table + CSV export)
-  // ---------------------------------------------------------------------------
   const memberComplianceRows = useMemo(() => {
     if (ledgerMonths.length === 0) return []
 
     return sortedMembers.map((m) => {
       const name = memberDisplay(m.profiles)
-      let paidCount = 0
-
-      // Determine status for each month
-      const monthStatuses = ledgerMonths.map((month) => {
-        const paid = memberPaidForMonth(contributions, m.user_id, month)
-        const flagged = memberFlaggedForMonth(missedPayments, m.user_id, month)
-
-        if (paid) {
-          paidCount += 1
-          return 'Paid'
-        }
-        if (flagged) return 'Missed'
-        return 'Unpaid'
-      })
-
-      // Calculate overall compliance percentage
-      const compliancePct =
-        ledgerMonths.length > 0
-          ? Math.round((paidCount / ledgerMonths.length) * 100)
-          : 0
-
+      const monthStatuses = ledgerMonths.map((month) =>
+        resolveMemberMonthStatus({
+          contributions,
+          missedPayments,
+          userId: m.user_id,
+          month,
+          refMonth,
+          windowConfig,
+        }),
+      )
+      const compliancePct = computeWeightedCompliancePct(monthStatuses)
       return { name, monthStatuses, compliancePct }
     })
-  }, [sortedMembers, ledgerMonths, contributions, missedPayments])
+  }, [
+    sortedMembers,
+    ledgerMonths,
+    contributions,
+    missedPayments,
+    refMonth,
+    windowConfig,
+  ])
 
-  // ---------------------------------------------------------------------------
-  // CSV export — creates a downloadable CSV from the table data
-  // ---------------------------------------------------------------------------
   function handleExportCsv() {
-    // Build header row
     const headers = ['Member', ...ledgerMonths, 'Compliance %']
     const rows = memberComplianceRows.map((row) => [
       row.name,
@@ -148,13 +135,13 @@ export default function ComplianceReportWidget({
       `${row.compliancePct}%`,
     ])
 
-    // Join everything into a CSV string
     const csvContent = [headers, ...rows]
       .map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(';'))
       .join('\n')
 
-    // Trigger a browser download
-    const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([`\ufeff${csvContent}`], {
+      type: 'text/csv;charset=utf-8;',
+    })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
@@ -165,33 +152,19 @@ export default function ComplianceReportWidget({
     URL.revokeObjectURL(url)
   }
 
-  // ---------------------------------------------------------------------------
-  // PDF export — uses html-to-image (toPng) to snapshot the container.
-  //
-  // Why html-to-image instead of html2canvas?
-  //   • html2canvas cannot parse Tailwind v4's oklch() color functions.
-  //   • html2canvas struggles with SVG elements inside ResponsiveContainer.
-  //   html-to-image uses the browser's native foreignObject SVG rendering
-  //   which correctly handles both oklch and nested Recharts SVGs.
-  // ---------------------------------------------------------------------------
   async function handleExportPdf() {
     if (!reportRef.current) return
 
     try {
-      // Capture the visible container (chart OR table) as a high-res PNG.
-      // We pass a filter that skips the Recharts tooltip portal (invisible
-      // overlay that can cause blank captures).
       const dataUrl = await toPng(reportRef.current, {
         pixelRatio: 2,
         backgroundColor: '#ffffff',
         filter: (node) => {
-          // Skip the tooltip overlay that Recharts renders off-screen
           if (node?.classList?.contains?.('recharts-tooltip-wrapper')) return false
           return true
         },
       })
 
-      // Load the PNG into an Image so we can measure its pixel dimensions
       const img = new Image()
       await new Promise((resolve, reject) => {
         img.onload = resolve
@@ -202,42 +175,61 @@ export default function ComplianceReportWidget({
       const imgW = img.naturalWidth
       const imgH = img.naturalHeight
 
-      // Build an A4-landscape PDF sized to fit the snapshot
       const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
       const pageWidth = pdf.internal.pageSize.getWidth()
 
-      // Title
       pdf.setFontSize(16)
-      pdf.setTextColor(5, 150, 105) // emerald-600
+      pdf.setTextColor(5, 150, 105)
       pdf.text('Contribution Compliance Report', 14, 16)
+      pdf.setFontSize(9)
+      pdf.setTextColor(80, 80, 80)
+      pdf.text(
+        'Statuses: Paid (on time), Late (after window), Missed, Unpaid. Compliance % weights Late at 50%.',
+        14,
+        22,
+      )
       pdf.setTextColor(0, 0, 0)
 
-      // Scale the image to fit the page width with margins
-      const usableWidth = pageWidth - 28 // 14mm margin each side
+      const usableWidth = pageWidth - 28
       const scaledHeight = (imgH * usableWidth) / imgW
-      pdf.addImage(dataUrl, 'PNG', 14, 24, usableWidth, scaledHeight)
+      pdf.addImage(dataUrl, 'PNG', 14, 28, usableWidth, scaledHeight)
 
       pdf.save('compliance_report.pdf')
     } catch (err) {
       console.error('PDF generation failed:', err)
-      alert('Failed to generate PDF. Check the console for details.')
+      await showAlert({
+        type: 'error',
+        title: 'PDF export failed',
+        message: 'Failed to generate PDF. Check the console for details.',
+      })
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Render nothing if there are no months to report on
-  // ---------------------------------------------------------------------------
-  if (ledgerMonths.length === 0) return null
+  if (ledgerMonths.length === 0) {
+    return (
+      <section className={`${cardLight} p-5`}>
+        <EmptyState
+          icon={BarChart3}
+          title="No compliance data yet"
+          description="Contribution cycles will appear here once members start paying in or missed payments are recorded on the Payments page."
+        />
+      </section>
+    )
+  }
 
   return (
     <section className={`${cardLight} p-5`}>
-      {/* ---- Header row ---- */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h3 className="border-b border-stone-200 pb-2 text-lg font-bold text-emerald-800 dark:border-slate-700 dark:text-emerald-300">
-          Contribution Compliance Report
-        </h3>
+        <div>
+          <h3 className="border-b border-stone-200 pb-2 text-lg font-bold text-emerald-800 dark:border-slate-700 dark:text-emerald-300">
+            Contribution Compliance Report
+          </h3>
+          <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+            On-time vs late uses your group payment window (SAST). Compliance %: Paid
+            = 100%, Late = 50%.
+          </p>
+        </div>
 
-        {/* View toggle */}
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
             View:
@@ -245,31 +237,31 @@ export default function ComplianceReportWidget({
           <button
             type="button"
             onClick={() => setView('chart')}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${view === 'chart'
-              ? 'bg-emerald-700 text-white shadow dark:bg-emerald-600'
-              : 'bg-stone-100 text-stone-600 hover:bg-stone-200 dark:bg-slate-800 dark:text-stone-300 dark:hover:bg-slate-700'
-              }`}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+              view === 'chart'
+                ? 'bg-emerald-700 text-white shadow dark:bg-emerald-600'
+                : 'bg-stone-100 text-stone-600 hover:bg-stone-200 dark:bg-slate-800 dark:text-stone-300 dark:hover:bg-slate-700'
+            }`}
           >
             Chart
           </button>
           <button
             type="button"
             onClick={() => setView('table')}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${view === 'table'
-              ? 'bg-emerald-700 text-white shadow dark:bg-emerald-600'
-              : 'bg-stone-100 text-stone-600 hover:bg-stone-200 dark:bg-slate-800 dark:text-stone-300 dark:hover:bg-slate-700'
-              }`}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+              view === 'table'
+                ? 'bg-emerald-700 text-white shadow dark:bg-emerald-600'
+                : 'bg-stone-100 text-stone-600 hover:bg-stone-200 dark:bg-slate-800 dark:text-stone-300 dark:hover:bg-slate-700'
+            }`}
           >
             Table
           </button>
         </div>
       </div>
 
-      {/* ---- Snapshot container (captured by html-to-image) ---- */}
       <div ref={reportRef} className="rounded-xl bg-white p-4 dark:bg-slate-900">
-        {/* ============ CHART VIEW ============ */}
         {view === 'chart' ? (
-          <ResponsiveContainer width="100%" height={340}>
+          <ResponsiveContainer width="100%" height={360}>
             <BarChart
               data={monthlyChartData}
               margin={{ top: 10, right: 20, left: 0, bottom: 5 }}
@@ -293,13 +285,35 @@ export default function ComplianceReportWidget({
                 }}
               />
               <Legend wrapperStyle={{ fontSize: '0.75rem' }} />
-              <Bar dataKey="Paid" fill="#059669" radius={[4, 4, 0, 0]} isAnimationActive={false} />
-              <Bar dataKey="Missed" fill="#dc2626" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+              <Bar
+                dataKey="Paid"
+                stackId="a"
+                fill={CHART_COLORS.Paid}
+                isAnimationActive={false}
+              />
+              <Bar
+                dataKey="Late"
+                stackId="a"
+                fill={CHART_COLORS.Late}
+                isAnimationActive={false}
+              />
+              <Bar
+                dataKey="Missed"
+                stackId="a"
+                fill={CHART_COLORS.Missed}
+                isAnimationActive={false}
+              />
+              <Bar
+                dataKey="Unpaid"
+                stackId="a"
+                fill={CHART_COLORS.Unpaid}
+                radius={[4, 4, 0, 0]}
+                isAnimationActive={false}
+              />
             </BarChart>
           </ResponsiveContainer>
         ) : null}
 
-        {/* ============ TABLE VIEW ============ */}
         {view === 'table' ? (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[480px] text-left text-sm text-stone-800 dark:text-stone-100">
@@ -322,12 +336,9 @@ export default function ComplianceReportWidget({
                     {row.monthStatuses.map((status, idx) => (
                       <td key={ledgerMonths[idx]} className="p-3 text-center">
                         <span
-                          className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold ${status === 'Paid'
-                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200'
-                            : status === 'Missed'
-                              ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200'
-                              : 'bg-stone-100 text-stone-500 dark:bg-slate-800 dark:text-stone-400'
-                            }`}
+                          className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-semibold ${
+                            STATUS_BADGE_CLASS[status] ?? STATUS_BADGE_CLASS.Unpaid
+                          }`}
                         >
                           {status}
                         </span>
@@ -336,12 +347,7 @@ export default function ComplianceReportWidget({
 
                     <td className="p-3 text-center">
                       <span
-                        className={`inline-block min-w-[3rem] rounded-full px-2 py-0.5 text-xs font-bold ${row.compliancePct >= 75
-                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200'
-                          : row.compliancePct >= 50
-                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200'
-                            : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200'
-                          }`}
+                        className={`inline-block min-w-12 rounded-full px-2 py-0.5 text-xs font-bold ${compliancePctBadgeClass(row.compliancePct)}`}
                       >
                         {row.compliancePct}%
                       </span>
@@ -350,11 +356,10 @@ export default function ComplianceReportWidget({
                 ))}
               </tbody>
             </table>
-          </div>
+            </div>
         ) : null}
       </div>
 
-      {/* ---- Export buttons ---- */}
       <div className="mt-4 flex flex-wrap gap-3">
         <button type="button" onClick={handleExportCsv} className={`${btnSecondary} text-xs`}>
           <span className="mr-1.5">📄</span> Export CSV

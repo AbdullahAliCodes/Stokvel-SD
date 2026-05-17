@@ -104,8 +104,8 @@ export default function MarketRatesWidget({ memberMonthlyContribution = 0, class
             : 'X/month'}
         </h4>
         <p className="mb-2 text-xs text-stone-500 dark:text-stone-400">
-          Compound projection at the current prime rate — not the same formula as
-          your group&apos;s live pool payout estimate.
+          Compound projection at the current prime rate (same basis as your
+          group&apos;s Estimated Amount Made).
         </p>
         {contribution <= 0 ? (
           <p className="text-xs text-stone-500 dark:text-stone-400">

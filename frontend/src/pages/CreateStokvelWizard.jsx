@@ -21,6 +21,8 @@ import {
   Droppable,
 } from "@hello-pangea/dnd";
 import { useSession } from "../context/SessionContext";
+import { useConfirm } from "../context/ModalContext";
+import Spinner from "../components/ui/Spinner";
 import { apiUrl } from "../utils/api";
 import {
   btnPrimary,
@@ -231,6 +233,7 @@ function memberPayoutRowRoleLabel(m, isAdminWizard) {
 /** @param {{ variant?: 'admin' | 'member' }} props */
 export function CreateStokvelWizard({ variant = "admin" }) {
   const { session } = useSession();
+  const confirm = useConfirm();
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
   const isAdmin = variant === "admin";
@@ -836,9 +839,11 @@ export function CreateStokvelWizard({ variant = "admin" }) {
 
     const treasurerIdForAdmin = treasurerUserIdFromSelection || myUserId;
     if (
-      !window.confirm(
-        "Create this group with the selected settings and members?",
-      )
+      !(await confirm({
+        title: "Create stokvel",
+        message:
+          "Create this group with the selected settings and members?",
+      }))
     )
       return;
 
@@ -1868,7 +1873,14 @@ export function CreateStokvelWizard({ variant = "admin" }) {
                   disabled={submitting || uploadingDocs}
                   className={`${btnPrimary} inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60`}
                 >
-                  {submitting || uploadingDocs ? "Creating..." : "Create stokvel"}
+                  {submitting || uploadingDocs ? (
+                    <>
+                      <Spinner size="sm" className="text-white" />
+                      Creating...
+                    </>
+                  ) : (
+                    "Create stokvel"
+                  )}
                 </button>
               ) : (
                 <button

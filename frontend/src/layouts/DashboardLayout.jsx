@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 import BrandLogo from "../components/BrandLogo";
 import ThemeToggle from "../components/ThemeToggle";
+import SkeletonPage from "../components/ui/SkeletonPage";
 import {
   LayoutDashboard,
   Wallet,
@@ -200,28 +201,9 @@ export default function DashboardLayout() {
     !knownMembershipIds.has(String(stokvel_id)) &&
     String(userRole || "").toLowerCase() !== "admin";
 
-  if (memberships === null && isScopedPath) {
-    return (
-      <div className="flex h-dvh items-center justify-center overflow-hidden bg-[#F4F5F0] text-stone-600 dark:bg-slate-950 dark:text-stone-400">
-        <p className="text-sm tracking-wide">Loading your groups…</p>
-      </div>
-    );
-  }
-
-  if (fetchError && memberships !== null && memberships.length === 0) {
-    return (
-      <div className="flex h-dvh flex-col items-center justify-center gap-3 overflow-hidden bg-[#F4F5F0] p-6 text-center text-stone-600 dark:bg-slate-950 dark:text-stone-400">
-        <p className="text-sm">Could not load your stokvels.</p>
-        <button
-          type="button"
-          className="rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-50 dark:border-slate-600 dark:bg-slate-800 dark:text-stone-200 dark:hover:bg-slate-700"
-          onClick={() => navigate("/dashboard", { replace: true })}
-        >
-          Try again
-        </button>
-      </div>
-    );
-  }
+  const showMembershipSkeleton = memberships === null && isScopedPath;
+  const showMembershipError =
+    fetchError && memberships !== null && memberships.length === 0;
 
   return (
     <div className="box-border flex min-h-dvh w-full flex-col gap-3 overflow-y-auto bg-[#F4F5F0] p-3 text-stone-800 dark:bg-slate-950 dark:text-stone-100 md:h-dvh md:min-h-0 md:flex-row md:gap-4 md:overflow-hidden md:p-4">
@@ -407,7 +389,22 @@ export default function DashboardLayout() {
         </div>
       </aside>
       <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain rounded-2xl border border-stone-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-stone-100 sm:p-6 md:p-8">
-        {blockOutlet ? null : <Outlet />}
+        {blockOutlet ? null : showMembershipSkeleton ? (
+          <SkeletonPage />
+        ) : showMembershipError ? (
+          <div className="flex flex-col items-center justify-center gap-3 p-6 text-center text-stone-600 dark:text-stone-400">
+            <p className="text-sm">Could not load your stokvels.</p>
+            <button
+              type="button"
+              className="rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-800 hover:bg-stone-50 dark:border-slate-600 dark:bg-slate-800 dark:text-stone-200 dark:hover:bg-slate-700"
+              onClick={() => navigate("/dashboard", { replace: true })}
+            >
+              Try again
+            </button>
+          </div>
+        ) : (
+          <Outlet />
+        )}
       </main>
     </div>
   );
