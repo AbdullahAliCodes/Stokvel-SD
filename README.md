@@ -25,6 +25,7 @@ copy .env.example .env
 ```
 
 Then open `backend/.env` and set:
+
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY` (needed for admin operations; optional for basic user routes)
