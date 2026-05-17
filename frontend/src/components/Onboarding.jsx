@@ -1,6 +1,7 @@
 import { Link, Navigate } from 'react-router-dom'
 import { UserPlus, Home } from 'lucide-react'
 import { useSession } from '../context/SessionContext'
+import Spinner from './ui/Spinner'
 
 export default function Onboarding() {
   const { userRole } = useSession()
@@ -9,8 +10,11 @@ export default function Onboarding() {
 
   if (!roleResolved) {
     return (
-      <div className="flex h-dvh items-center justify-center overflow-hidden bg-[#F4F5F0] text-stone-600 dark:bg-slate-950 dark:text-stone-300">
-        <p className="text-sm tracking-wide">Loading…</p>
+      <div className="flex h-dvh flex-col items-center justify-center gap-4 overflow-hidden bg-[#F4F5F0] text-stone-600 dark:bg-slate-950 dark:text-stone-300">
+        <Spinner size="lg" label="Preparing your workspace" />
+        <p className="text-sm tracking-wide text-stone-500 dark:text-stone-400">
+          Preparing your workspace…
+        </p>
       </div>
     )
   }

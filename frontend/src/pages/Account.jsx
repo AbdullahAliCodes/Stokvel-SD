@@ -9,6 +9,7 @@ import {
   btnPrimary,
   errorBox,
 } from '../ui'
+import SkeletonPage from '../components/ui/SkeletonPage'
 
 function parseApiError(text) {
   try {
@@ -125,7 +126,7 @@ export default function Account() {
       ) : null}
 
       {loading ? (
-        <p className="text-sm text-stone-500">Loading…</p>
+        <SkeletonPage variant="form" />
       ) : (
         <form onSubmit={handleSubmit} className="max-w-lg space-y-4">
           <label className={labelLight}>

@@ -3,6 +3,7 @@ import {
   accrueFixedPoolInterestToDate,
   calendarMonthsInclusive,
   computeFixedPoolProjection,
+  simulateFixedPoolCompound,
 } from './projectionService.js'
 
 const MEMBER_A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
@@ -88,7 +89,7 @@ describe('projectionService', () => {
     expect(result.pool_interest_to_date).toBe(150.5)
     expect(result.member_interest_share_to_date).toBe(30.1)
     expect(result.estimated_amount_made).toBe(2030.1)
-    expect(result.expected_payout_per_member).toBe(6420)
+    expect(result.expected_payout_per_member).toBe(6213.54)
   })
 
   it('computeFixedPoolProjection maturity fields use full cycle', () => {
@@ -115,7 +116,7 @@ describe('projectionService', () => {
     })
 
     expect(result.expected_principal_per_member).toBe(3000)
-    expect(result.expected_payout_per_member).toBe(3090)
+    expect(result.expected_payout_per_member).toBe(3106.77)
     expect(result.estimated_amount_made).toBeNull()
   })
 
@@ -128,6 +129,16 @@ describe('projectionService', () => {
         primeRate: 10,
       }),
     ).toBeNull()
+  })
+
+  it('simulateFixedPoolCompound matches month-by-month pool growth', () => {
+    const compound = simulateFixedPoolCompound(
+      ['2026-01', '2026-02'],
+      () => 5000,
+      12,
+    )
+    expect(compound.pool_interest).toBe(150.5)
+    expect(compound.pool_balance).toBe(10150.5)
   })
 
   it('returns null when prime rate missing', () => {

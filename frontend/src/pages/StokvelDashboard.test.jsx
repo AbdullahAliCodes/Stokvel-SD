@@ -133,7 +133,7 @@ describe("StokvelDashboard", () => {
     );
 
     render(<StokvelDashboard />);
-    expect(screen.getByText("Loading dashboard…")).toBeInTheDocument();
+    expect(document.querySelector(".animate-pulse")).toBeInTheDocument();
   });
 
   it("shows hard error page when detail request fails and no effective stokvel exists", async () => {

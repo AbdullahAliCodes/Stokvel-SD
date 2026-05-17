@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft } from 'lucide-react'
 import { useSession } from '../context/SessionContext'
+import { useConfirm } from '../context/ModalContext'
 import { apiUrl } from '../utils/api'
 import {
   pageTitle,
@@ -24,13 +25,10 @@ function parseApiError(text) {
   }
 }
 
-function confirmAction(message) {
-  return window.confirm(message)
-}
-
 export default function AdminEditStokvel() {
   const { id } = useParams()
   const { session } = useSession()
+  const confirm = useConfirm()
   const navigate = useNavigate()
 
   const [loading, setLoading] = useState(true)
@@ -109,7 +107,7 @@ export default function AdminEditStokvel() {
   async function handleSubmit(e) {
     e.preventDefault()
     if (!session?.access_token || !id) return
-    if (!confirmAction('Save group configuration changes?')) return
+    if (!(await confirm({ message: 'Save group configuration changes?' }))) return
     setSaving(true)
     setError('')
     try {
@@ -142,7 +140,12 @@ export default function AdminEditStokvel() {
   async function handleAddMember(e) {
     e.preventDefault()
     if (!session?.access_token || !id) return
-    if (!confirmAction(`Add "${memberUsername.trim()}" to this group?`)) return
+    if (
+      !(await confirm({
+        message: `Add "${memberUsername.trim()}" to this group?`,
+      }))
+    )
+      return
     setMemberInviteErr('')
     setMemberInviteMsg('')
     setMemberInviteLoading(true)
@@ -177,7 +180,12 @@ export default function AdminEditStokvel() {
       setMeetingScheduleErrorShakeKey((k) => k + 1)
       return
     }
-    if (!confirmAction('Schedule this meeting and send member notifications?')) return
+    if (
+      !(await confirm({
+        message: 'Schedule this meeting and send member notifications?',
+      }))
+    )
+      return
     setMeetingSaving(true)
     try {
       const res = await fetch(apiUrl(`/api/stokvels/${id}/meetings`), {
@@ -212,7 +220,7 @@ export default function AdminEditStokvel() {
 
   async function handleSaveMinutes(meetingId) {
     if (!session?.access_token || !id) return
-    if (!confirmAction('Save updated meeting minutes?')) return
+    if (!(await confirm({ message: 'Save updated meeting minutes?' }))) return
     setMeetingSaving(true)
     setMeetingError('')
     setMeetingInfo('')
@@ -242,7 +250,15 @@ export default function AdminEditStokvel() {
 
   async function handleDeleteMeeting(meetingId) {
     if (!session?.access_token || !id) return
-    if (!confirmAction('Delete this meeting? This action cannot be undone.')) return
+    if (
+      !(await confirm({
+        title: 'Delete meeting',
+        message: 'Delete this meeting? This action cannot be undone.',
+        destructive: true,
+        confirmLabel: 'Delete',
+      }))
+    )
+      return
     setMeetingSaving(true)
     setMeetingError('')
     setMeetingInfo('')
@@ -265,7 +281,16 @@ export default function AdminEditStokvel() {
 
   async function handleDeleteStokvel() {
     if (!session?.access_token || !id) return
-    if (!confirmAction('Delete this entire stokvel and all related data? This cannot be undone.')) return
+    if (
+      !(await confirm({
+        title: 'Delete stokvel',
+        message:
+          'Delete this entire stokvel and all related data? This cannot be undone.',
+        destructive: true,
+        confirmLabel: 'Delete',
+      }))
+    )
+      return
     setSaving(true)
     setError('')
     try {

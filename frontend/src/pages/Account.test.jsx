@@ -34,7 +34,7 @@ describe('Account', () => {
   it('shows loading state while fetching profile', async () => {
     mockFetch.mockImplementation(() => new Promise(() => {}))
     renderWithProviders(<Account />, { session: { access_token: 'fake-token' } })
-    expect(screen.getByText('Loading…')).toBeInTheDocument()
+    expect(document.querySelector('.animate-pulse')).toBeInTheDocument()
   })
 
   it('populates form with profile data on successful load', async () => {

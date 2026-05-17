@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { supabase } from "./utils/supabase";
 import { ThemeProvider } from "./context/ThemeContext";
+import { ModalProvider } from "./context/ModalContext";
 import { SessionProvider } from "./context/SessionContext";
 import RequireAuth from "./components/RequireAuth";
 import RequireAdmin from "./components/RequireAdmin";
@@ -41,12 +42,12 @@ import AcceptInvitation from "./pages/AcceptInvitation";
 
 export default function App() {
   const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: initial } }) => {
       setSession(initial);
-      setLoading(false);
+      setAuthReady(true);
     });
 
     const {
@@ -60,11 +61,7 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      {loading ? (
-        <div className="flex h-dvh items-center justify-center overflow-hidden bg-[#faf8f5] text-stone-600 dark:bg-slate-950 dark:text-stone-400">
-          <p className="text-sm tracking-wide">Loading…</p>
-        </div>
-      ) : (
+      <ModalProvider>
       <SessionProvider session={session}>
         <div className="h-full min-h-0 overflow-hidden">
           <BrowserRouter>
@@ -80,9 +77,8 @@ export default function App() {
               <Route path="/accept-invitation" element={<AcceptInvitation />} />
             </Route>
 
-            <Route element={<RequireAuth session={session} />}>
+            <Route element={<RequireAuth session={session} authReady={authReady} />}>
               <Route element={<RequireMember />}>
-                <Route path="/dashboard" element={<DashboardGateway />} />
                 <Route path="/onboarding" element={<Onboarding />} />
 
                 <Route
@@ -99,6 +95,7 @@ export default function App() {
                 />
 
                 <Route element={<DashboardLayout />}>
+                  <Route path="/dashboard" element={<DashboardGateway />} />
                   <Route path="/apply" element={<Apply />} />
                   <Route path="/account" element={<Account />} />
                   <Route path="/support" element={<Support />} />
@@ -149,7 +146,7 @@ export default function App() {
           </BrowserRouter>
         </div>
       </SessionProvider>
-      )}
+      </ModalProvider>
     </ThemeProvider>
   );
 }

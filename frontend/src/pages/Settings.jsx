@@ -11,6 +11,7 @@ import {
   pageSubtitle,
 } from '../ui'
 import GroupPageHeader from '../components/GroupPageHeader'
+import SkeletonPage from '../components/ui/SkeletonPage'
 
 function parseApiError(text) {
   try {
@@ -161,7 +162,7 @@ export default function Settings() {
         ) : null}
 
         {loading ? (
-          <p className="text-sm text-stone-500 dark:text-stone-400">Loading group settings…</p>
+          <SkeletonPage variant="form" />
         ) : (
           <form onSubmit={handleSave} className="space-y-4">
             <label className={labelLight}>

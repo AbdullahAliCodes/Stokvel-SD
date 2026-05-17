@@ -4,6 +4,8 @@ import { useSession } from '../context/SessionContext'
 import { apiUrl } from '../utils/api'
 import { readViewCache, writeViewCache } from '../utils/viewCache'
 import { myStokvelsCacheKey, stokvelStatusOf } from '../utils/stokvelMembership'
+import SkeletonPage from './ui/SkeletonPage'
+import Spinner from './ui/Spinner'
 
 const CACHE_TTL_MS = 180000
 
@@ -27,8 +29,6 @@ function activeIdsSet(sortedActive) {
 export default function DashboardGateway() {
   const { session, userRole } = useSession()
   const navigate = useNavigate()
-  // Some unit tests mock `useSession()` without returning `userRole`.
-  // Treat `undefined` as "resolved" so routing still happens in that scenario.
   const roleResolved =
     userRole === undefined ? true : userRole !== null && userRole !== undefined && userRole !== 'loading'
   const isAdmin = String(userRole || '').toLowerCase() === 'admin'
@@ -100,8 +100,14 @@ export default function DashboardGateway() {
   }, [session, userRole, roleResolved, isAdmin, navigate])
 
   return (
-    <div className="flex h-dvh items-center justify-center overflow-hidden bg-[#F4F5F0] text-stone-600 dark:bg-slate-950 dark:text-stone-300">
-      <p className="text-sm tracking-wide">Finding your stokvel…</p>
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <Spinner size="sm" label="Finding your stokvel" />
+        <p className="text-sm tracking-wide text-stone-500 dark:text-stone-400">
+          Finding your stokvel…
+        </p>
+      </div>
+      <SkeletonPage />
     </div>
   )
 }

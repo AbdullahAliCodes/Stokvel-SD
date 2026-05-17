@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { Users } from 'lucide-react'
 import OpportunityCard from '../components/OpportunityCard'
+import { EmptyState } from '../components/ui'
 import { useSession } from '../context/SessionContext'
 import { apiUrl } from '../utils/api'
 import { myStokvelsCacheKey } from '../utils/stokvelMembership'
@@ -177,8 +179,12 @@ export default function PublicStokvels() {
           </div>
         ) : null}
         {!loading && !error && items.length === 0 ? (
-          <div className="mx-auto mt-10 max-w-xl rounded-2xl border border-stone-200 bg-stone-50/80 px-5 py-6 text-center text-sm text-stone-700 md:mt-12">
-            No public stokvels are available yet. Check back soon.
+          <div className="mx-auto mt-10 max-w-xl md:mt-12">
+            <EmptyState
+              icon={Users}
+              title="No public stokvels yet"
+              description="No public stokvels are available yet. Check back soon."
+            />
           </div>
         ) : null}
         {!loading && !error && items.length > 0 ? (

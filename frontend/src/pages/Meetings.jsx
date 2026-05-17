@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { useSession } from "../context/SessionContext";
+import { useConfirm } from "../context/ModalContext";
 import { apiUrl } from "../utils/api";
 import {
   btnPrimary,
@@ -16,6 +17,7 @@ import { validateMeetingScheduleLocal } from "../utils/meetingScheduleValidation
 import MeetingCalendar from "../components/meetings/MeetingCalendar";
 import MeetingDetailsPanel from "../components/meetings/MeetingDetailsPanel";
 import GroupPageHeader from "../components/GroupPageHeader";
+import SkeletonPage from "../components/ui/SkeletonPage";
 
 function parseApiError(text) {
   try {
@@ -24,10 +26,6 @@ function parseApiError(text) {
   } catch {
     return text || "Request failed";
   }
-}
-
-function confirmAction(message) {
-  return window.confirm(message);
 }
 
 function toDatetimeLocalValue(value) {
@@ -64,6 +62,7 @@ export default function Meetings() {
   const { stokvel_id } = useParams();
   const navigate = useNavigate();
   const { session } = useSession();
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [stokvel, setStokvel] = useState(null);
@@ -230,7 +229,7 @@ export default function Meetings() {
 
   async function handleSaveMeeting(meetingId) {
     if (!session?.access_token || !stokvel_id) return;
-    if (!confirmAction("Save edits to this meeting?")) return;
+    if (!(await confirm({ message: "Save edits to this meeting?" }))) return;
     setMeetingSaving(true);
     setMeetingActionError("");
     setMeetingActionOk("");
@@ -272,7 +271,7 @@ export default function Meetings() {
 
   async function handleSaveMinutes(meetingId) {
     if (!session?.access_token || !stokvel_id) return;
-    if (!confirmAction("Save minutes for this meeting?")) return;
+    if (!(await confirm({ message: "Save minutes for this meeting?" }))) return;
     setMeetingSaving(true);
     setMeetingActionError("");
     setMeetingActionOk("");
@@ -363,7 +362,15 @@ export default function Meetings() {
 
   async function handleDeleteMeeting(meetingId) {
     if (!session?.access_token || !stokvel_id) return;
-    if (!confirmAction("Delete this meeting? This cannot be undone.")) return;
+    if (
+      !(await confirm({
+        title: "Delete meeting",
+        message: "Delete this meeting? This cannot be undone.",
+        destructive: true,
+        confirmLabel: "Delete",
+      }))
+    )
+      return;
     setMeetingSaving(true);
     setMeetingActionError("");
     setMeetingActionOk("");
@@ -389,11 +396,7 @@ export default function Meetings() {
   if (!stokvel_id) return null;
 
   if (loading && !stokvel && !error) {
-    return (
-      <div className="flex min-h-[200px] items-center justify-center text-sm text-stone-500 dark:text-stone-400">
-        Loading meetings…
-      </div>
-    );
+    return <SkeletonPage />;
   }
 
   if (error && !effectiveStokvel) {

@@ -25,6 +25,12 @@ vi.mock("../context/SessionContext", () => ({
   useSession: () => sessionState.current,
 }));
 
+const confirmMock = vi.fn().mockResolvedValue(true);
+
+vi.mock("../context/ModalContext", () => ({
+  useConfirm: () => confirmMock,
+}));
+
 vi.mock("../utils/api", () => ({
   apiUrl: (path) => `http://test${path}`,
 }));
@@ -143,7 +149,8 @@ describe("Payments", () => {
     sessionState.current = { session: { access_token: "token-1", user: { id: "u1" } } };
     readViewCacheMock.mockReset();
     writeViewCacheMock.mockReset();
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+    confirmMock.mockReset();
+    confirmMock.mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -311,7 +318,7 @@ describe("Payments", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save treasurer" }));
     expect(await screen.findByText("Patch failed")).toBeInTheDocument();
 
-    vi.mocked(window.confirm).mockReturnValue(false);
+    confirmMock.mockResolvedValueOnce(false);
     fireEvent.click(screen.getByRole("button", { name: "Save treasurer" }));
     const patchCalls = global.fetch.mock.calls.filter(
       ([u, o]) => String(u).endsWith("/treasurer") && o?.method === "PATCH",
@@ -414,6 +421,7 @@ describe("Payments", () => {
   it("allows treasurer to save reorder for upcoming payouts only", async () => {
     const detail = {
       ...detailBase,
+      stokvel: { ...detailBase.stokvel, type: "Rotating" },
       membership: { ...detailBase.membership, group_role: "treasurer" },
       members: [
         { user_id: "u1", group_role: "treasurer", profiles: { full_name: "Treasurer One" } },

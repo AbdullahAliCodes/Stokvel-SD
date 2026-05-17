@@ -18,6 +18,10 @@ vi.mock('../utils/api', () => ({
   apiUrl: (path) => `http://localhost${path}`,
 }))
 
+vi.mock('../context/ModalContext', () => ({
+  useConfirm: () => vi.fn().mockResolvedValue(true),
+}))
+
 const renderWithProviders = (ui, { session = null } = {}) => {
   return render(
     <MemoryRouter>

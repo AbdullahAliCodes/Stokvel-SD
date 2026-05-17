@@ -40,6 +40,12 @@ vi.mock("../utils/viewCache", () => ({
   writeViewCache: (...args) => writeViewCacheMock(...args),
 }));
 
+const confirmMock = vi.fn().mockResolvedValue(true);
+
+vi.mock("../context/ModalContext", () => ({
+  useConfirm: () => confirmMock,
+}));
+
 vi.mock("../components/meetings/MeetingCalendar", () => ({
   default: ({ meetings, selectedDateKey, onSelectDay }) => (
     <div data-testid="meeting-calendar">
@@ -160,7 +166,8 @@ describe("Meetings page", () => {
     };
     readViewCacheMock.mockReset();
     writeViewCacheMock.mockReset();
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+    confirmMock.mockReset();
+    confirmMock.mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -193,7 +200,7 @@ describe("Meetings page", () => {
 
     renderMeetings();
 
-    expect(screen.getByText("Loading meetings…")).toBeInTheDocument();
+    expect(document.querySelector(".animate-pulse")).toBeInTheDocument();
   });
 
   it("shows hard error fallback when detail load fails and no stokvel is available", async () => {
@@ -398,7 +405,7 @@ describe("Meetings page", () => {
   });
 
   it("does not call patch when edit confirmation is rejected", async () => {
-    vi.mocked(window.confirm).mockReturnValue(false);
+    confirmMock.mockResolvedValueOnce(false);
     readViewCacheMock.mockReturnValue(null);
     setupFetchHandlers({
       detail: makeResponse({ json: baseDetail }),

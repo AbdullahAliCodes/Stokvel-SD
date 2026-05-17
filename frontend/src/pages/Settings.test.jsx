@@ -43,7 +43,7 @@ describe("Settings", () => {
     );
 
     render(<Settings />);
-    expect(screen.getByText("Loading group settings…")).toBeInTheDocument();
+    expect(document.querySelector(".animate-pulse")).toBeInTheDocument();
   });
 
   it("loads and renders settings form with API values", async () => {
@@ -99,7 +99,7 @@ describe("Settings", () => {
     sessionState.current = { session: null };
     routeState.params = { stokvel_id: "stok-1" };
     render(<Settings />);
-    expect(screen.getByText("Loading group settings…")).toBeInTheDocument();
+    expect(document.querySelector(".animate-pulse")).toBeInTheDocument();
     expect(global.fetch).not.toHaveBeenCalled();
   });
 

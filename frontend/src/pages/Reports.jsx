@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
-import { Loader2 } from "lucide-react";
 import { useSession } from "../context/SessionContext";
+import SkeletonPage from "../components/ui/SkeletonPage";
 import { apiUrl } from "../utils/api";
 import { cardLight, errorBox } from "../ui";
 import { readViewCache, writeViewCache } from "../utils/viewCache";
@@ -209,11 +209,7 @@ export default function Reports() {
 
       {error ? <p className={`mb-6 ${errorBox}`}>{error}</p> : null}
 
-      {session && loading ? (
-        <div className="flex justify-center p-8">
-          <Loader2 className="h-8 w-8 animate-spin text-green-600" />
-        </div>
-      ) : null}
+      {session && loading ? <SkeletonPage /> : null}
 
       {session && !loading && membership ? (
         <>
@@ -229,6 +225,12 @@ export default function Reports() {
               contributions={contributions}
               missedPayments={missedPayments}
               ledgerMonths={ledgerMonths}
+              refMonth={refMonth}
+              paymentWindow={{
+                payment_window_start_day:
+                  effectiveStokvel?.payment_window_start_day,
+                payment_window_end_day: effectiveStokvel?.payment_window_end_day,
+              }}
             />
           </div>
 
