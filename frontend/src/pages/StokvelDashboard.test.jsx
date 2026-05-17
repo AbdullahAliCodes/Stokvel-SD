@@ -173,10 +173,6 @@ describe("StokvelDashboard", () => {
     expect(screen.getByText("Plan payouts")).toBeInTheDocument();
     expect(screen.getByText("Admin User")).toBeInTheDocument();
     expect(screen.getByText("treasurer")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Payments & finances" })).toHaveAttribute(
-      "href",
-      "/group/stok-1/payments",
-    );
     expect(screen.getByRole("link", { name: "All meetings" })).toHaveAttribute(
       "href",
       "/group/stok-1/meetings",

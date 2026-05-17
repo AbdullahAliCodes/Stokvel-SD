@@ -17,6 +17,7 @@ import {
   isPaidAtInWindowForTargetMonth,
   zonedYmdParts,
 } from "../utils/dates.js";
+import { buildPayoutReport } from "../utils/payoutReport.js";
 
 const router = Router();
 
@@ -500,6 +501,109 @@ router.get("/:id/payouts", requireAuth, async (req, res) => {
   } catch (err) {
     console.error("GET /api/stokvels/:id/payouts:", err);
     sendSupabaseFailure(res, err, "GET /api/stokvels/:id/payouts");
+  }
+});
+
+/** Member payout history and upcoming projections. */
+router.get("/:id/payout-report", requireAuth, async (req, res) => {
+  try {
+    const stokvelId = req.params.id;
+    if (!UUID_RE_STOKVEL_PARAM.test(String(stokvelId))) {
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    const userSupabase = userScopedSupabase(req);
+    const access = await resolveGroupAccess({ req, userSupabase, stokvelId });
+    if (access.error) {
+      if (access.error.message === "Not found") {
+        return res.status(404).json({ error: "Not found" });
+      }
+      console.error("GET /api/stokvels/:id/payout-report membership:", access.error);
+      return res.status(500).json({ error: access.error.message });
+    }
+
+    const { data: stokvel, error: stokvelError } = await access.reader
+      .from("stokvels")
+      .select("id, name, contribution_amount, status, type, cycle_length")
+      .eq("id", stokvelId)
+      .single();
+
+    if (stokvelError) {
+      console.error("GET /api/stokvels/:id/payout-report stokvel:", stokvelError);
+      if (stokvelError.code === "PGRST116") {
+        return res.status(404).json({ error: "Not found" });
+      }
+      return res.status(500).json({ error: stokvelError.message });
+    }
+
+    const { data: members, error: membersError } = await fetchStokvelMembers(
+      access.reader,
+      stokvelId,
+    );
+    if (membersError) {
+      console.error("GET /api/stokvels/:id/payout-report members:", membersError);
+      return res.status(500).json({ error: membersError.message });
+    }
+
+    const svc = getServiceSupabase();
+    if (!svc) {
+      return res.status(500).json({
+        error:
+          "Server configuration error: cannot load payout report without service role access.",
+      });
+    }
+
+    const { data: payoutRows, error: payoutErr } = await svc
+      .from("payouts")
+      .select(
+        "id, stokvel_id, user_id, target_month, scheduled_payout_date, cycle_index, status, disbursed_at, created_at",
+      )
+      .eq("stokvel_id", stokvelId);
+
+    if (payoutErr) {
+      console.error("GET /api/stokvels/:id/payout-report payouts:", payoutErr);
+      return res.status(500).json({ error: payoutErr.message });
+    }
+
+    const userIds = [
+      ...new Set((payoutRows ?? []).map((p) => p.user_id).filter(Boolean)),
+    ];
+    let profileById = new Map();
+    if (userIds.length > 0) {
+      const { data: profiles, error: profileErr } = await svc
+        .from("profiles")
+        .select("id, first_name, last_name")
+        .in("id", userIds);
+      if (profileErr) {
+        console.error("GET /api/stokvels/:id/payout-report profiles:", profileErr);
+        return res.status(500).json({ error: profileErr.message });
+      }
+      profileById = toProfileMap(profiles);
+    }
+
+    const todayIso = todayIsoSast();
+    const report = buildPayoutReport({
+      stokvel,
+      payoutRows: payoutRows ?? [],
+      members: members ?? [],
+      profileById,
+      viewerUserId: req.user.id,
+      todayIso,
+    });
+
+    return res.json({
+      success: true,
+      stokvel: {
+        id: stokvel.id,
+        name: stokvel.name,
+        status: stokvel.status,
+      },
+      today: todayIso,
+      report,
+    });
+  } catch (err) {
+    console.error("GET /api/stokvels/:id/payout-report:", err);
+    return res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
