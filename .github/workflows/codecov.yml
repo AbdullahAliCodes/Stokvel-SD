@@ -9,10 +9,6 @@ on:
 jobs:
   backend-coverage:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -25,25 +21,26 @@ jobs:
           cache-dependency-path: backend/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: cd backend && npm ci
 
       - name: Run tests with coverage
-        run: npm test -- --coverage
+        run: cd backend && npm test -- --coverage
+
+      - name: Verify coverage file exists
+        if: always()
+        run: ls -la backend/coverage/lcov.info
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
+        if: always()
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: backend/coverage/lcov.info
+          files: ./backend/coverage/lcov.info
           flags: backend
           fail_ci_if_error: false
 
   frontend-coverage:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -56,13 +53,18 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: cd frontend && npm ci
 
       - name: Run tests with coverage
-        run: npm run test:coverage
+        run: cd frontend && npm run test:coverage
+
+      - name: Verify coverage file exists
+        if: always()
+        run: ls -la frontend/coverage/lcov.info
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
+        if: always()
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./frontend/coverage/lcov.info
