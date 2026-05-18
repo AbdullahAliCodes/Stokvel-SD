@@ -24,6 +24,16 @@ status:
     default:
       target: auto
       threshold: 1%
+    # Tell Codecov to track the frontend percentage separately
+    frontend:
+      target: auto
+      flags:
+        - frontend
+    # Tell Codecov to track the backend percentage separately
+    backend:
+      target: auto
+      flags:
+        - backend
   patch:
     default:
       target: auto
