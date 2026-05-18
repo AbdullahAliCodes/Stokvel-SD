@@ -1,12 +1,16 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals'
 
+let mockSupabaseInstance = {
+  auth: {
+    getUser: jest.fn(),
+  },
+  from: jest.fn(),
+}
+
 // ESM-safe module mock
 jest.unstable_mockModule('../utils/supabase.js', () => ({
-  supabase: {
-    auth: {
-      getUser: jest.fn(),
-    },
-    from: jest.fn(),
+  get supabase() {
+    return mockSupabaseInstance
   },
 }))
 
@@ -35,6 +39,10 @@ describe('requireAuth middleware', () => {
   let req, res, next
 
   beforeEach(() => {
+    mockSupabaseInstance = {
+      auth: { getUser: jest.fn() },
+      from: jest.fn(),
+    }
     req = { headers: {} }
     res = {
       status: jest.fn().mockReturnThis(),
@@ -57,6 +65,34 @@ describe('requireAuth middleware', () => {
     req.headers.authorization = 'InvalidToken'
     await requireAuth(req, res, next)
     expect(res.status).toHaveBeenCalledWith(401)
+  })
+
+  it('returns 401 when auth succeeds but user payload is missing', async () => {
+    req.headers.authorization = 'Bearer token'
+    supabase.auth.getUser.mockResolvedValue({ data: { user: null }, error: null })
+    await requireAuth(req, res, next)
+    expect(res.status).toHaveBeenCalledWith(401)
+    expect(res.json).toHaveBeenCalledWith({ error: 'Invalid token' })
+  })
+
+  it('returns 503 for certificate-related auth transport errors', async () => {
+    req.headers.authorization = 'Bearer token'
+    supabase.auth.getUser.mockResolvedValue({
+      data: null,
+      error: { message: 'certificate verify failed' },
+    })
+    await requireAuth(req, res, next)
+    expect(res.status).toHaveBeenCalledWith(503)
+  })
+
+  it('returns 503 for Supabase transport errors with network message', async () => {
+    req.headers.authorization = 'Bearer token'
+    supabase.auth.getUser.mockResolvedValue({
+      data: null,
+      error: { message: 'ECONNREFUSED connecting to auth' },
+    })
+    await requireAuth(req, res, next)
+    expect(res.status).toHaveBeenCalledWith(503)
   })
 
   it('returns 401 if Bearer token is empty', async () => {

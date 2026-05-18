@@ -401,13 +401,16 @@ describe('adminStokvels routes', () => {
       const handler = getHandler('post', '/stokvels')
       const client = createSupabaseMock()
       mockGetServiceSupabase.mockReturnValue(client)
+      const memberId = '22222222-2222-4222-8222-222222222222'
 
       client.__enqueue('stokvels.selectMaybeSingle', { data: null, error: null })
       client.__enqueue('stokvels.insertSingle', { data: { id: 's1', name: 'Group A' }, error: null })
       client.__enqueue('stokvel_members.insert', { error: null })
-      client.__enqueue('profiles.selectMany', { data: [{ id: 'u2', role: 'user' }], error: null })
+      client.__enqueue('profiles.selectMany', { data: [{ id: memberId, role: 'user' }], error: null })
       client.__enqueue('stokvel_members.insert', { error: null })
       mockEnsurePlatformAdminsInStokvel.mockResolvedValue({ error: null })
+      client.__enqueue('profiles.selectMaybeSingle', { data: { id: memberId, email: '' }, error: null })
+      client.__enqueue('profiles.updateEq', { error: null })
       client.__enqueue('profiles.selectMaybeSingle', { data: { email: 'member@test.com' }, error: null })
       client.__enqueue('stokvels.selectMaybeSingle', {
         data: { id: 's1', name: 'Group A', status: 'active' },
@@ -420,10 +423,17 @@ describe('adminStokvels routes', () => {
           contributionAmount: 100,
           type: 'Rotating',
           cycleLength: 6,
-          initialMemberIds: ['22222222-2222-4222-8222-222222222222'],
-          treasurerUserId: '22222222-2222-4222-8222-222222222222',
+          initialMemberIds: [memberId],
+          treasurerUserId: memberId,
           membersCount: 2,
-          memberDetails: [],
+          memberDetails: [
+            {
+              userId: memberId,
+              email: 'member@test.com',
+              name: 'Member',
+              role: 'member',
+            },
+          ],
           documents: [' doc1.pdf '],
         },
       })

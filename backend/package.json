@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node --use-system-ca src/index.js",
     "dev": "node --use-system-ca --watch-path=src src/index.js",
-    "test": "node --use-system-ca --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand"
+    "test": "node --use-system-ca --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
+    "coverage": "node --use-system-ca --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand --coverage"
   },
   "keywords": [],
   "author": "",

@@ -172,6 +172,17 @@ describe('Profile Router', () => {
       expect(res.body).toEqual({ error: 'That username is already taken.' })
     })
 
+    it('inserts username when profile row does not exist', async () => {
+      mockClient._state.maybeSingleQueue.push({ data: null, error: null })
+      mockClient._state.maybeSingleQueue.push({ data: null, error: null })
+
+      const res = await request(app).post('/api/profile/username').send({ username: 'new_user' })
+
+      expect(res.status).toBe(200)
+      expect(res.body).toEqual({ success: true, username: 'new_user' })
+      expect(mockClient._chain.insert).toHaveBeenCalled()
+    })
+
     it('saves username for existing profile', async () => {
       // 1) taken check => not taken
       // 2) existing profile lookup => exists
@@ -230,6 +241,75 @@ describe('Profile Router', () => {
 
       expect(res.status).toBe(500)
       expect(res.body).toEqual({ error: 'profiles update failed' })
+    })
+
+    it('returns 400 for invalid email', async () => {
+      const res = await request(app).patch('/api/profile/me').send({ email: 'not-an-email' })
+      expect(res.status).toBe(400)
+      expect(res.body.error).toMatch(/valid email/i)
+    })
+
+    it('inserts profile when user row does not exist yet', async () => {
+      mockClient._state.maybeSingleQueue.push({ data: null, error: null })
+      mockClient._state.singleQueue.push({
+        data: { first_name: 'New', last_name: 'User', username: null, email: 'new@x.com' },
+        error: null,
+      })
+
+      const res = await request(app)
+        .patch('/api/profile/me')
+        .send({ firstName: 'New', lastName: 'User', email: 'new@x.com' })
+
+      expect(res.status).toBe(200)
+      expect(res.body.success).toBe(true)
+      expect(mockClient._chain.insert).toHaveBeenCalled()
+    })
+
+    it('returns success without profile payload when post-update read fails', async () => {
+      mockClient._state.maybeSingleQueue.push({ data: { id: 'test-user-id' }, error: null })
+      mockClient._state.singleQueue.push({ data: null, error: { message: 'read failed' } })
+
+      const res = await request(app).patch('/api/profile/me').send({ firstName: 'Only' })
+      expect(res.status).toBe(200)
+      expect(res.body).toEqual({ success: true })
+    })
+
+    it('clears username when null is sent', async () => {
+      mockClient._state.maybeSingleQueue.push({ data: { id: 'test-user-id' }, error: null })
+      mockClient._state.singleQueue.push({
+        data: { first_name: '', last_name: '', username: null, email: '' },
+        error: null,
+      })
+
+      const res = await request(app).patch('/api/profile/me').send({ username: null })
+      expect(res.status).toBe(200)
+      expect(res.body.success).toBe(true)
+    })
+  })
+
+  describe('GET /api/profile/me client unavailable', () => {
+    it('returns 503 when no supabase client can be created', async () => {
+      getServiceSupabase.mockReturnValue(null)
+      createUserJwtSupabase.mockReturnValue(null)
+
+      const res = await request(app).get('/api/profile/me')
+      expect(res.status).toBe(503)
+    })
+  })
+
+  describe('GET /api/profile/username-available success path', () => {
+    it('returns available true when username is free', async () => {
+      mockClient._state.maybeSingleQueue.push({ data: null, error: null })
+      const res = await request(app).get('/api/profile/username-available?username=free_name')
+      expect(res.status).toBe(200)
+      expect(res.body).toEqual({ available: true })
+    })
+
+    it('returns 500 when username lookup fails', async () => {
+      mockClient._state.maybeSingleQueue.push({ data: null, error: { message: 'lookup failed' } })
+      const res = await request(app).get('/api/profile/username-available?u=john')
+      expect(res.status).toBe(500)
+      expect(res.body.error).toBe('lookup failed')
     })
   })
 })

@@ -205,6 +205,16 @@ beforeEach(() => {
 })
 
 describe('stokvels routes', () => {
+  it('GET / returns 500 when membership query fails', async () => {
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    client.__push('stokvel_members.selectMany', { data: null, error: { message: 'membership list failed' } })
+
+    const res = await request(makeApp()).get('/api/stokvels/')
+    expect(res.status).toBe(500)
+    expect(res.body.error).toBe('membership list failed')
+  })
+
   it('GET / returns memberships list', async () => {
     const client = createSupabaseMock()
     mockCreateClient.mockReturnValue(client)
@@ -572,6 +582,38 @@ describe('stokvels routes', () => {
     expect(res.body).toEqual({ error: 'Only admin or treasurer can record minutes.' })
   })
 
+  it('PATCH /:id/meetings/:meetingId/minutes returns 404 when meeting missing', async () => {
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'admin' }, error: null })
+    client.__push('meetings.updateSelectMaybeSingle', { data: null, error: null })
+
+    const res = await request(makeApp())
+      .patch('/api/stokvels/s1/meetings/m1/minutes')
+      .send({ minutes: 'Notes' })
+
+    expect(res.status).toBe(404)
+    expect(res.body.error).toMatch(/Meeting not found/i)
+  })
+
+  it('PATCH /:id/meetings/:meetingId/minutes saves minutes for treasurer', async () => {
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'treasurer' }, error: null })
+    client.__push('meetings.updateSelectMaybeSingle', {
+      data: { id: 'm1', stokvel_id: 's1', minutes: 'Recorded notes' },
+      error: null,
+    })
+
+    const res = await request(makeApp())
+      .patch('/api/stokvels/s1/meetings/m1/minutes')
+      .send({ minutes: 'Recorded notes' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+    expect(res.body.meeting.minutes).toBe('Recorded notes')
+  })
+
   it('DELETE /:id/meetings/:meetingId deletes meeting when authorized', async () => {
     const client = createSupabaseMock()
     mockCreateClient.mockReturnValue(client)
@@ -656,6 +698,86 @@ describe('stokvels routes', () => {
 
     expect(res.status).toBe(500)
     expect(res.body).toEqual({ error: 'DB Timeout' })
+  })
+
+  it('PATCH /:id returns 403 when requester is not admin', async () => {
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'member' }, error: null })
+
+    const res = await request(makeApp()).patch(`/api/stokvels/${sid}`).send({ name: 'New Name' })
+
+    expect(res.status).toBe(403)
+    expect(res.body).toEqual({ error: 'Forbidden' })
+  })
+
+  it('PATCH /:id returns 400 when no valid fields provided', async () => {
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'admin' }, error: null })
+
+    const res = await request(makeApp()).patch(`/api/stokvels/${sid}`).send({ unknown: true })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/No valid fields/i)
+  })
+
+  it('PATCH /:id updates stokvel settings for admin', async () => {
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'admin' }, error: null })
+    client.__push('stokvels.updateSelectMaybeSingle', {
+      data: {
+        id: sid,
+        name: 'Renamed',
+        contribution_amount: 250,
+        meeting_frequency: 'monthly',
+        is_public: true,
+      },
+      error: null,
+    })
+
+    const res = await request(makeApp()).patch(`/api/stokvels/${sid}`).send({
+      name: 'Renamed',
+      contribution_amount: 250,
+      meeting_frequency: 'monthly',
+      is_public: true,
+    })
+
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+    expect(res.body.stokvel.name).toBe('Renamed')
+  })
+
+  it('PATCH /:id returns 400 for invalid meeting_frequency', async () => {
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'admin' }, error: null })
+
+    const res = await request(makeApp())
+      .patch(`/api/stokvels/${sid}`)
+      .send({ meeting_frequency: 'daily' })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/meeting_frequency/i)
+  })
+
+  it('PATCH /:id returns 400 when is_public is not boolean', async () => {
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'admin' }, error: null })
+
+    const res = await request(makeApp())
+      .patch(`/api/stokvels/${sid}`)
+      .send({ is_public: 'yes' })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/is_public must be a boolean/i)
   })
 
   it('POST /:id/contributions returns 400 for invalid amount', async () => {
@@ -1021,6 +1143,160 @@ describe('stokvels routes', () => {
     expect(res.body.payouts[0].status).toBe('pending')
   })
 
+  it('POST /:id/payouts/:payoutId/disburse returns 400 for invalid payout id', async () => {
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'treasurer' }, error: null })
+
+    const res = await request(makeApp()).post(`/api/stokvels/${sid}/payouts/not-a-uuid/disburse`)
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/Invalid payout id/i)
+  })
+
+  it('POST /:id/payouts/:payoutId/disburse returns 403 for non-treasurer', async () => {
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const pid = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'admin' }, error: null })
+
+    const res = await request(makeApp()).post(`/api/stokvels/${sid}/payouts/${pid}/disburse`)
+    expect(res.status).toBe(403)
+    expect(res.body.error).toMatch(/Only treasurers/i)
+  })
+
+  it('POST /:id/payouts/:payoutId/disburse returns 503 without service client', async () => {
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const pid = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'treasurer' }, error: null })
+    mockGetServiceSupabase.mockReturnValue(null)
+
+    const res = await request(makeApp()).post(`/api/stokvels/${sid}/payouts/${pid}/disburse`)
+    expect(res.status).toBe(503)
+  })
+
+  it('POST /:id/payouts/:payoutId/disburse returns 409 when payout already completed', async () => {
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const pid = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+    const userClient = createSupabaseMock()
+    mockCreateClient.mockReturnValue(userClient)
+    userClient.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'treasurer' }, error: null })
+
+    const svc = createSupabaseMock()
+    mockGetServiceSupabase.mockReturnValue(svc)
+    svc.__push('payouts.selectMaybeSingle', {
+      data: {
+        id: pid,
+        stokvel_id: sid,
+        status: 'completed',
+        disbursed_at: '2026-01-01T00:00:00.000Z',
+        scheduled_payout_date: '2026-01-01',
+      },
+      error: null,
+    })
+
+    const res = await request(makeApp()).post(`/api/stokvels/${sid}/payouts/${pid}/disburse`)
+    expect(res.status).toBe(409)
+  })
+
+  it('POST /:id/payouts/:payoutId/disburse returns 404 when payout is missing', async () => {
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const pid = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+    const userClient = createSupabaseMock()
+    mockCreateClient.mockReturnValue(userClient)
+    userClient.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'treasurer' }, error: null })
+
+    const svc = createSupabaseMock()
+    mockGetServiceSupabase.mockReturnValue(svc)
+    svc.__push('payouts.selectMaybeSingle', { data: null, error: null })
+
+    const res = await request(makeApp()).post(`/api/stokvels/${sid}/payouts/${pid}/disburse`)
+    expect(res.status).toBe(404)
+    expect(res.body.error).toMatch(/Payout not found/i)
+  })
+
+  it('POST /:id/payouts/:payoutId/disburse returns 400 when payout date is missing', async () => {
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const pid = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+    const userClient = createSupabaseMock()
+    mockCreateClient.mockReturnValue(userClient)
+    userClient.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'treasurer' }, error: null })
+
+    const svc = createSupabaseMock()
+    mockGetServiceSupabase.mockReturnValue(svc)
+    svc.__push('payouts.selectMaybeSingle', {
+      data: {
+        id: pid,
+        stokvel_id: sid,
+        status: 'pending',
+        disbursed_at: null,
+        scheduled_payout_date: null,
+      },
+      error: null,
+    })
+
+    const res = await request(makeApp()).post(`/api/stokvels/${sid}/payouts/${pid}/disburse`)
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/Payout date is missing/i)
+  })
+
+  it('POST /:id/payouts/:payoutId/disburse returns 400 when payout date not reached', async () => {
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const pid = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+    const userClient = createSupabaseMock()
+    mockCreateClient.mockReturnValue(userClient)
+    userClient.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'treasurer' }, error: null })
+
+    const svc = createSupabaseMock()
+    mockGetServiceSupabase.mockReturnValue(svc)
+    svc.__push('payouts.selectMaybeSingle', {
+      data: {
+        id: pid,
+        stokvel_id: sid,
+        status: 'pending',
+        disbursed_at: null,
+        scheduled_payout_date: '2099-12-01',
+      },
+      error: null,
+    })
+
+    const res = await request(makeApp()).post(`/api/stokvels/${sid}/payouts/${pid}/disburse`)
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/not been reached/i)
+  })
+
+  it('POST /:id/payouts/:payoutId/disburse returns 500 when update fails', async () => {
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const pid = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+    const userClient = createSupabaseMock()
+    mockCreateClient.mockReturnValue(userClient)
+    userClient.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'treasurer' }, error: null })
+
+    const svc = createSupabaseMock()
+    mockGetServiceSupabase.mockReturnValue(svc)
+    svc.__push('payouts.selectMaybeSingle', {
+      data: {
+        id: pid,
+        stokvel_id: sid,
+        status: 'pending',
+        disbursed_at: null,
+        scheduled_payout_date: '2020-01-01',
+      },
+      error: null,
+    })
+    svc.__push('payouts.updateSelectMaybeSingle', {
+      data: null,
+      error: { message: 'disburse update failed' },
+    })
+
+    const res = await request(makeApp()).post(`/api/stokvels/${sid}/payouts/${pid}/disburse`)
+    expect(res.status).toBe(500)
+    expect(res.body.error).toBe('disburse update failed')
+  })
+
   it('POST /:id/payouts/:payoutId/disburse marks due pending payout as completed for treasurer', async () => {
     const client = createSupabaseMock()
     mockCreateClient.mockReturnValue(client)
@@ -1057,5 +1333,265 @@ describe('stokvels routes', () => {
     expect(res.status).toBe(200)
     expect(res.body.success).toBe(true)
     expect(res.body.payout.status).toBe('completed')
+  })
+
+  it('PATCH /:id/payout-order returns 404 for invalid stokvel id', async () => {
+    const res = await request(makeApp())
+      .patch('/api/stokvels/not-a-uuid/payout-order')
+      .send({ orderedUpcomingPayoutIds: ['p1'] })
+    expect(res.status).toBe(404)
+  })
+
+  it('PATCH /:id/payout-order returns 400 when orderedUpcomingPayoutIds is missing', async () => {
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'treasurer' }, error: null })
+
+    const res = await request(makeApp())
+      .patch(`/api/stokvels/${sid}/payout-order`)
+      .send({})
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/orderedUpcomingPayoutIds/i)
+  })
+
+  it('PATCH /:id/payout-order returns 403 for members', async () => {
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'member' }, error: null })
+
+    const res = await request(makeApp())
+      .patch(`/api/stokvels/${sid}/payout-order`)
+      .send({ orderedUpcomingPayoutIds: ['a', 'b'] })
+
+    expect(res.status).toBe(403)
+  })
+
+  it('PATCH /:id/payout-order returns 503 without service role client', async () => {
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'admin' }, error: null })
+    mockGetServiceSupabase.mockReturnValue(null)
+
+    const res = await request(makeApp())
+      .patch(`/api/stokvels/${sid}/payout-order`)
+      .send({ orderedUpcomingPayoutIds: ['p1', 'p2'] })
+
+    expect(res.status).toBe(503)
+  })
+
+  it('PATCH /:id/payout-order reorders upcoming payouts successfully', async () => {
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const p1 = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+    const p2 = 'cccccccc-cccc-cccc-cccc-cccccccccccc'
+
+    const userClient = createSupabaseMock()
+    mockCreateClient.mockReturnValue(userClient)
+    userClient.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'treasurer' }, error: null })
+
+    const svc = createSupabaseMock()
+    mockGetServiceSupabase.mockReturnValue(svc)
+
+    const initialPayouts = [
+      {
+        id: p1,
+        stokvel_id: sid,
+        user_id: 'user-a',
+        target_month: '2099-06',
+        scheduled_payout_date: '2099-06-15',
+        cycle_index: 0,
+      },
+      {
+        id: p2,
+        stokvel_id: sid,
+        user_id: 'user-b',
+        target_month: '2099-07',
+        scheduled_payout_date: '2099-07-15',
+        cycle_index: 1,
+      },
+    ]
+
+    svc.__push('payouts.selectMany', { data: initialPayouts, error: null })
+    svc.__push('payouts.updateEq', { error: null })
+    svc.__push('payouts.updateEq', { error: null })
+    svc.__push('payouts.selectMany', {
+      data: [
+        { ...initialPayouts[1], user_id: 'user-a' },
+        { ...initialPayouts[0], user_id: 'user-b' },
+      ],
+      error: null,
+    })
+
+    const res = await request(makeApp())
+      .patch(`/api/stokvels/${sid}/payout-order`)
+      .send({ orderedUpcomingPayoutIds: [p2, p1] })
+
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+    expect(Array.isArray(res.body.payouts)).toBe(true)
+  })
+
+  it('PATCH /:id/payout-order returns 400 when ordered id is not an upcoming payout', async () => {
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const p1 = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+    const p2 = 'cccccccc-cccc-cccc-cccc-cccccccccccc'
+    const foreign = 'dddddddd-dddd-dddd-dddd-dddddddddddd'
+    const userClient = createSupabaseMock()
+    mockCreateClient.mockReturnValue(userClient)
+    userClient.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'treasurer' }, error: null })
+
+    const svc = createSupabaseMock()
+    mockGetServiceSupabase.mockReturnValue(svc)
+    svc.__push('payouts.selectMany', {
+      data: [
+        { id: p1, stokvel_id: sid, user_id: 'u1', scheduled_payout_date: '2099-06-15', cycle_index: 0 },
+        { id: p2, stokvel_id: sid, user_id: 'u2', scheduled_payout_date: '2099-07-15', cycle_index: 1 },
+      ],
+      error: null,
+    })
+
+    const res = await request(makeApp())
+      .patch(`/api/stokvels/${sid}/payout-order`)
+      .send({ orderedUpcomingPayoutIds: [foreign, p2] })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/not upcoming/i)
+  })
+
+  it('PATCH /:id returns 404 when update returns no row', async () => {
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'admin' }, error: null })
+    client.__push('stokvels.updateSelectMaybeSingle', { data: null, error: null })
+
+    const res = await request(makeApp()).patch(`/api/stokvels/${sid}`).send({ name: 'Missing row' })
+    expect(res.status).toBe(404)
+  })
+
+  it('PATCH /:id/payout-order returns 400 when only one upcoming payout exists', async () => {
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const p1 = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+    const userClient = createSupabaseMock()
+    mockCreateClient.mockReturnValue(userClient)
+    userClient.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'admin' }, error: null })
+
+    const svc = createSupabaseMock()
+    mockGetServiceSupabase.mockReturnValue(svc)
+    svc.__push('payouts.selectMany', {
+      data: [
+        {
+          id: p1,
+          stokvel_id: sid,
+          user_id: 'u1',
+          scheduled_payout_date: '2099-06-15',
+          cycle_index: 0,
+        },
+      ],
+      error: null,
+    })
+
+    const res = await request(makeApp())
+      .patch(`/api/stokvels/${sid}/payout-order`)
+      .send({ orderedUpcomingPayoutIds: [p1] })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/not enough upcoming payouts/i)
+  })
+
+  it('PATCH /:id/payout-order returns 500 when payout list query fails', async () => {
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const userClient = createSupabaseMock()
+    mockCreateClient.mockReturnValue(userClient)
+    userClient.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'admin' }, error: null })
+
+    const svc = createSupabaseMock()
+    mockGetServiceSupabase.mockReturnValue(svc)
+    svc.__push('payouts.selectMany', { data: null, error: { message: 'list failed' } })
+
+    const res = await request(makeApp())
+      .patch(`/api/stokvels/${sid}/payout-order`)
+      .send({ orderedUpcomingPayoutIds: ['p1', 'p2'] })
+
+    expect(res.status).toBe(500)
+    expect(res.body.error).toBe('list failed')
+  })
+
+  it('PATCH /:id/payout-order returns 400 when ordered ids count mismatches upcoming', async () => {
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const p1 = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+    const p2 = 'cccccccc-cccc-cccc-cccc-cccccccccccc'
+    const userClient = createSupabaseMock()
+    mockCreateClient.mockReturnValue(userClient)
+    userClient.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'admin' }, error: null })
+
+    const svc = createSupabaseMock()
+    mockGetServiceSupabase.mockReturnValue(svc)
+    svc.__push('payouts.selectMany', {
+      data: [
+        { id: p1, stokvel_id: sid, user_id: 'u1', scheduled_payout_date: '2099-06-15', cycle_index: 0 },
+        { id: p2, stokvel_id: sid, user_id: 'u2', scheduled_payout_date: '2099-07-15', cycle_index: 1 },
+      ],
+      error: null,
+    })
+
+    const res = await request(makeApp())
+      .patch(`/api/stokvels/${sid}/payout-order`)
+      .send({ orderedUpcomingPayoutIds: [p1] })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/each upcoming payout exactly once/i)
+  })
+
+  it('PATCH /:id/payout-order returns 400 when ordered ids contain duplicates', async () => {
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const p1 = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+    const p2 = 'cccccccc-cccc-cccc-cccc-cccccccccccc'
+    const userClient = createSupabaseMock()
+    mockCreateClient.mockReturnValue(userClient)
+    userClient.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'treasurer' }, error: null })
+
+    const svc = createSupabaseMock()
+    mockGetServiceSupabase.mockReturnValue(svc)
+    svc.__push('payouts.selectMany', {
+      data: [
+        { id: p1, stokvel_id: sid, user_id: 'u1', scheduled_payout_date: '2099-06-15', cycle_index: 0 },
+        { id: p2, stokvel_id: sid, user_id: 'u2', scheduled_payout_date: '2099-07-15', cycle_index: 1 },
+      ],
+      error: null,
+    })
+
+    const res = await request(makeApp())
+      .patch(`/api/stokvels/${sid}/payout-order`)
+      .send({ orderedUpcomingPayoutIds: [p1, p1] })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/duplicates/i)
+  })
+
+  it('PATCH /:id/meetings/:meetingId updates meeting when authorized', async () => {
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'treasurer' }, error: null })
+    client.__push('meetings.updateSelectMaybeSingle', {
+      data: {
+        id: 'm1',
+        stokvel_id: 's1',
+        title: 'Updated title',
+        meeting_date: '2026-08-01T10:00:00.000Z',
+      },
+      error: null,
+    })
+
+    const res = await request(makeApp())
+      .patch('/api/stokvels/s1/meetings/m1')
+      .send({ title: 'Updated title', meetingDate: '2026-08-01T10:00:00.000Z' })
+
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+    expect(res.body.meeting.title).toBe('Updated title')
   })
 })
