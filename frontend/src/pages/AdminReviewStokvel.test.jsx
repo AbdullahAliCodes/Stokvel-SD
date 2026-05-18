@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import AdminReviewStokvel from './AdminReviewStokvel'
 import { SessionContext } from '../context/SessionContext'
@@ -31,11 +31,29 @@ const renderWithProviders = (ui, { session = null } = {}) => {
 
 describe('AdminReviewStokvel', () => {
   const mockFetch = vi.fn()
-  global.fetch = mockFetch
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mockFetch.mockReset()
+    vi.stubGlobal('fetch', mockFetch)
   })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  /** Queue fetch responses in call order (avoids mockResolvedValueOnce races in full suite). */
+  function queueFetchResponses(...responses) {
+    const queue = [...responses]
+    mockFetch.mockImplementation(async () => {
+      const next = queue.shift()
+      if (!next) {
+        throw new Error(`Unexpected fetch (remaining queue: ${queue.length})`)
+      }
+      if (next instanceof Error) throw next
+      return next
+    })
+  }
 
   const mockStokvelFull = {
     name: 'New Application',
@@ -141,90 +159,79 @@ describe('AdminReviewStokvel', () => {
   })
 
   it('handles approve action successfully and navigates', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      text: async () => JSON.stringify({ stokvel: mockStokvelFull }),
-    })
+    queueFetchResponses(
+      { ok: true, text: async () => JSON.stringify({ stokvel: mockStokvelFull }) },
+      { ok: true, text: async () => JSON.stringify({ success: true }) },
+    )
     renderWithProviders(<AdminReviewStokvel />, { session: { access_token: 'fake-token' } })
-    
-    const approveBtn = await screen.findByRole('button', { name: 'Approve' })
-    
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      text: async () => JSON.stringify({ success: true }),
-    })
 
+    const approveBtn = await screen.findByRole('button', { name: 'Approve' })
     fireEvent.click(approveBtn)
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledTimes(2)
-      expect(mockFetch).toHaveBeenLastCalledWith('http://localhost/api/admin/stokvels/123', expect.objectContaining({
-        method: 'PATCH',
-        body: JSON.stringify({ status: 'active' })
-      }))
+      expect(mockFetch).toHaveBeenLastCalledWith(
+        'http://localhost/api/admin/stokvels/123',
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'active' }),
+        }),
+      )
       expect(mockNavigate).toHaveBeenCalledWith('/admin/groups', { replace: true })
     })
   })
 
   it('handles approve error gracefully', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      text: async () => JSON.stringify({ stokvel: mockStokvelFull }),
-    })
+    queueFetchResponses(
+      { ok: true, text: async () => JSON.stringify({ stokvel: mockStokvelFull }) },
+      { ok: false, text: async () => JSON.stringify({ error: 'Approve failure' }) },
+    )
     renderWithProviders(<AdminReviewStokvel />, { session: { access_token: 'fake-token' } })
-    
-    const approveBtn = await screen.findByRole('button', { name: 'Approve' })
-    
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      text: async () => JSON.stringify({ error: 'Approve failure' }),
-    })
 
+    const approveBtn = await screen.findByRole('button', { name: 'Approve' })
     fireEvent.click(approveBtn)
 
-    expect(await screen.findByText('Approve failure')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Approve failure')
+    })
   })
 
   it('handles reject action successfully and navigates', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      text: async () => JSON.stringify({ stokvel: mockStokvelFull }),
-    })
+    queueFetchResponses(
+      { ok: true, text: async () => JSON.stringify({ stokvel: mockStokvelFull }) },
+      { ok: true, text: async () => JSON.stringify({ success: true }) },
+    )
     renderWithProviders(<AdminReviewStokvel />, { session: { access_token: 'fake-token' } })
-    
-    const rejectBtn = await screen.findByRole('button', { name: 'Reject' })
-    
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      text: async () => JSON.stringify({ success: true }),
-    })
 
+    const rejectBtn = await screen.findByRole('button', { name: 'Reject' })
     fireEvent.click(rejectBtn)
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledTimes(2)
-      expect(mockFetch).toHaveBeenLastCalledWith('http://localhost/api/admin/stokvels/123', expect.objectContaining({
-        method: 'PATCH',
-        body: JSON.stringify({ status: 'rejected' })
-      }))
+      expect(mockFetch).toHaveBeenLastCalledWith(
+        'http://localhost/api/admin/stokvels/123',
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'rejected' }),
+        }),
+      )
       expect(mockNavigate).toHaveBeenCalledWith('/admin/groups', { replace: true })
     })
   })
 
   it('handles reject error gracefully', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      text: async () => JSON.stringify({ stokvel: mockStokvelFull }),
-    })
+    queueFetchResponses(
+      { ok: true, text: async () => JSON.stringify({ stokvel: mockStokvelFull }) },
+      new Error('Reject network fail'),
+    )
     renderWithProviders(<AdminReviewStokvel />, { session: { access_token: 'fake-token' } })
-    
-    const rejectBtn = await screen.findByRole('button', { name: 'Reject' })
-    
-    mockFetch.mockRejectedValueOnce(new Error('Reject network fail'))
 
+    const rejectBtn = await screen.findByRole('button', { name: 'Reject' })
     fireEvent.click(rejectBtn)
 
-    expect(await screen.findByText('Reject network fail')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Reject network fail')
+    })
   })
 
   it('aborts actions if session disappears', async () => {
