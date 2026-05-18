@@ -17,7 +17,10 @@ jest.unstable_mockModule('@supabase/supabase-js', () => ({
 }))
 
 jest.unstable_mockModule('../middleware/auth.js', () => ({
-  requireAuth: (req, _res, next) => {
+  requireAuth: (req, res, next) => {
+    if (req.headers?.['x-test-unauth'] === '1') {
+      return res.status(401).json({ error: 'Missing or malformed authorization header' })
+    }
     const roleHeader = req.headers?.['x-test-role']
     req.user = {
       id: '11111111-1111-4111-8111-111111111111',
@@ -1593,5 +1596,140 @@ describe('stokvels routes', () => {
     expect(res.status).toBe(200)
     expect(res.body.success).toBe(true)
     expect(res.body.meeting.title).toBe('Updated title')
+  })
+
+  describe('failure branches and auth', () => {
+    const sid = '11111111-1111-4111-8111-111111111111'
+    const memberId = '22222222-2222-4222-8222-222222222222'
+
+    it('returns 401 when authorization header is missing', async () => {
+      const res = await request(makeApp())
+        .get('/api/stokvels/')
+        .set('x-test-unauth', '1')
+
+      expect(res.status).toBe(401)
+      expect(res.body).toEqual({ error: 'Missing or malformed authorization header' })
+    })
+
+    it('GET /:id returns 500 when stokvel row query fails', async () => {
+      const client = createSupabaseMock()
+      mockCreateClient.mockReturnValue(client)
+      client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'member' }, error: null })
+      client.__push('stokvels.selectSingle', { data: null, error: { message: 'stokvel read failed' } })
+
+      const res = await request(makeApp()).get(`/api/stokvels/${sid}`)
+
+      expect(res.status).toBe(500)
+      expect(res.body.error).toBe('stokvel read failed')
+    })
+
+    it('GET /:id/meetings returns 500 when meetings query fails', async () => {
+      const client = createSupabaseMock()
+      mockCreateClient.mockReturnValue(client)
+      client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'member' }, error: null })
+      client.__push('meetings.selectMany', { data: null, error: { message: 'meetings query failed' } })
+
+      const res = await request(makeApp()).get(`/api/stokvels/${sid}/meetings`)
+
+      expect(res.status).toBe(500)
+      expect(res.body.error).toBe('meetings query failed')
+    })
+
+    it('POST /:id/missed-payments returns 503 without service role client', async () => {
+      const client = createSupabaseMock()
+      mockCreateClient.mockReturnValue(client)
+      mockGetServiceSupabase.mockReturnValue(null)
+      client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'admin' }, error: null })
+      client.__push('stokvel_members.selectMaybeSingle', {
+        data: { user_id: memberId },
+        error: null,
+      })
+
+      const res = await request(makeApp())
+        .post(`/api/stokvels/${sid}/missed-payments`)
+        .send({ user_id: memberId, target_month: '2026-03' })
+
+      expect(res.status).toBe(503)
+      expect(res.body.error).toMatch(/service role/i)
+    })
+
+    it('POST /:id/missed-payments returns 500 when insert fails', async () => {
+      const client = createSupabaseMock()
+      mockCreateClient.mockReturnValue(client)
+      mockGetServiceSupabase.mockReturnValue(client)
+      client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'treasurer' }, error: null })
+      client.__push('stokvel_members.selectMaybeSingle', { data: { user_id: memberId }, error: null })
+      client.__push('missed_payments.insertDirect', {
+        data: null,
+        error: { message: 'insert failed', code: 'XX000' },
+      })
+
+      const res = await request(makeApp())
+        .post(`/api/stokvels/${sid}/missed-payments`)
+        .send({ user_id: memberId, target_month: '2026-03' })
+
+      expect(res.status).toBe(500)
+      expect(res.body.error).toBe('insert failed')
+    })
+
+    it('POST /:id/missed-payments returns 500 when target member lookup fails', async () => {
+      const client = createSupabaseMock()
+      mockCreateClient.mockReturnValue(client)
+      mockGetServiceSupabase.mockReturnValue(client)
+      client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'admin' }, error: null })
+      client.__push('stokvel_members.selectMaybeSingle', {
+        data: null,
+        error: { message: 'member lookup failed' },
+      })
+
+      const res = await request(makeApp())
+        .post(`/api/stokvels/${sid}/missed-payments`)
+        .send({ user_id: memberId, target_month: '2026-03' })
+
+      expect(res.status).toBe(500)
+      expect(res.body.error).toBe('member lookup failed')
+    })
+
+    it('POST /:id/contributions returns 500 when membership lookup fails', async () => {
+      const client = createSupabaseMock()
+      mockCreateClient.mockReturnValue(client)
+      client.__push('stokvel_members.selectMaybeSingle', {
+        data: null,
+        error: { message: 'membership lookup failed' },
+      })
+
+      const res = await request(makeApp())
+        .post(`/api/stokvels/${sid}/contributions`)
+        .send({ amount: 100 })
+
+      expect(res.status).toBe(500)
+      expect(res.body.error).toBe('membership lookup failed')
+    })
+
+    it('POST /:id/contributions returns 500 when insert fails', async () => {
+      const client = createSupabaseMock()
+      mockCreateClient.mockReturnValue(client)
+      client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'member' }, error: null })
+      client.__push('contributions.insertSingle', {
+        data: null,
+        error: { message: 'contribution insert failed' },
+      })
+
+      const res = await request(makeApp())
+        .post(`/api/stokvels/${sid}/contributions`)
+        .send({ amount: 250 })
+
+      expect(res.status).toBe(500)
+      expect(res.body.error).toBe('contribution insert failed')
+    })
+
+    it('POST /:id/missed-payments returns 400 for invalid user_id', async () => {
+      const res = await request(makeApp())
+        .post(`/api/stokvels/${sid}/missed-payments`)
+        .send({ user_id: 'not-a-uuid', target_month: '2026-03' })
+
+      expect(res.status).toBe(400)
+      expect(res.body.error).toMatch(/Invalid user_id/i)
+    })
   })
 })

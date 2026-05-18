@@ -18,8 +18,10 @@ vi.mock('../utils/api', () => ({
   apiUrl: (path) => `http://localhost${path}`,
 }))
 
+const confirmMock = vi.hoisted(() => vi.fn().mockResolvedValue(true))
+
 vi.mock('../context/ModalContext', () => ({
-  useConfirm: () => vi.fn().mockResolvedValue(true),
+  useConfirm: () => confirmMock,
 }))
 
 const renderWithProviders = (ui, { session = null } = {}) => {
@@ -34,8 +36,6 @@ const renderWithProviders = (ui, { session = null } = {}) => {
 
 describe('CreateStokvelWizard', { timeout: 15000 }, () => {
   const mockFetch = vi.fn()
-  global.fetch = mockFetch
-  global.confirm = vi.fn()
 
   const defaultSessionAdmin = {
     access_token: 'fake-token',
@@ -44,13 +44,17 @@ describe('CreateStokvelWizard', { timeout: 15000 }, () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    global.confirm.mockReturnValue(true)
+    mockFetch.mockReset()
+    vi.stubGlobal('fetch', mockFetch)
+    vi.stubGlobal('confirm', vi.fn(() => true))
+    confirmMock.mockResolvedValue(true)
   })
 
   // Always restore real timers after each test so they don't bleed
   afterEach(() => {
     vi.useRealTimers()
     vi.clearAllMocks()
+    vi.unstubAllGlobals()
   })
 
   describe('Basic Rendering and Tabs', () => {
@@ -292,6 +296,115 @@ describe('CreateStokvelWizard', { timeout: 15000 }, () => {
       })
 
       expect(await screen.findByText('test.pdf')).toBeInTheDocument()
+    })
+  })
+
+  describe('Fixed stokvel UI toggles', () => {
+    it('hides payout order controls and shows maturity copy for Fixed type', async () => {
+      renderWithProviders(<CreateStokvelWizard variant="admin" />, { session: defaultSessionAdmin })
+
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText(/Type/i), { target: { value: 'Fixed' } })
+        fireEvent.click(screen.getByRole('button', { name: /Next/i }))
+      })
+
+      expect(screen.getByText(/bulk payout at maturity/i)).toBeInTheDocument()
+      expect(screen.queryByText(/^Payout order$/i)).not.toBeInTheDocument()
+      expect(screen.queryByLabelText(/Randomize at activation/i)).not.toBeInTheDocument()
+    })
+
+    it('shows payout order controls for Rotating type', async () => {
+      renderWithProviders(<CreateStokvelWizard variant="admin" />, { session: defaultSessionAdmin })
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Next/i }))
+      })
+
+      expect(screen.getByText(/^Payout order$/i)).toBeInTheDocument()
+      expect(screen.getByLabelText(/Randomize at activation/i)).toBeInTheDocument()
+    })
+  })
+
+  describe('Submit validation branches', () => {
+    it('shows error when payment window days are invalid on submit', async () => {
+      renderWithProviders(<CreateStokvelWizard variant="admin" />, { session: defaultSessionAdmin })
+
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText(/Group name/i), { target: { value: 'Fixed Pool' } })
+        fireEvent.change(screen.getByLabelText(/Contribution amount/i), { target: { value: '100' } })
+        fireEvent.change(screen.getByLabelText(/Type/i), { target: { value: 'Fixed' } })
+        fireEvent.change(screen.getByLabelText(/Payment window start day/i), {
+          target: { value: '40' },
+        })
+      })
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Next/i }))
+      })
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Next/i }))
+      })
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Create stokvel/i }))
+      })
+
+      expect(
+        await screen.findByText(/Payment window days must be whole numbers between 1 and 31/i),
+      ).toBeInTheDocument()
+      expect(confirmMock).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('Cancel and API failure paths', () => {
+    it('does not call the API when useConfirm resolves false', async () => {
+      confirmMock.mockResolvedValue(false)
+
+      renderWithProviders(<CreateStokvelWizard variant="admin" />, { session: defaultSessionAdmin })
+
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText(/Group name/i), { target: { value: 'My Group' } })
+        fireEvent.change(screen.getByLabelText(/Contribution amount/i), { target: { value: '100' } })
+      })
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Next/i }))
+      })
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Next/i }))
+      })
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Create stokvel/i }))
+      })
+
+      await waitFor(() => {
+        expect(confirmMock).toHaveBeenCalled()
+      })
+      expect(mockFetch).not.toHaveBeenCalled()
+    })
+
+    it('surfaces API failure in the error box on submit', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        text: async () => JSON.stringify({ error: 'Stokvel creation failed on server' }),
+      })
+
+      renderWithProviders(<CreateStokvelWizard variant="admin" />, { session: defaultSessionAdmin })
+
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText(/Group name/i), { target: { value: 'My Group' } })
+        fireEvent.change(screen.getByLabelText(/Contribution amount/i), { target: { value: '100' } })
+      })
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Next/i }))
+      })
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Next/i }))
+      })
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Create stokvel/i }))
+      })
+
+      expect(await screen.findByText(/Stokvel creation failed on server/i)).toBeInTheDocument()
+      expect(mockFetch).toHaveBeenCalledTimes(1)
     })
   })
 

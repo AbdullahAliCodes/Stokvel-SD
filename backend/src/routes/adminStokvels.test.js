@@ -919,6 +919,192 @@ describe('adminStokvels routes', () => {
     })
   })
 
+  describe('activation edge cases', () => {
+    it('POST /stokvels returns 400 when activateStokvel fails after create', async () => {
+      const handler = getHandler('post', '/stokvels')
+      const client = createSupabaseMock()
+      mockGetServiceSupabase.mockReturnValue(client)
+      mockActivateStokvel.mockResolvedValue({
+        ok: false,
+        error: 'Not enough paying members for cycle length',
+      })
+
+      client.__enqueue('stokvels.selectMaybeSingle', { data: null, error: null })
+      client.__enqueue('stokvels.insertSingle', { data: { id: 's1', name: 'Group A' }, error: null })
+      client.__enqueue('stokvel_members.insert', { error: null })
+      client.__enqueue('stokvel_members.deleteEq', { error: null })
+      client.__enqueue('stokvels.deleteEq', { error: null })
+
+      const req = makeReq({
+        body: {
+          name: 'Group A',
+          contributionAmount: 100,
+          type: 'Rotating',
+          cycleLength: 6,
+        },
+      })
+      const res = makeRes()
+
+      await handler(req, res)
+
+      expect(mockActivateStokvel).toHaveBeenCalled()
+      expect(res.status).toHaveBeenCalledWith(400)
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Not enough paying members for cycle length',
+      })
+    })
+
+    it('PATCH /stokvels/:stokvelId returns 500 when activating without service role', async () => {
+      const handler = getHandler('patch', '/stokvels/:stokvelId')
+      const client = createSupabaseMock()
+      mockGetServiceSupabase.mockReturnValue(null)
+      mockCreateClient.mockReturnValue(client)
+
+      client.__enqueue('stokvels.selectMaybeSingle', { data: { id: 's1' }, error: null })
+      client.__enqueue('stokvels.selectMaybeSingle', {
+        data: { id: 's1', name: 'Group A', status: 'pending' },
+        error: null,
+      })
+      client.__enqueue('invitations.selectMany', { data: [], error: null })
+      client.__enqueue('stokvels.updateSelect', {
+        data: [{ id: 's1', name: 'Group A', status: 'active' }],
+        error: null,
+      })
+
+      const req = makeReq({ params: { stokvelId: 's1' }, body: { status: 'active' } })
+      const res = makeRes()
+
+      await handler(req, res)
+
+      expect(res.status).toHaveBeenCalledWith(500)
+      expect(res.json.mock.calls[0][0].error).toMatch(/SUPABASE_SERVICE_ROLE_KEY/)
+    })
+
+    it('PATCH /stokvels/:stokvelId returns 400 when activateStokvel fails on approval', async () => {
+      const handler = getHandler('patch', '/stokvels/:stokvelId')
+      const client = createSupabaseMock()
+      mockGetServiceSupabase.mockReturnValue(client)
+      mockActivateStokvel.mockResolvedValue({
+        ok: false,
+        error: 'Activation failed (payout schedule or member roster).',
+      })
+
+      client.__enqueue('stokvels.selectMaybeSingle', { data: { id: 's1' }, error: null })
+      client.__enqueue('stokvels.selectMaybeSingle', {
+        data: { id: 's1', name: 'Group A', status: 'pending' },
+        error: null,
+      })
+      client.__enqueue('invitations.selectMany', { data: [], error: null })
+      client.__enqueue('stokvels.updateSelect', {
+        data: [{ id: 's1', name: 'Group A', status: 'active' }],
+        error: null,
+      })
+
+      const req = makeReq({ params: { stokvelId: 's1' }, body: { status: 'active' } })
+      const res = makeRes()
+
+      await handler(req, res)
+
+      expect(mockActivateStokvel).toHaveBeenCalledWith('s1', client)
+      expect(res.status).toHaveBeenCalledWith(400)
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'Activation failed (payout schedule or member roster).',
+      })
+    })
+  })
+
+  describe('POST /stokvels/:stokvelId/invitations failure branches', () => {
+    it('returns 404 when stokvel does not exist', async () => {
+      const handler = getHandler('post', '/stokvels/:stokvelId/invitations')
+      const client = createSupabaseMock()
+      mockGetServiceSupabase.mockReturnValue(client)
+      mockNormalizeInviteEmail.mockReturnValue('guest@site.com')
+
+      client.__enqueue('stokvels.selectMaybeSingle', { data: null, error: null })
+
+      const req = makeReq({
+        params: { stokvelId: 'missing' },
+        body: { email: 'guest@site.com' },
+      })
+      const res = makeRes()
+
+      await handler(req, res)
+
+      expect(res.status).toHaveBeenCalledWith(404)
+      expect(res.json).toHaveBeenCalledWith({ error: 'Stokvel not found' })
+    })
+
+    it('returns 500 when stokvel lookup fails', async () => {
+      const handler = getHandler('post', '/stokvels/:stokvelId/invitations')
+      const client = createSupabaseMock()
+      mockGetServiceSupabase.mockReturnValue(client)
+      mockNormalizeInviteEmail.mockReturnValue('guest@site.com')
+
+      client.__enqueue('stokvels.selectMaybeSingle', {
+        data: null,
+        error: { message: 'group lookup failed' },
+      })
+
+      const req = makeReq({
+        params: { stokvelId: 's1' },
+        body: { email: 'guest@site.com' },
+      })
+      const res = makeRes()
+
+      await handler(req, res)
+
+      expect(res.status).toHaveBeenCalledWith(500)
+      expect(res.json).toHaveBeenCalledWith({ error: 'group lookup failed' })
+    })
+
+    it('returns 500 when upsert fails for existing profile', async () => {
+      const handler = getHandler('post', '/stokvels/:stokvelId/invitations')
+      const client = createSupabaseMock()
+      mockGetServiceSupabase.mockReturnValue(client)
+      mockNormalizeInviteEmail.mockReturnValue('member@site.com')
+
+      client.__enqueue('stokvels.selectMaybeSingle', { data: { id: 's1', name: 'Group A' }, error: null })
+      client.__enqueue('profiles.selectMaybeSingle', { data: { id: 'u2' }, error: null })
+      client.__enqueue('stokvel_members.upsert', { error: { message: 'upsert failed' } })
+
+      const req = makeReq({
+        params: { stokvelId: 's1' },
+        body: { email: 'member@site.com' },
+      })
+      const res = makeRes()
+
+      await handler(req, res)
+
+      expect(res.status).toHaveBeenCalledWith(500)
+      expect(res.json).toHaveBeenCalledWith({ error: 'upsert failed' })
+    })
+
+    it('returns 500 when createInvitation fails', async () => {
+      const handler = getHandler('post', '/stokvels/:stokvelId/invitations')
+      const client = createSupabaseMock()
+      mockGetServiceSupabase.mockReturnValue(client)
+      mockNormalizeInviteEmail.mockReturnValue('new@site.com')
+
+      client.__enqueue('stokvels.selectMaybeSingle', { data: { id: 's1', name: 'Group A' }, error: null })
+      client.__enqueue('profiles.selectMaybeSingle', { data: null, error: null })
+      mockCreateInvitation.mockResolvedValue({
+        data: null,
+        error: { message: 'invite create failed' },
+      })
+
+      const req = makeReq({
+        params: { stokvelId: 's1' },
+        body: { email: 'new@site.com' },
+      })
+      const res = makeRes()
+
+      await handler(req, res)
+
+      expect(res.status).toHaveBeenCalledWith(500)
+      expect(res.json).toHaveBeenCalledWith({ error: 'invite create failed' })
+    })
+  })
+
   describe('db client fallback behavior', () => {
     it('uses user-scoped createClient when service client is unavailable', async () => {
       const handler = getHandler('get', '/stokvels')

@@ -4,10 +4,13 @@ import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals
 
 // ESM-safe mocks
 jest.unstable_mockModule('../middleware/auth.js', () => ({
-  requireAuth: (req, _res, next) => {
-    req.user = { id: 'test-user-id' }
+  requireAuth: (req, res, next) => {
+    if (req.headers?.['x-test-unauth'] === '1') {
+      return res.status(401).json({ error: 'Missing or malformed authorization header' })
+    }
+    req.user = { id: 'test-user-id', email: 'user@example.com' }
     req.headers = req.headers || {}
-    req.headers.authorization = 'Bearer fake-test-token'
+    req.headers.authorization = req.headers.authorization || 'Bearer fake-test-token'
     next()
   },
 }))
@@ -104,7 +107,7 @@ describe('Profile Router', () => {
           firstName: 'John',
           lastName: 'Doe',
           username: 'john_doe',
-          email: '',
+          email: 'user@example.com',
         },
       })
     })
@@ -310,6 +313,105 @@ describe('Profile Router', () => {
       const res = await request(app).get('/api/profile/username-available?u=john')
       expect(res.status).toBe(500)
       expect(res.body.error).toBe('lookup failed')
+    })
+  })
+
+  describe('auth and malformed payloads', () => {
+    it('returns 401 on protected routes when session token is missing', async () => {
+      const res = await request(app).get('/api/profile/me').set('x-test-unauth', '1')
+      expect(res.status).toBe(401)
+      expect(res.body).toEqual({ error: 'Missing or malformed authorization header' })
+    })
+
+    it('PATCH /me returns 400 for invalid username in body', async () => {
+      const res = await request(app).patch('/api/profile/me').send({ username: 'invalid_name!' })
+      expect(res.status).toBe(400)
+      expect(res.body.error).toMatch(/Username must be 3/)
+    })
+
+    it('PATCH /me returns 500 when username availability check fails', async () => {
+      mockClient._state.maybeSingleQueue.push({
+        data: null,
+        error: { message: 'username check failed' },
+      })
+
+      const res = await request(app).patch('/api/profile/me').send({ username: 'valid_user' })
+
+      expect(res.status).toBe(500)
+      expect(res.body.error).toBe('username check failed')
+    })
+
+    it('PATCH /me returns 500 when existing profile lookup fails', async () => {
+      mockClient._state.maybeSingleQueue.push({
+        data: null,
+        error: { message: 'profile lookup failed' },
+      })
+
+      const res = await request(app).patch('/api/profile/me').send({ firstName: 'Jane' })
+
+      expect(res.status).toBe(500)
+      expect(res.body.error).toBe('profile lookup failed')
+    })
+
+    it('POST /username returns 400 when body is missing username', async () => {
+      const res = await request(app).post('/api/profile/username').send({})
+      expect(res.status).toBe(400)
+      expect(res.body.error).toMatch(/Username must be 3/)
+    })
+
+    it('POST /username returns 503 when supabase client is unavailable', async () => {
+      getServiceSupabase.mockReturnValue(null)
+      createUserJwtSupabase.mockReturnValue(null)
+
+      const res = await request(app).post('/api/profile/username').send({ username: 'new_user' })
+
+      expect(res.status).toBe(503)
+    })
+
+    it('POST /username returns 500 when taken check fails', async () => {
+      mockClient._state.maybeSingleQueue.push({
+        data: null,
+        error: { message: 'taken check failed' },
+      })
+
+      const res = await request(app).post('/api/profile/username').send({ username: 'new_user' })
+
+      expect(res.status).toBe(500)
+      expect(res.body.error).toBe('taken check failed')
+    })
+
+    it('POST /username returns 500 when insert fails for new profile', async () => {
+      mockClient._state.maybeSingleQueue.push({ data: null, error: null })
+      mockClient._state.maybeSingleQueue.push({ data: null, error: null })
+      mockClient._state.insertResult = { error: { message: 'insert username failed' } }
+
+      const res = await request(app).post('/api/profile/username').send({ username: 'new_user' })
+
+      expect(res.status).toBe(500)
+      expect(res.body.error).toBe('insert username failed')
+    })
+
+    it('POST /username returns 500 when update fails for existing profile', async () => {
+      mockClient._state.maybeSingleQueue.push({ data: null, error: null })
+      mockClient._state.maybeSingleQueue.push({ data: { id: 'test-user-id' }, error: null })
+      mockClient._state.updateResult = { error: { message: 'update username failed' } }
+
+      const res = await request(app).post('/api/profile/username').send({ username: 'renamed_user' })
+
+      expect(res.status).toBe(500)
+      expect(res.body.error).toBe('update username failed')
+    })
+
+    it('PATCH /me returns 500 when insert fails for new profile row', async () => {
+      mockClient._state.maybeSingleQueue.push({ data: null, error: null })
+      mockClient._state.insertResult = { error: { message: 'patch insert failed' } }
+
+      const res = await request(app)
+        .patch('/api/profile/me')
+        .send({ firstName: 'New', email: 'new@example.com' })
+
+      expect(res.status).toBe(500)
+      expect(res.body.error).toBe('patch insert failed')
     })
   })
 })
