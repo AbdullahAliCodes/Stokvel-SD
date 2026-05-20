@@ -1,0 +1,2506 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stokvel SD — Full Architecture</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: system-ui, sans-serif;
+        background: #f5f5f5;
+      }
+      #toolbar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: #fff;
+        border-bottom: 1px solid #e0e0e0;
+        padding: 9px 18px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      #toolbar strong {
+        font-size: 14px;
+        color: #111;
+      }
+      .hint {
+        font-size: 12px;
+        color: #888;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 6px 14px;
+        border-radius: 7px;
+        border: none;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: opacity 0.15s;
+      }
+      .btn:hover {
+        opacity: 0.85;
+      }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      .btn-primary {
+        background: #1d4ed8;
+        color: #fff;
+      }
+      .btn-secondary {
+        background: #e5e7eb;
+        color: #374151;
+      }
+      #status {
+        font-size: 12px;
+        color: #059669;
+        display: none;
+      }
+      #wrap {
+        width: 100%;
+        overflow: auto;
+        cursor: grab;
+        padding: 24px;
+        background: #f5f5f5;
+      }
+      #wrap:active {
+        cursor: grabbing;
+      }
+      #diagram-container {
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 10px;
+        display: inline-block;
+        padding: 20px;
+      }
+      svg text {
+        font-family: system-ui, sans-serif;
+      }
+      #legend {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        padding: 10px 18px;
+        background: #f9f9f9;
+        border-top: 1px solid #e8e8e8;
+        font-size: 12px;
+        color: #555;
+        align-items: center;
+      }
+      .li {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .sw {
+        width: 12px;
+        height: 12px;
+        border-radius: 2px;
+        flex-shrink: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="toolbar">
+      <strong>Stokvel SD — architecture diagram</strong>
+      <span class="hint"
+        >L1 context · L2 containers · L3 backend internals · drag to pan</span
+      >
+      <button class="btn btn-primary" onclick="exportPNG()">
+        ⬇ Export PNG
+      </button>
+      <button class="btn btn-secondary" onclick="exportSVG()">
+        ⬇ Export SVG
+      </button>
+      <span id="status">✓ Saved!</span>
+    </div>
+
+    <div id="wrap">
+      <div id="diagram-container">
+        <svg
+          id="diag"
+          width="2200"
+          height="1060"
+          viewBox="0 0 2200 1060"
+          xmlns="http://www.w3.org/2000/svg"
+          style="display: block"
+        >
+          <defs>
+            <marker
+              id="arr"
+              viewBox="0 0 10 10"
+              refX="8"
+              refY="5"
+              markerWidth="5"
+              markerHeight="5"
+              orient="auto-start-reverse"
+            >
+              <path
+                d="M2 1L8 5L2 9"
+                fill="none"
+                stroke="context-stroke"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </marker>
+          </defs>
+
+          <!-- In-diagram download button rendered as part of the SVG canvas -->
+          <g
+            id="svg-dl-btn"
+            onclick="exportPNG()"
+            style="cursor: pointer"
+            onmouseenter="
+              document
+                .getElementById('svg-dl-bg')
+                .setAttribute('fill', '#1849c6')
+            "
+            onmouseleave="
+              document
+                .getElementById('svg-dl-bg')
+                .setAttribute('fill', '#1D4ED8')
+            "
+          >
+            <rect
+              id="svg-dl-bg"
+              x="2054"
+              y="16"
+              width="130"
+              height="34"
+              rx="17"
+              fill="#1D4ED8"
+            />
+            <line
+              x1="2091"
+              y1="26"
+              x2="2091"
+              y2="37"
+              stroke="#fff"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+            <polyline
+              points="2086,34 2091,40 2096,34"
+              fill="none"
+              stroke="#fff"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <line
+              x1="2086"
+              y1="42"
+              x2="2096"
+              y2="42"
+              stroke="#fff"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+            <text
+              x="2138"
+              y="33"
+              text-anchor="middle"
+              dominant-baseline="central"
+              font-size="12"
+              font-weight="500"
+              fill="#ffffff"
+            >
+              Download PNG
+            </text>
+          </g>
+
+          <!-- ═══════════════════════════════════════
+     LAYER HEADER BANDS
+════════════════════════════════════════ -->
+          <rect
+            x="20"
+            y="20"
+            width="340"
+            height="24"
+            rx="4"
+            fill="#EEEDFE"
+            stroke="#AFA9EC"
+            stroke-width="0.5"
+          />
+          <text
+            x="190"
+            y="32"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#3C3489"
+          >
+            L1 — System context
+          </text>
+
+          <rect
+            x="380"
+            y="20"
+            width="860"
+            height="24"
+            rx="4"
+            fill="#E1F5EE"
+            stroke="#5DCAA5"
+            stroke-width="0.5"
+          />
+          <text
+            x="810"
+            y="32"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#085041"
+          >
+            L2 — Containers &amp; deployment
+          </text>
+
+          <rect
+            x="1260"
+            y="20"
+            width="920"
+            height="24"
+            rx="4"
+            fill="#F1EFE8"
+            stroke="#B4B2A9"
+            stroke-width="0.5"
+          />
+          <text
+            x="1700"
+            y="32"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#444441"
+          >
+            L3 — Backend internals
+          </text>
+
+          <!-- ═══════════════════════════════════════
+     L1 — SYSTEM CONTEXT  x=20..360
+════════════════════════════════════════ -->
+
+          <!-- Actors -->
+          <rect
+            x="20"
+            y="60"
+            width="110"
+            height="36"
+            rx="16"
+            fill="#EEEDFE"
+            stroke="#534AB7"
+            stroke-width="0.5"
+          />
+          <text
+            x="75"
+            y="78"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#26215C"
+          >
+            Member
+          </text>
+
+          <rect
+            x="20"
+            y="110"
+            width="110"
+            height="36"
+            rx="16"
+            fill="#EEEDFE"
+            stroke="#534AB7"
+            stroke-width="0.5"
+          />
+          <text
+            x="75"
+            y="128"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#26215C"
+          >
+            Treasurer
+          </text>
+
+          <rect
+            x="20"
+            y="160"
+            width="110"
+            height="36"
+            rx="16"
+            fill="#EEEDFE"
+            stroke="#534AB7"
+            stroke-width="0.5"
+          />
+          <text
+            x="75"
+            y="178"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#26215C"
+          >
+            Group admin
+          </text>
+
+          <rect
+            x="20"
+            y="210"
+            width="110"
+            height="36"
+            rx="16"
+            fill="#EEEDFE"
+            stroke="#534AB7"
+            stroke-width="0.5"
+          />
+          <text
+            x="75"
+            y="228"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#26215C"
+          >
+            Platform admin
+          </text>
+
+          <rect
+            x="20"
+            y="260"
+            width="110"
+            height="36"
+            rx="16"
+            fill="#EEEDFE"
+            stroke="#534AB7"
+            stroke-width="0.5"
+          />
+          <text
+            x="75"
+            y="278"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#26215C"
+          >
+            Invitee
+          </text>
+
+          <!-- System box -->
+          <rect
+            x="148"
+            y="130"
+            width="180"
+            height="90"
+            rx="10"
+            fill="#E1F5EE"
+            stroke="#0F6E56"
+            stroke-width="1"
+          />
+          <text
+            x="238"
+            y="158"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="12"
+            font-weight="500"
+            fill="#064E3B"
+          >
+            Stokvel
+          </text>
+          <text
+            x="238"
+            y="174"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="12"
+            font-weight="500"
+            fill="#064E3B"
+          >
+            management
+          </text>
+          <text
+            x="238"
+            y="190"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="12"
+            font-weight="500"
+            fill="#064E3B"
+          >
+            system
+          </text>
+          <text
+            x="238"
+            y="208"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#0F6E56"
+          >
+            SPA · API · Supabase
+          </text>
+
+          <!-- actor → system -->
+          <line
+            x1="130"
+            y1="78"
+            x2="146"
+            y2="160"
+            stroke="#7F77DD"
+            stroke-width="0.8"
+            marker-end="url(#arr)"
+          />
+          <line
+            x1="130"
+            y1="128"
+            x2="146"
+            y2="168"
+            stroke="#7F77DD"
+            stroke-width="0.8"
+            marker-end="url(#arr)"
+          />
+          <line
+            x1="130"
+            y1="178"
+            x2="146"
+            y2="178"
+            stroke="#7F77DD"
+            stroke-width="0.8"
+            marker-end="url(#arr)"
+          />
+          <line
+            x1="130"
+            y1="228"
+            x2="146"
+            y2="196"
+            stroke="#7F77DD"
+            stroke-width="0.8"
+            marker-end="url(#arr)"
+          />
+          <line
+            x1="130"
+            y1="278"
+            x2="146"
+            y2="210"
+            stroke="#7F77DD"
+            stroke-width="0.8"
+            marker-end="url(#arr)"
+          />
+
+          <!-- External services (right of L1) -->
+          <rect
+            x="20"
+            y="340"
+            width="120"
+            height="34"
+            rx="6"
+            fill="#F1EFE8"
+            stroke="#888780"
+            stroke-width="0.5"
+          />
+          <text
+            x="80"
+            y="357"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#2C2C2A"
+          >
+            Supabase
+          </text>
+          <rect
+            x="150"
+            y="340"
+            width="100"
+            height="34"
+            rx="6"
+            fill="#F1EFE8"
+            stroke="#888780"
+            stroke-width="0.5"
+          />
+          <text
+            x="200"
+            y="357"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#2C2C2A"
+          >
+            Paystack
+          </text>
+          <rect
+            x="20"
+            y="386"
+            width="100"
+            height="34"
+            rx="6"
+            fill="#F1EFE8"
+            stroke="#888780"
+            stroke-width="0.5"
+          />
+          <text
+            x="70"
+            y="403"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#2C2C2A"
+          >
+            FRED API
+          </text>
+          <rect
+            x="130"
+            y="386"
+            width="120"
+            height="34"
+            rx="6"
+            fill="#F1EFE8"
+            stroke="#888780"
+            stroke-width="0.5"
+          />
+          <text
+            x="190"
+            y="403"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#2C2C2A"
+          >
+            Gmail SMTP
+          </text>
+          <rect
+            x="20"
+            y="432"
+            width="120"
+            height="34"
+            rx="6"
+            fill="#F1EFE8"
+            stroke="#888780"
+            stroke-width="0.5"
+          />
+          <text
+            x="80"
+            y="449"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#2C2C2A"
+          >
+            Google OAuth
+          </text>
+          <rect
+            x="150"
+            y="432"
+            width="100"
+            height="34"
+            rx="6"
+            fill="#F1EFE8"
+            stroke="#888780"
+            stroke-width="0.5"
+          />
+          <text
+            x="200"
+            y="449"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#2C2C2A"
+          >
+            Flask ML
+          </text>
+
+          <!-- system → externals -->
+          <line
+            x1="238"
+            y1="220"
+            x2="200"
+            y2="338"
+            stroke="#5F5E5A"
+            stroke-width="0.6"
+            stroke-dasharray="4,3"
+            marker-end="url(#arr)"
+          />
+          <line
+            x1="248"
+            y1="220"
+            x2="238"
+            y2="338"
+            stroke="#5F5E5A"
+            stroke-width="0.6"
+            stroke-dasharray="4,3"
+            marker-end="url(#arr)"
+          />
+
+          <!-- Bridge: L1 → L2 -->
+          <line
+            x1="328"
+            y1="175"
+            x2="378"
+            y2="175"
+            stroke="#5DCAA5"
+            stroke-width="1"
+            stroke-dasharray="5,3"
+            marker-end="url(#arr)"
+          />
+          <text
+            x="353"
+            y="168"
+            text-anchor="middle"
+            font-size="10"
+            fill="#0F6E56"
+          >
+            zoom in
+          </text>
+
+          <!-- ═══════════════════════════════════════
+     L2 — CONTAINERS  x=380..1240
+════════════════════════════════════════ -->
+
+          <!-- Zone: Vercel / static host -->
+          <rect
+            x="390"
+            y="50"
+            width="310"
+            height="290"
+            rx="10"
+            fill="none"
+            stroke="#AFA9EC"
+            stroke-width="0.8"
+            stroke-dasharray="6,3"
+          />
+          <text x="406" y="68" font-size="10" fill="#534AB7">
+            Vercel / static host
+          </text>
+
+          <!-- React SPA -->
+          <rect
+            x="406"
+            y="76"
+            width="278"
+            height="64"
+            rx="8"
+            fill="#EEEDFE"
+            stroke="#534AB7"
+            stroke-width="0.6"
+          />
+          <text
+            x="545"
+            y="96"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="12"
+            font-weight="500"
+            fill="#26215C"
+          >
+            React SPA
+          </text>
+          <text
+            x="545"
+            y="112"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#534AB7"
+          >
+            React 19 · Vite 6 · Tailwind 4 · 13 pages · 3 layouts
+          </text>
+          <text
+            x="545"
+            y="128"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#534AB7"
+          >
+            SessionContext · ThemeContext · ModalContext
+          </text>
+
+          <!-- Supabase JS browser -->
+          <rect
+            x="406"
+            y="154"
+            width="130"
+            height="52"
+            rx="6"
+            fill="#EEEDFE"
+            stroke="#534AB7"
+            stroke-width="0.5"
+          />
+          <text
+            x="471"
+            y="172"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#26215C"
+          >
+            Supabase JS
+          </text>
+          <text
+            x="471"
+            y="188"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#534AB7"
+          >
+            auth · session · OAuth
+          </text>
+
+          <!-- Paystack inline -->
+          <rect
+            x="546"
+            y="154"
+            width="138"
+            height="52"
+            rx="6"
+            fill="#EEEDFE"
+            stroke="#534AB7"
+            stroke-width="0.5"
+          />
+          <text
+            x="615"
+            y="172"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#26215C"
+          >
+            Paystack inline JS
+          </text>
+          <text
+            x="615"
+            y="188"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#534AB7"
+          >
+            PaystackPop.setup()
+          </text>
+
+          <!-- jspdf / html2canvas -->
+          <rect
+            x="406"
+            y="218"
+            width="278"
+            height="36"
+            rx="6"
+            fill="#EEEDFE"
+            stroke="#534AB7"
+            stroke-width="0.5"
+          />
+          <text
+            x="545"
+            y="236"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#534AB7"
+          >
+            Report export: jspdf · jspdf-autotable · html2canvas (client-side)
+          </text>
+
+          <!-- viewCache / localStorage -->
+          <rect
+            x="406"
+            y="264"
+            width="278"
+            height="30"
+            rx="6"
+            fill="#EEEDFE"
+            stroke="#534AB7"
+            stroke-width="0.5"
+          />
+          <text
+            x="545"
+            y="279"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#534AB7"
+          >
+            viewCache (120s) · localStorage last_stokvel_id
+          </text>
+
+          <!-- Zone: Render -->
+          <rect
+            x="720"
+            y="50"
+            width="500"
+            height="460"
+            rx="10"
+            fill="none"
+            stroke="#5DCAA5"
+            stroke-width="0.8"
+            stroke-dasharray="6,3"
+          />
+          <text x="736" y="68" font-size="10" fill="#0F6E56">Render</text>
+
+          <!-- Express API box -->
+          <rect
+            x="736"
+            y="76"
+            width="468"
+            height="76"
+            rx="8"
+            fill="#E1F5EE"
+            stroke="#059669"
+            stroke-width="0.6"
+          />
+          <text
+            x="970"
+            y="96"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="12"
+            font-weight="500"
+            fill="#064E3B"
+          >
+            Express API
+          </text>
+          <text
+            x="970"
+            y="112"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#0F6E56"
+          >
+            Node 20 · Express 5 · backend/src/index.js
+          </text>
+          <text
+            x="970"
+            y="128"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#0F6E56"
+          >
+            6 routers · 3 services · multer 10MB · CORS whitelist · requireAuth
+            · requireAdmin
+          </text>
+
+          <!-- node-cron -->
+          <rect
+            x="736"
+            y="168"
+            width="160"
+            height="50"
+            rx="6"
+            fill="#E1F5EE"
+            stroke="#059669"
+            stroke-width="0.5"
+          />
+          <text
+            x="816"
+            y="186"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#064E3B"
+          >
+            node-cron
+          </text>
+          <text
+            x="816"
+            y="202"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#0F6E56"
+          >
+            06:00 SAST · on boot
+          </text>
+
+          <!-- Memory cache -->
+          <rect
+            x="910"
+            y="168"
+            width="160"
+            height="50"
+            rx="6"
+            fill="#E1F5EE"
+            stroke="#059669"
+            stroke-width="0.5"
+          />
+          <text
+            x="990"
+            y="186"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#064E3B"
+          >
+            Memory cache
+          </text>
+          <text
+            x="990"
+            y="202"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#0F6E56"
+          >
+            30s TTL · dashboardCache Map
+          </text>
+
+          <!-- Flask ML sidecar -->
+          <rect
+            x="1084"
+            y="168"
+            width="120"
+            height="50"
+            rx="6"
+            fill="#E1F5EE"
+            stroke="#059669"
+            stroke-width="0.5"
+          />
+          <text
+            x="1144"
+            y="186"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#064E3B"
+          >
+            Flask ML
+          </text>
+          <text
+            x="1144"
+            y="202"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#0F6E56"
+          >
+            :5001/predict
+          </text>
+
+          <!-- Zone: Supabase -->
+          <rect
+            x="720"
+            y="240"
+            width="500"
+            height="270"
+            rx="10"
+            fill="none"
+            stroke="#B4B2A9"
+            stroke-width="0.8"
+            stroke-dasharray="6,3"
+          />
+          <text x="736" y="258" font-size="10" fill="#5F5E5A">
+            Supabase cloud
+          </text>
+
+          <rect
+            x="736"
+            y="266"
+            width="148"
+            height="60"
+            rx="6"
+            fill="#F1EFE8"
+            stroke="#888780"
+            stroke-width="0.5"
+          />
+          <text
+            x="810"
+            y="286"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#2C2C2A"
+          >
+            Supabase Auth
+          </text>
+          <text
+            x="810"
+            y="302"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#5F5E5A"
+          >
+            email/pw · Google OAuth
+          </text>
+          <text
+            x="810"
+            y="316"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#5F5E5A"
+          >
+            JWT · getUser(token)
+          </text>
+
+          <rect
+            x="896"
+            y="266"
+            width="170"
+            height="60"
+            rx="6"
+            fill="#F1EFE8"
+            stroke="#888780"
+            stroke-width="0.5"
+          />
+          <text
+            x="981"
+            y="286"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#2C2C2A"
+          >
+            Supabase Postgres
+          </text>
+          <text
+            x="981"
+            y="302"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#5F5E5A"
+          >
+            11 tables · PostgREST
+          </text>
+          <text
+            x="981"
+            y="316"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#5F5E5A"
+          >
+            RLS on 6 tables
+          </text>
+
+          <rect
+            x="1078"
+            y="266"
+            width="126"
+            height="60"
+            rx="6"
+            fill="#F1EFE8"
+            stroke="#888780"
+            stroke-width="0.5"
+          />
+          <text
+            x="1141"
+            y="286"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#2C2C2A"
+          >
+            Supabase Storage
+          </text>
+          <text
+            x="1141"
+            y="302"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#5F5E5A"
+          >
+            stokvel-documents
+          </text>
+          <text
+            x="1141"
+            y="316"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#5F5E5A"
+          >
+            public bucket
+          </text>
+
+          <!-- DB tables grid -->
+          <rect
+            x="736"
+            y="340"
+            width="468"
+            height="30"
+            rx="4"
+            fill="#F1EFE8"
+            stroke="#B4B2A9"
+            stroke-width="0.4"
+          />
+          <text
+            x="970"
+            y="355"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#444441"
+          >
+            profiles · stokvels · stokvel_members · contributions · payouts ·
+            missed_payments
+          </text>
+          <rect
+            x="736"
+            y="376"
+            width="468"
+            height="30"
+            rx="4"
+            fill="#F1EFE8"
+            stroke="#B4B2A9"
+            stroke-width="0.4"
+          />
+          <text
+            x="970"
+            y="391"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#444441"
+          >
+            meetings · invitations · market_data · member_health_scores · issues
+          </text>
+          <rect
+            x="736"
+            y="412"
+            width="468"
+            height="30"
+            rx="4"
+            fill="#F1EFE8"
+            stroke="#B4B2A9"
+            stroke-width="0.4"
+          />
+          <text
+            x="970"
+            y="427"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#5F5E5A"
+          >
+            schema.sql + supabase/migrations/ · no ORM · PostgREST client only
+          </text>
+
+          <!-- External services row (L2) -->
+          <rect
+            x="720"
+            y="532"
+            width="110"
+            height="44"
+            rx="6"
+            fill="#FAECE7"
+            stroke="#993C1D"
+            stroke-width="0.5"
+          />
+          <text
+            x="775"
+            y="548"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#4A1B0C"
+          >
+            Paystack API
+          </text>
+          <text
+            x="775"
+            y="564"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#993C1D"
+          >
+            api.paystack.co
+          </text>
+
+          <rect
+            x="844"
+            y="532"
+            width="100"
+            height="44"
+            rx="6"
+            fill="#FAECE7"
+            stroke="#993C1D"
+            stroke-width="0.5"
+          />
+          <text
+            x="894"
+            y="548"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#4A1B0C"
+          >
+            FRED API
+          </text>
+          <text
+            x="894"
+            y="564"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#993C1D"
+          >
+            stlouisfed.org
+          </text>
+
+          <rect
+            x="958"
+            y="532"
+            width="110"
+            height="44"
+            rx="6"
+            fill="#FAECE7"
+            stroke="#993C1D"
+            stroke-width="0.5"
+          />
+          <text
+            x="1013"
+            y="548"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#4A1B0C"
+          >
+            Gmail SMTP
+          </text>
+          <text
+            x="1013"
+            y="564"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#993C1D"
+          >
+            smtp.gmail.com:465
+          </text>
+
+          <rect
+            x="1082"
+            y="532"
+            width="130"
+            height="44"
+            rx="6"
+            fill="#FAECE7"
+            stroke="#993C1D"
+            stroke-width="0.5"
+          />
+          <text
+            x="1147"
+            y="548"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#4A1B0C"
+          >
+            GitHub Actions
+          </text>
+          <text
+            x="1147"
+            y="564"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#993C1D"
+          >
+            push main → Render hook
+          </text>
+
+          <!-- L2 connections -->
+          <!-- SPA → API -->
+          <line
+            x1="700"
+            y1="114"
+            x2="734"
+            y2="114"
+            stroke="#1D9E75"
+            stroke-width="1"
+            marker-end="url(#arr)"
+          />
+          <text
+            x="717"
+            y="107"
+            text-anchor="middle"
+            font-size="9"
+            fill="#0F6E56"
+          >
+            fetch Bearer
+          </text>
+          <text
+            x="717"
+            y="118"
+            text-anchor="middle"
+            font-size="9"
+            fill="#0F6E56"
+          >
+            /api/*
+          </text>
+
+          <!-- SPA Supabase JS → Supabase Auth -->
+          <path
+            d="M471 206 L471 236 L736 260"
+            fill="none"
+            stroke="#7F77DD"
+            stroke-width="0.7"
+            stroke-dasharray="4,3"
+            marker-end="url(#arr)"
+          />
+          <text x="540" y="232" font-size="9" fill="#534AB7">
+            supabase-js session
+          </text>
+
+          <!-- Paystack inline → API verify -->
+          <path
+            d="M615 206 L615 230 L960 230 L960 152"
+            fill="none"
+            stroke="#7F77DD"
+            stroke-width="0.7"
+            stroke-dasharray="4,3"
+            marker-end="url(#arr)"
+          />
+          <text x="760" y="226" font-size="9" fill="#534AB7">
+            reference → verify
+          </text>
+
+          <!-- API → Supabase Auth -->
+          <line
+            x1="850"
+            y1="152"
+            x2="820"
+            y2="264"
+            stroke="#1D9E75"
+            stroke-width="0.7"
+            marker-end="url(#arr)"
+          />
+          <!-- API → Supabase PG -->
+          <line
+            x1="970"
+            y1="152"
+            x2="970"
+            y2="264"
+            stroke="#1D9E75"
+            stroke-width="0.7"
+            marker-end="url(#arr)"
+          />
+          <!-- API → Supabase Storage -->
+          <line
+            x1="1100"
+            y1="152"
+            x2="1130"
+            y2="264"
+            stroke="#1D9E75"
+            stroke-width="0.7"
+            marker-end="url(#arr)"
+          />
+          <!-- API → Flask ML -->
+          <path
+            d="M1100 200 L1082 200"
+            fill="none"
+            stroke="#1D9E75"
+            stroke-width="0.7"
+            marker-end="url(#arr)"
+          />
+          <!-- API → Paystack -->
+          <path
+            d="M800 152 L800 520 L775 530"
+            fill="none"
+            stroke="#1D9E75"
+            stroke-width="0.7"
+            marker-end="url(#arr)"
+          />
+          <!-- cron → FRED -->
+          <path
+            d="M816 218 L816 486 L894 530"
+            fill="none"
+            stroke="#1D9E75"
+            stroke-width="0.7"
+            stroke-dasharray="4,3"
+            marker-end="url(#arr)"
+          />
+          <!-- API → Gmail -->
+          <path
+            d="M1020 152 L1013 530"
+            fill="none"
+            stroke="#1D9E75"
+            stroke-width="0.7"
+            stroke-dasharray="4,3"
+            marker-end="url(#arr)"
+          />
+          <!-- GitHub → Render zone -->
+          <line
+            x1="1147"
+            y1="530"
+            x2="1147"
+            y2="512"
+            stroke="#D85A30"
+            stroke-width="0.7"
+            stroke-dasharray="4,2"
+            marker-end="url(#arr)"
+          />
+
+          <!-- Bridge: L2 → L3 -->
+          <line
+            x1="1220"
+            y1="175"
+            x2="1258"
+            y2="175"
+            stroke="#888780"
+            stroke-width="1"
+            stroke-dasharray="5,3"
+            marker-end="url(#arr)"
+          />
+          <text
+            x="1239"
+            y="168"
+            text-anchor="middle"
+            font-size="10"
+            fill="#5F5E5A"
+          >
+            zoom in
+          </text>
+
+          <!-- ═══════════════════════════════════════
+     L3 — BACKEND INTERNALS  x=1260..2180
+════════════════════════════════════════ -->
+
+          <!-- Express container -->
+          <rect
+            x="1270"
+            y="50"
+            width="900"
+            height="620"
+            rx="12"
+            fill="none"
+            stroke="#5DCAA5"
+            stroke-width="0.8"
+            stroke-dasharray="7,3"
+          />
+          <text x="1286" y="68" font-size="10" fill="#0F6E56">
+            Express API — backend/src/
+          </text>
+
+          <!-- Middleware -->
+          <rect
+            x="1286"
+            y="76"
+            width="864"
+            height="44"
+            rx="6"
+            fill="#E1F5EE"
+            stroke="#059669"
+            stroke-width="0.6"
+          />
+          <text
+            x="1718"
+            y="92"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="12"
+            font-weight="500"
+            fill="#064E3B"
+          >
+            Middleware chain
+          </text>
+          <text
+            x="1718"
+            y="108"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#0F6E56"
+          >
+            CORS (whitelist FRONTEND_URL) · express.json() · requireAuth (Bearer
+            JWT → supabase.auth.getUser → profiles.role) · requireAdmin
+            (role===admin) · multer (memory, 10MB)
+          </text>
+
+          <line
+            x1="1718"
+            y1="120"
+            x2="1718"
+            y2="138"
+            stroke="#0F6E56"
+            stroke-width="1"
+            marker-end="url(#arr)"
+          />
+
+          <!-- Routers row -->
+          <text x="1286" y="154" font-size="10" fill="#5F5E5A">Routers</text>
+
+          <rect
+            x="1286"
+            y="162"
+            width="130"
+            height="64"
+            rx="6"
+            fill="#E1F5EE"
+            stroke="#059669"
+            stroke-width="0.5"
+          />
+          <text
+            x="1351"
+            y="182"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#064E3B"
+          >
+            stokvels router
+          </text>
+          <text
+            x="1351"
+            y="198"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#0F6E56"
+          >
+            /api/stokvels
+          </text>
+          <text
+            x="1351"
+            y="214"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#0F6E56"
+          >
+            CRUD · payments · payouts
+          </text>
+
+          <rect
+            x="1428"
+            y="162"
+            width="124"
+            height="64"
+            rx="6"
+            fill="#E1F5EE"
+            stroke="#059669"
+            stroke-width="0.5"
+          />
+          <text
+            x="1490"
+            y="182"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#064E3B"
+          >
+            admin router
+          </text>
+          <text
+            x="1490"
+            y="198"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#0F6E56"
+          >
+            /api/admin
+          </text>
+          <text
+            x="1490"
+            y="214"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#0F6E56"
+          >
+            users · stokvels · members
+          </text>
+
+          <rect
+            x="1564"
+            y="162"
+            width="120"
+            height="64"
+            rx="6"
+            fill="#E1F5EE"
+            stroke="#059669"
+            stroke-width="0.5"
+          />
+          <text
+            x="1624"
+            y="182"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#064E3B"
+          >
+            profile router
+          </text>
+          <text
+            x="1624"
+            y="198"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#0F6E56"
+          >
+            /api/profile
+          </text>
+          <text
+            x="1624"
+            y="214"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#0F6E56"
+          >
+            me · username · PATCH
+          </text>
+
+          <rect
+            x="1696"
+            y="162"
+            width="130"
+            height="64"
+            rx="6"
+            fill="#E1F5EE"
+            stroke="#059669"
+            stroke-width="0.5"
+          />
+          <text
+            x="1761"
+            y="182"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#064E3B"
+          >
+            invitations router
+          </text>
+          <text
+            x="1761"
+            y="198"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#0F6E56"
+          >
+            /api/invitations
+          </text>
+          <text
+            x="1761"
+            y="214"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#0F6E56"
+          >
+            token preview · accept
+          </text>
+
+          <rect
+            x="1838"
+            y="162"
+            width="120"
+            height="64"
+            rx="6"
+            fill="#E1F5EE"
+            stroke="#059669"
+            stroke-width="0.5"
+          />
+          <text
+            x="1898"
+            y="182"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#064E3B"
+          >
+            health router
+          </text>
+          <text
+            x="1898"
+            y="198"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#0F6E56"
+          >
+            /api/members
+          </text>
+          <text
+            x="1898"
+            y="214"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#0F6E56"
+          >
+            score · refresh
+          </text>
+
+          <rect
+            x="1970"
+            y="162"
+            width="180"
+            height="64"
+            rx="6"
+            fill="#E1F5EE"
+            stroke="#059669"
+            stroke-width="0.5"
+          />
+          <text
+            x="2060"
+            y="182"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#064E3B"
+          >
+            market-rates router
+          </text>
+          <text
+            x="2060"
+            y="198"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#0F6E56"
+          >
+            /api/market-rates (+ /v1)
+          </text>
+          <text
+            x="2060"
+            y="214"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#0F6E56"
+          >
+            rates · projection (public)
+          </text>
+
+          <!-- Inline routes -->
+          <rect
+            x="1286"
+            y="240"
+            width="864"
+            height="32"
+            rx="6"
+            fill="#F1EFE8"
+            stroke="#888780"
+            stroke-width="0.4"
+          />
+          <text
+            x="1718"
+            y="256"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#444441"
+          >
+            index.js inline: GET /api/me · GET /api/my-stokvels · GET
+            /api/my-meetings · POST /api/stokvels · POST /api/stokvels/:id/join
+            · POST /api/uploads/documents
+          </text>
+
+          <!-- Services -->
+          <text x="1286" y="294" font-size="10" fill="#5F5E5A">Services</text>
+
+          <rect
+            x="1286"
+            y="302"
+            width="200"
+            height="60"
+            rx="6"
+            fill="#E1F5EE"
+            stroke="#059669"
+            stroke-width="0.5"
+          />
+          <text
+            x="1386"
+            y="320"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#064E3B"
+          >
+            marketDataService
+          </text>
+          <text
+            x="1386"
+            y="336"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#0F6E56"
+          >
+            getMarketRates · updateMarketRates
+          </text>
+          <text
+            x="1386"
+            y="350"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#0F6E56"
+          >
+            calculateProjectedGrowth
+          </text>
+
+          <rect
+            x="1498"
+            y="302"
+            width="190"
+            height="60"
+            rx="6"
+            fill="#E1F5EE"
+            stroke="#059669"
+            stroke-width="0.5"
+          />
+          <text
+            x="1593"
+            y="320"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#064E3B"
+          >
+            projectionService
+          </text>
+          <text
+            x="1593"
+            y="336"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#0F6E56"
+          >
+            computeFixedPoolProjection
+          </text>
+          <text
+            x="1593"
+            y="350"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#0F6E56"
+          >
+            Fixed-type stokvel math
+          </text>
+
+          <rect
+            x="1700"
+            y="302"
+            width="210"
+            height="60"
+            rx="6"
+            fill="#E1F5EE"
+            stroke="#059669"
+            stroke-width="0.5"
+          />
+          <text
+            x="1805"
+            y="320"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#064E3B"
+          >
+            healthScoreService
+          </text>
+          <text
+            x="1805"
+            y="336"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#0F6E56"
+          >
+            calculateHealthScore → ML POST
+          </text>
+          <text
+            x="1805"
+            y="350"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#0F6E56"
+          >
+            weighted fallback if ML down
+          </text>
+
+          <!-- Utils -->
+          <text x="1286" y="386" font-size="10" fill="#5F5E5A">Utils</text>
+
+          <rect
+            x="1286"
+            y="394"
+            width="148"
+            height="52"
+            rx="6"
+            fill="#F1EFE8"
+            stroke="#888780"
+            stroke-width="0.5"
+          />
+          <text
+            x="1360"
+            y="412"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#2C2C2A"
+          >
+            stokvelActivation
+          </text>
+          <text
+            x="1360"
+            y="428"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#5F5E5A"
+          >
+            activateStokvel · shuffleMemberIds · generatePayoutSchedule
+          </text>
+
+          <rect
+            x="1444"
+            y="394"
+            width="148"
+            height="52"
+            rx="6"
+            fill="#F1EFE8"
+            stroke="#888780"
+            stroke-width="0.5"
+          />
+          <text
+            x="1518"
+            y="412"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#2C2C2A"
+          >
+            invitations util
+          </text>
+          <text
+            x="1518"
+            y="428"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#5F5E5A"
+          >
+            createInvitation · sendInvitationEmail · sendMeetingScheduledEmail
+          </text>
+
+          <rect
+            x="1602"
+            y="394"
+            width="110"
+            height="52"
+            rx="6"
+            fill="#F1EFE8"
+            stroke="#888780"
+            stroke-width="0.5"
+          />
+          <text
+            x="1657"
+            y="412"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#2C2C2A"
+          >
+            dates util
+          </text>
+          <text
+            x="1657"
+            y="428"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#5F5E5A"
+          >
+            getCurrentPaymentCycle · getTargetMonth · payout schedule
+          </text>
+
+          <rect
+            x="1722"
+            y="394"
+            width="110"
+            height="52"
+            rx="6"
+            fill="#F1EFE8"
+            stroke="#888780"
+            stroke-width="0.5"
+          />
+          <text
+            x="1777"
+            y="412"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#2C2C2A"
+          >
+            mailer
+          </text>
+          <text
+            x="1777"
+            y="428"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#5F5E5A"
+          >
+            nodemailer sendMailSafe smtp.gmail.com:465
+          </text>
+
+          <rect
+            x="1842"
+            y="394"
+            width="148"
+            height="52"
+            rx="6"
+            fill="#F1EFE8"
+            stroke="#888780"
+            stroke-width="0.5"
+          />
+          <text
+            x="1916"
+            y="412"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#2C2C2A"
+          >
+            supabaseAdmin
+          </text>
+          <text
+            x="1916"
+            y="428"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#5F5E5A"
+          >
+            getServiceSupabase · createUserJwtSupabase · bypass RLS
+          </text>
+
+          <rect
+            x="2000"
+            y="394"
+            width="150"
+            height="52"
+            rx="6"
+            fill="#F1EFE8"
+            stroke="#888780"
+            stroke-width="0.5"
+          />
+          <text
+            x="2075"
+            y="412"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#2C2C2A"
+          >
+            payoutReport
+          </text>
+          <text
+            x="2075"
+            y="428"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#5F5E5A"
+          >
+            buildPayoutReport · profileUserSearch
+          </text>
+
+          <!-- Access control helpers -->
+          <rect
+            x="1286"
+            y="460"
+            width="864"
+            height="32"
+            rx="6"
+            fill="#F1EFE8"
+            stroke="#888780"
+            stroke-width="0.4"
+          />
+          <text
+            x="1718"
+            y="476"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#444441"
+          >
+            Access helpers: resolveGroupAccess · requireGroupRole · isTreasurer
+            · canManageMeetings · ensurePlatformAdminsInStokvel
+          </text>
+
+          <!-- Cron job -->
+          <rect
+            x="1286"
+            y="506"
+            width="864"
+            height="44"
+            rx="6"
+            fill="#E1F5EE"
+            stroke="#059669"
+            stroke-width="0.6"
+          />
+          <text
+            x="1718"
+            y="522"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="12"
+            font-weight="500"
+            fill="#064E3B"
+          >
+            fetchRates cron job — jobs/fetchRates.js
+          </text>
+          <text
+            x="1718"
+            y="538"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#0F6E56"
+          >
+            node-cron '0 6 * * *' Africa/Johannesburg · fetchRepoRateFromFred()
+            on boot + daily · axios → FRED → updateMarketRates() → market_data
+          </text>
+
+          <!-- Auth + Role model -->
+          <rect
+            x="1286"
+            y="564"
+            width="420"
+            height="68"
+            rx="6"
+            fill="#F1EFE8"
+            stroke="#888780"
+            stroke-width="0.4"
+          />
+          <text
+            x="1496"
+            y="580"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#2C2C2A"
+          >
+            Auth strategy
+          </text>
+          <text x="1296" y="596" font-size="10" fill="#5F5E5A">
+            Supabase Auth JWT · Bearer token in every /api/* request
+          </text>
+          <text x="1296" y="610" font-size="10" fill="#5F5E5A">
+            Platform roles: profiles.role → user | admin
+          </text>
+          <text x="1296" y="624" font-size="10" fill="#5F5E5A">
+            Group roles: stokvel_members.group_role → member | treasurer | admin
+          </text>
+
+          <!-- Known gaps -->
+          <rect
+            x="1716"
+            y="564"
+            width="434"
+            height="68"
+            rx="6"
+            fill="#FAEEDA"
+            stroke="#854F0B"
+            stroke-width="0.5"
+          />
+          <text
+            x="1933"
+            y="580"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#633806"
+          >
+            Known gaps / TODOs
+          </text>
+          <text x="1726" y="596" font-size="10" fill="#633806">
+            stokvels.js:761 — PSP disbursement stub (payout marked complete, no
+            real transfer)
+          </text>
+          <text x="1726" y="610" font-size="10" fill="#633806">
+            No rate limiting · no Helmet · /admin/tickets placeholder · ML model
+            must be trained manually
+          </text>
+          <text x="1726" y="624" font-size="10" fill="#633806">
+            vite.config.js proxy :5001 vs README default :5000 · no DB trigger
+            for profile on signup
+          </text>
+
+          <!-- CI/CD strip -->
+          <rect
+            x="1270"
+            y="690"
+            width="900"
+            height="36"
+            rx="6"
+            fill="#FAECE7"
+            stroke="#993C1D"
+            stroke-width="0.5"
+          />
+          <text
+            x="1718"
+            y="700"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="11"
+            font-weight="500"
+            fill="#4A1B0C"
+          >
+            CI/CD
+          </text>
+          <text
+            x="1718"
+            y="714"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#993C1D"
+          >
+            codecov.yml: push main → Node 20 Jest (backend) + Vitest (frontend)
+            → Codecov · render-deploy.yml: push main → curl RENDER_DEPLOY_HOOK
+          </text>
+
+          <!-- ENV vars strip -->
+          <rect
+            x="1270"
+            y="736"
+            width="900"
+            height="30"
+            rx="6"
+            fill="#F1EFE8"
+            stroke="#888780"
+            stroke-width="0.4"
+          />
+          <text
+            x="1718"
+            y="751"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#5F5E5A"
+          >
+            Backend env: PORT · SUPABASE_URL · SUPABASE_ANON_KEY ·
+            SUPABASE_SERVICE_ROLE_KEY · SUPABASE_DOCUMENTS_BUCKET · FRONTEND_URL
+            · EMAIL_USER · EMAIL_APP_PASSWORD · PAYSTACK_SECRET_KEY ·
+            FRED_API_KEY · ML_HEALTH_PREDICT_URL
+          </text>
+          <rect
+            x="1270"
+            y="772"
+            width="900"
+            height="24"
+            rx="6"
+            fill="#F1EFE8"
+            stroke="#888780"
+            stroke-width="0.4"
+          />
+          <text
+            x="1718"
+            y="784"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#5F5E5A"
+          >
+            Frontend env: VITE_SUPABASE_URL · VITE_SUPABASE_ANON_KEY ·
+            VITE_API_BASE_URL · VITE_PAYSTACK_PUBLIC_KEY
+          </text>
+
+          <!-- Security strip -->
+          <rect
+            x="1270"
+            y="806"
+            width="900"
+            height="30"
+            rx="6"
+            fill="#EEEDFE"
+            stroke="#534AB7"
+            stroke-width="0.4"
+          />
+          <text
+            x="1718"
+            y="821"
+            text-anchor="middle"
+            dominant-baseline="central"
+            font-size="10"
+            fill="#3C3489"
+          >
+            Public (no auth): GET / · /api/health · /api/public/stokvels ·
+            /api/market-rates · /api/invitations/:token ·
+            /api/profile/username-available
+          </text>
+        </svg>
+      </div>
+    </div>
+
+    <div id="legend">
+      <div class="li">
+        <div
+          class="sw"
+          style="background: #eeedfe; border: 1px solid #534ab7"
+        ></div>
+        Frontend / actor
+      </div>
+      <div class="li">
+        <div
+          class="sw"
+          style="background: #e1f5ee; border: 1px solid #059669"
+        ></div>
+        Backend / Express
+      </div>
+      <div class="li">
+        <div
+          class="sw"
+          style="background: #f1efe8; border: 1px solid #888780"
+        ></div>
+        Infrastructure / util / Supabase
+      </div>
+      <div class="li">
+        <div
+          class="sw"
+          style="background: #faece7; border: 1px solid #993c1d"
+        ></div>
+        External service
+      </div>
+      <div class="li">
+        <div
+          class="sw"
+          style="background: #faeeda; border: 1px solid #854f0b"
+        ></div>
+        Known gap / TODO
+      </div>
+      <div class="li">
+        <span
+          style="
+            border-top: 1px dashed #888;
+            width: 20px;
+            display: inline-block;
+          "
+        ></span
+        >&nbsp;Zone boundary / indirect
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script>
+      const wrap = document.getElementById("wrap");
+      let drag = false,
+        sx = 0,
+        sy = 0,
+        sl = 0,
+        st = 0;
+      wrap.addEventListener("mousedown", (e) => {
+        drag = true;
+        sx = e.clientX;
+        sy = e.clientY;
+        sl = wrap.scrollLeft;
+        st = wrap.scrollTop;
+      });
+      wrap.addEventListener("mousemove", (e) => {
+        if (!drag) return;
+        wrap.scrollLeft = sl - (e.clientX - sx);
+        wrap.scrollTop = st - (e.clientY - sy);
+      });
+      wrap.addEventListener("mouseup", () => (drag = false));
+      wrap.addEventListener("mouseleave", () => (drag = false));
+
+      function showStatus() {
+        const s = document.getElementById("status");
+        s.style.display = "inline";
+        setTimeout(() => (s.style.display = "none"), 2500);
+      }
+
+      function exportPNG() {
+        const btn = event.target;
+        btn.textContent = "⏳ Rendering...";
+        btn.disabled = true;
+        html2canvas(document.getElementById("diagram-container"), {
+          scale: 2,
+          backgroundColor: "#ffffff",
+          useCORS: true,
+          logging: false,
+        }).then((c) => {
+          const a = document.createElement("a");
+          a.download = "stokvel_architecture_full.png";
+          a.href = c.toDataURL("image/png");
+          a.click();
+          btn.textContent = "⬇ Export PNG";
+          btn.disabled = false;
+          showStatus();
+        });
+      }
+
+      function exportSVG() {
+        const svg = document.getElementById("diag");
+        const blob = new Blob([svg.outerHTML], {
+          type: "image/svg+xml;charset=utf-8",
+        });
+        const a = document.createElement("a");
+        a.download = "stokvel_architecture_full.svg";
+        a.href = URL.createObjectURL(blob);
+        a.click();
+        showStatus();
+      }
+    </script>
+  </body>
+</html>
