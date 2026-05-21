@@ -673,17 +673,17 @@ describe('stokvels routes', () => {
     expect(res.body.error).toMatch(/name must be a non-empty string/i)
   })
 
-  it('PATCH /:id returns 400 when contribution_amount is not a positive number', async () => {
+  it('PATCH /:id returns 400 when only unsupported fields are provided', async () => {
     const client = createSupabaseMock()
     mockCreateClient.mockReturnValue(client)
     client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'admin' }, error: null })
 
     const res = await request(makeApp())
       .patch('/api/stokvels/11111111-1111-1111-1111-111111111111')
-      .send({ contribution_amount: 'abc' })
+      .send({ contribution_amount: 'abc', is_public: true })
 
     expect(res.status).toBe(400)
-    expect(res.body.error).toMatch(/contribution_amount must be a number greater than 0/i)
+    expect(res.body.error).toMatch(/No valid fields provided/i)
   })
 
   it('PATCH /:id returns 500 when DB update fails with timeout', async () => {
@@ -736,23 +736,74 @@ describe('stokvels routes', () => {
       data: {
         id: sid,
         name: 'Renamed',
-        contribution_amount: 250,
-        meeting_frequency: 'monthly',
-        is_public: true,
+        meeting_frequency: 'bi-weekly',
+        payment_window_start_day: 22,
+        payment_window_end_day: 7,
       },
       error: null,
     })
 
     const res = await request(makeApp()).patch(`/api/stokvels/${sid}`).send({
       name: 'Renamed',
-      contribution_amount: 250,
-      meeting_frequency: 'monthly',
-      is_public: true,
+      meeting_frequency: 'bi-weekly',
+      payment_window_start_day: 22,
+      payment_window_end_day: 7,
     })
 
     expect(res.status).toBe(200)
     expect(res.body.success).toBe(true)
     expect(res.body.stokvel.name).toBe('Renamed')
+    expect(res.body.stokvel.meeting_frequency).toBe('bi-weekly')
+    expect(res.body.stokvel.payment_window_start_day).toBe(22)
+    expect(res.body.stokvel.payment_window_end_day).toBe(7)
+  })
+
+  it('PATCH /:id returns 400 for invalid payment_window_start_day', async () => {
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'admin' }, error: null })
+
+    const res = await request(makeApp())
+      .patch(`/api/stokvels/${sid}`)
+      .send({ payment_window_start_day: 32 })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/payment_window_start_day/i)
+  })
+
+  it('PATCH /:id returns 400 for invalid payment_window_end_day', async () => {
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'admin' }, error: null })
+
+    const res = await request(makeApp())
+      .patch(`/api/stokvels/${sid}`)
+      .send({ payment_window_end_day: 0 })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/payment_window_end_day/i)
+  })
+
+  it('PATCH /:id ignores contribution_amount and is_public', async () => {
+    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    const client = createSupabaseMock()
+    mockCreateClient.mockReturnValue(client)
+    client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'admin' }, error: null })
+    client.__push('stokvels.updateSelectMaybeSingle', {
+      data: { id: sid, name: 'Only Name' },
+      error: null,
+    })
+
+    const res = await request(makeApp()).patch(`/api/stokvels/${sid}`).send({
+      name: 'Only Name',
+      contribution_amount: 999,
+      is_public: true,
+    })
+
+    expect(res.status).toBe(200)
+    expect(res.body.stokvel.name).toBe('Only Name')
   })
 
   it('PATCH /:id returns 400 for invalid meeting_frequency', async () => {
@@ -767,20 +818,6 @@ describe('stokvels routes', () => {
 
     expect(res.status).toBe(400)
     expect(res.body.error).toMatch(/meeting_frequency/i)
-  })
-
-  it('PATCH /:id returns 400 when is_public is not boolean', async () => {
-    const sid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
-    const client = createSupabaseMock()
-    mockCreateClient.mockReturnValue(client)
-    client.__push('stokvel_members.selectMaybeSingle', { data: { group_role: 'admin' }, error: null })
-
-    const res = await request(makeApp())
-      .patch(`/api/stokvels/${sid}`)
-      .send({ is_public: 'yes' })
-
-    expect(res.status).toBe(400)
-    expect(res.body.error).toMatch(/is_public must be a boolean/i)
   })
 
   it('POST /:id/contributions returns 400 for invalid amount', async () => {

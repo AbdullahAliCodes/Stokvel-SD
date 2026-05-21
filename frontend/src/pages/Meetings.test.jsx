@@ -105,7 +105,7 @@ function renderMeetings() {
 const baseMembers = [{ user_id: "user-1", group_role: "treasurer" }];
 const baseDetail = {
   membership: { group_role: "member", stokvels: { name: "Fallback Group" } },
-  stokvel: { id: "stok-1", name: "Alpha Group" },
+  stokvel: { id: "stok-1", name: "Alpha Group", meeting_frequency: "bi-weekly" },
   members: baseMembers,
   totalContribution: 1000,
   contributions: [],
@@ -200,6 +200,8 @@ describe("Meetings page", () => {
     renderMeetings();
 
     expect(await screen.findByText("Alpha Group")).toBeInTheDocument();
+    expect(screen.getByText(/Meeting Frequency:/i)).toBeInTheDocument();
+    expect(screen.getByText(/Bi-weekly/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Schedule new meeting" })).toBeInTheDocument();
     expect(screen.getByText("Planning Session")).toBeInTheDocument();
     expect(screen.getByText("Last Session")).toBeInTheDocument();

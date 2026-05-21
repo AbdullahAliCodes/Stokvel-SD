@@ -43,6 +43,15 @@ function toDisplayDate(value) {
   return d.toLocaleString("en-ZA", { dateStyle: "medium", timeStyle: "short" });
 }
 
+function formatMeetingFrequencyLabel(value) {
+  const v = String(value ?? "").trim().toLowerCase();
+  if (v === "weekly") return "Weekly";
+  if (v === "bi-weekly") return "Bi-weekly";
+  if (v === "monthly") return "Monthly";
+  if (!v) return "Monthly";
+  return v.charAt(0).toUpperCase() + v.slice(1);
+}
+
 const markdownBody =
   "text-sm leading-relaxed text-stone-700 dark:text-stone-300 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_strong]:font-semibold [&_a]:text-emerald-800 [&_a]:underline dark:[&_a]:text-emerald-300 [&_code]:rounded [&_code]:bg-stone-100 [&_code]:px-1 [&_code]:text-xs dark:[&_code]:bg-slate-800";
 
@@ -183,6 +192,9 @@ export default function Meetings() {
 
   const effectiveStokvel = stokvel ?? membership?.stokvels ?? null;
   const groupName = effectiveStokvel?.name ?? "This group";
+  const meetingFrequencyLabel = formatMeetingFrequencyLabel(
+    effectiveStokvel?.meeting_frequency,
+  );
   const myGroupRole =
     members.find((m) => m.user_id === session?.user?.id)?.group_role ||
     membership?.group_role;
@@ -597,6 +609,15 @@ export default function Meetings() {
           ) : null
         }
       />
+
+      {!showInitialSkeleton && effectiveStokvel ? (
+        <p className={`${pageSubtitle} -mt-4`}>
+          <span className="font-medium text-stone-700 dark:text-stone-300">
+            Meeting Frequency:
+          </span>{" "}
+          {meetingFrequencyLabel}
+        </p>
+      ) : null}
 
       {showInitialSkeleton ? (
         <SkeletonPage />

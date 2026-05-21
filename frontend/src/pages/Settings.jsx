@@ -3,12 +3,12 @@ import { Settings as SettingsIcon } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 import { useSession } from '../context/SessionContext'
 import { apiUrl } from '../utils/api'
+import { paymentWindowFromStokvel } from '../utils/paymentWindow.js'
 import {
   btnPrimary,
   errorBox,
   inputLight,
   labelLight,
-  pageSubtitle,
 } from '../ui'
 import GroupPageHeader from '../components/GroupPageHeader'
 import SkeletonPage from '../components/ui/SkeletonPage'
@@ -26,6 +26,12 @@ function normalizeMeetingFrequency(value) {
   return value === 'weekly' || value === 'bi-weekly' || value === 'monthly' ? value : 'monthly'
 }
 
+function parsePaymentWindowDay(value) {
+  const n = Number(value)
+  if (!Number.isInteger(n) || n < 1 || n > 31) return null
+  return n
+}
+
 export default function Settings() {
   const { stokvel_id } = useParams()
   const { session } = useSession()
@@ -37,9 +43,9 @@ export default function Settings() {
   const [saveSuccess, setSaveSuccess] = useState('')
 
   const [name, setName] = useState('')
-  const [contributionAmount, setContributionAmount] = useState('')
   const [meetingFrequency, setMeetingFrequency] = useState('monthly')
-  const [isPublic, setIsPublic] = useState(false)
+  const [paymentWindowStartDay, setPaymentWindowStartDay] = useState('25')
+  const [paymentWindowEndDay, setPaymentWindowEndDay] = useState('5')
 
   useEffect(() => {
     if (!session?.access_token || !stokvel_id) return
@@ -62,11 +68,10 @@ export default function Settings() {
 
         if (cancelled) return
         setName(stokvel.name ?? '')
-        setContributionAmount(
-          stokvel.contribution_amount != null ? String(stokvel.contribution_amount) : '',
-        )
         setMeetingFrequency(normalizeMeetingFrequency(stokvel.meeting_frequency))
-        setIsPublic(Boolean(stokvel.is_public))
+        const window = paymentWindowFromStokvel(stokvel)
+        setPaymentWindowStartDay(String(window.startDay))
+        setPaymentWindowEndDay(String(window.endDay))
       } catch (err) {
         if (!cancelled) setLoadError(err.message ?? String(err))
       } finally {
@@ -84,6 +89,13 @@ export default function Settings() {
     e.preventDefault()
     if (!session?.access_token || !stokvel_id) return
 
+    const windowStart = parsePaymentWindowDay(paymentWindowStartDay)
+    const windowEnd = parsePaymentWindowDay(paymentWindowEndDay)
+    if (windowStart == null || windowEnd == null) {
+      setSaveError('Payment window days must be whole numbers between 1 and 31.')
+      return
+    }
+
     setIsSaving(true)
     setSaveError('')
     setSaveSuccess('')
@@ -97,9 +109,9 @@ export default function Settings() {
         },
         body: JSON.stringify({
           name: name.trim(),
-          contribution_amount: Number(contributionAmount),
           meeting_frequency: meetingFrequency,
-          is_public: isPublic,
+          payment_window_start_day: windowStart,
+          payment_window_end_day: windowEnd,
         }),
       })
       const text = await res.text()
@@ -108,13 +120,10 @@ export default function Settings() {
       const updated = payload.stokvel ?? {}
 
       setName(updated.name ?? name)
-      setContributionAmount(
-        updated.contribution_amount != null
-          ? String(updated.contribution_amount)
-          : contributionAmount,
-      )
       setMeetingFrequency(normalizeMeetingFrequency(updated.meeting_frequency))
-      setIsPublic(Boolean(updated.is_public))
+      const window = paymentWindowFromStokvel(updated)
+      setPaymentWindowStartDay(String(window.startDay))
+      setPaymentWindowEndDay(String(window.endDay))
       setSaveSuccess('Group settings updated successfully.')
     } catch (err) {
       setSaveError(err.message ?? String(err))
@@ -133,10 +142,10 @@ export default function Settings() {
             <>
               <span className="font-medium text-stone-800 dark:text-stone-100">{name}</span>
               {' — '}
-              Update configuration for members and public directory visibility.
+              Update group name, meeting frequency, and payment window rules.
             </>
           ) : (
-            'Update your group configuration for members and public directory visibility.'
+            'Update group name, meeting frequency, and payment window rules.'
           )
         }
       />
@@ -164,7 +173,7 @@ export default function Settings() {
         {loading ? (
           <SkeletonPage variant="form" />
         ) : (
-          <form onSubmit={handleSave} className="space-y-4">
+          <form onSubmit={handleSave} className="space-y-4" noValidate>
             <label className={labelLight}>
               Group Name
               <input
@@ -172,19 +181,6 @@ export default function Settings() {
                 className={inputLight}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                required
-              />
-            </label>
-
-            <label className={labelLight}>
-              Monthly Contribution (R)
-              <input
-                type="number"
-                min="0.01"
-                step="0.01"
-                className={inputLight}
-                value={contributionAmount}
-                onChange={(e) => setContributionAmount(e.target.value)}
                 required
               />
             </label>
@@ -202,22 +198,56 @@ export default function Settings() {
               </select>
             </label>
 
-            <label className="flex items-center justify-between gap-3 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/60">
-              <div>
-                <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
-                  Public Directory Visibility
-                </p>
-                <p className="text-xs text-stone-500 dark:text-stone-400">
-                  Allow this stokvel to appear in the public directory.
-                </p>
+            <div className="rounded-xl border border-stone-200 bg-stone-50/80 p-4 dark:border-slate-700 dark:bg-slate-800/40">
+              <p className="text-sm font-medium text-stone-800 dark:text-stone-100">
+                Payment window rules
+              </p>
+              <p className="mt-1 text-xs text-stone-600 dark:text-stone-300">
+                Calendar days when members are expected to pay contributions (South African
+                time). For example, start day 25 and end day 5 means payments are due from
+                the 25th of the prior month through the 5th of the cycle month.
+              </p>
+              <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                <label className={labelLight}>
+                  Payment window start day
+                  <input
+                    type="number"
+                    min={1}
+                    max={31}
+                    className={inputLight}
+                    value={paymentWindowStartDay}
+                    onChange={(e) => setPaymentWindowStartDay(e.target.value)}
+                    aria-describedby="payment-window-start-hint"
+                    required
+                  />
+                  <span
+                    id="payment-window-start-hint"
+                    className="mt-1 block text-xs font-normal text-stone-500 dark:text-stone-400"
+                  >
+                    Day 1–31
+                  </span>
+                </label>
+                <label className={labelLight}>
+                  Payment window end day
+                  <input
+                    type="number"
+                    min={1}
+                    max={31}
+                    className={inputLight}
+                    value={paymentWindowEndDay}
+                    onChange={(e) => setPaymentWindowEndDay(e.target.value)}
+                    aria-describedby="payment-window-end-hint"
+                    required
+                  />
+                  <span
+                    id="payment-window-end-hint"
+                    className="mt-1 block text-xs font-normal text-stone-500 dark:text-stone-400"
+                  >
+                    Day 1–31
+                  </span>
+                </label>
               </div>
-              <input
-                type="checkbox"
-                checked={isPublic}
-                onChange={(e) => setIsPublic(e.target.checked)}
-                className="h-5 w-5 rounded border-stone-300 text-emerald-700 focus:ring-emerald-600"
-              />
-            </label>
+            </div>
 
             <button type="submit" className={btnPrimary} disabled={isSaving}>
               {isSaving ? 'Saving…' : 'Save Changes'}

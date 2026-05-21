@@ -10,6 +10,7 @@ import {
   isPaidAtInWindowForTargetMonth,
   generateFixedMaturityPayoutSchedule,
   generatePayoutSchedule,
+  parsePaymentWindowDay,
 } from './dates.js'
 
 describe('dates.js payment cycles (Africa/Johannesburg)', () => {
@@ -86,6 +87,14 @@ describe('dates.js payment cycles (Africa/Johannesburg)', () => {
 
   it('normalizePaymentWindow falls back to DEFAULT_PAYMENT_WINDOW', () => {
     expect(DEFAULT_PAYMENT_WINDOW).toEqual({ startDay: 25, endDay: 5 })
+  })
+
+  it('parsePaymentWindowDay accepts 1–31 and rejects invalid values', () => {
+    expect(parsePaymentWindowDay(25)).toBe(25)
+    expect(parsePaymentWindowDay('5')).toBe(5)
+    expect(parsePaymentWindowDay(0)).toBeNull()
+    expect(parsePaymentWindowDay(32)).toBeNull()
+    expect(parsePaymentWindowDay('x')).toBeNull()
   })
 
   it('computeFixedMaturityFromCycle: 6 cycles ends on 5th of 6th month', () => {

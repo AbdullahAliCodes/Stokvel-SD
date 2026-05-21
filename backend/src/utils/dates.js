@@ -39,6 +39,17 @@ export function paymentWindowFromStokvel(stokvel) {
 }
 
 /**
+ * Parse a single calendar day for PATCH payloads. Returns null when invalid.
+ * @param {unknown} raw
+ * @returns {number | null}
+ */
+export function parsePaymentWindowDay(raw) {
+  const n = Number(raw)
+  if (!Number.isInteger(n) || n < 1 || n > 31) return null
+  return n
+}
+
+/**
  * @param {Date | string | number} date
  * @returns {{ year: number, month: number, day: number }}
  */
