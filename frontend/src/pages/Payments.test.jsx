@@ -89,7 +89,15 @@ function failText(text) {
   return { ok: false, text: async () => text };
 }
 
-function setupFetch({ detail, meetings, treasurerPatch, approvalPatch, treasurerPayouts } = {}) {
+function setupFetch({
+  detail,
+  meetings,
+  treasurerPatch,
+  approvalPatch,
+  treasurerPayouts,
+  payoutOrderPatch,
+  missedPaymentPost,
+} = {}) {
   global.fetch = vi.fn(async (url, opts = {}) => {
     const method = opts.method ?? "GET";
     const u = String(url);
@@ -99,9 +107,11 @@ function setupFetch({ detail, meetings, treasurerPatch, approvalPatch, treasurer
       return treasurerPayouts ?? okJson({ payouts: [] });
     }
     if (u.endsWith("/api/stokvels/stok-1/treasurer") && method === "PATCH") return treasurerPatch;
-    if (u.endsWith("/api/stokvels/stok-1/payout-order") && method === "PATCH") return okJson({ success: true });
+    if (u.endsWith("/api/stokvels/stok-1/payout-order") && method === "PATCH") {
+      return payoutOrderPatch ?? okJson({ success: true });
+    }
     if (u.endsWith("/api/stokvels/stok-1/missed-payments") && method === "POST") {
-      return okJson({ success: true });
+      return missedPaymentPost ?? okJson({ success: true });
     }
     if (u.includes("/api/stokvels/stok-1/payouts/") && method === "POST") {
       return okJson({ success: true, payout: { status: "completed" } });
@@ -472,5 +482,241 @@ describe("Payments", () => {
     expect(reorderCall).toBeTruthy();
     const body = JSON.parse(reorderCall[1].body);
     expect(body.orderedUpcomingPayoutIds).toEqual(["p2", "p3"]);
+  });
+
+  it("shows raw detail load error text when the response is JSON", async () => {
+    readViewCacheMock.mockReturnValue(null);
+    setupFetch({
+      detail: failText('{"error":"Structured load failure"}'),
+      meetings: okJson({ meetings: [] }),
+    });
+
+    renderPayments();
+    expect(
+      await screen.findByText('{"error":"Structured load failure"}'),
+    ).toBeInTheDocument();
+  });
+
+  it("renders cached detail immediately then refreshes from the network", async () => {
+    let resolveDetail;
+    const detailDeferred = new Promise((resolve) => {
+      resolveDetail = resolve;
+    });
+
+    readViewCacheMock.mockReturnValue({
+      membership: { group_role: "member", stokvels: { name: "Cached Group" } },
+      stokvel: { id: "stok-1", name: "Cached Group", status: "active", contribution_amount: 250 },
+      members: detailBase.members,
+      totalContribution: 999,
+      contributions: detailBase.contributions,
+      currentCycle: detailBase.currentCycle,
+      payouts: [],
+      missedPayments: [],
+      meetings: [{ id: "cached-meeting" }],
+    });
+
+    global.fetch = vi.fn(async (url, opts = {}) => {
+      const method = opts.method ?? "GET";
+      const u = String(url);
+      if (u.endsWith("/api/stokvels/stok-1") && method === "GET") return detailDeferred;
+      if (u.endsWith("/api/stokvels/stok-1/meetings") && method === "GET") {
+        return okJson({ meetings: [] });
+      }
+      if (u.endsWith("/api/stokvels/stok-1/payouts") && method === "GET") {
+        return okJson({ payouts: [] });
+      }
+      throw new Error(`Unhandled fetch ${method} ${u}`);
+    });
+
+    renderPayments();
+    expect(await screen.findByText("Cached Group")).toBeInTheDocument();
+    expect(screen.getByText("R 999")).toBeInTheDocument();
+
+    resolveDetail(okJson(detailBase));
+    await waitFor(() => expect(screen.getByText("Main Group")).toBeInTheDocument());
+  });
+
+  it("falls back to cached meetings when meetings fetch fails", async () => {
+    readViewCacheMock.mockReturnValue({
+      membership: detailBase.membership,
+      stokvel: detailBase.stokvel,
+      members: detailBase.members,
+      totalContribution: detailBase.totalContribution,
+      contributions: detailBase.contributions,
+      currentCycle: detailBase.currentCycle,
+      payouts: [],
+      missedPayments: [],
+      meetings: [{ id: "cached-meeting" }],
+    });
+    setupFetch({
+      detail: okJson(detailBase),
+      meetings: { ok: false, text: async () => "meetings failed" },
+    });
+
+    renderPayments();
+    await screen.findByText("Main Group");
+    expect(writeViewCacheMock).toHaveBeenCalled();
+    const lastWrite = writeViewCacheMock.mock.calls.at(-1)?.[1];
+    expect(lastWrite?.meetings).toEqual([{ id: "cached-meeting" }]);
+  });
+
+  it("hides treasurer and payout manager controls for standard members", async () => {
+    readViewCacheMock.mockReturnValue(null);
+    const rotatingDetail = {
+      ...detailBase,
+      stokvel: { ...detailBase.stokvel, type: "Rotating" },
+      membership: { ...detailBase.membership, group_role: "member" },
+      payouts: [
+        {
+          id: "p1",
+          user_id: "u2",
+          target_month: "2099-12",
+          scheduled_payout_date: "2099-12-05",
+          cycle_index: 0,
+        },
+        {
+          id: "p2",
+          user_id: "u1",
+          target_month: "2100-01",
+          scheduled_payout_date: "2100-01-05",
+          cycle_index: 1,
+        },
+      ],
+    };
+    setupFetch({ detail: okJson(rotatingDetail), meetings: okJson({ meetings: [] }) });
+
+    renderPayments();
+    await screen.findByText("Cycle ledger");
+    expect(screen.queryByText("Assign treasurer")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Save upcoming payout order/i })).not.toBeInTheDocument();
+    expect(screen.queryByText("Payouts (Treasurer)")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /approve payment/i })).not.toBeInTheDocument();
+  });
+
+  it("shows approval error when treasurer approval PATCH fails", async () => {
+    const detailTreasurer = {
+      ...detailBase,
+      membership: { ...detailBase.membership, group_role: "treasurer" },
+    };
+    readViewCacheMock.mockReturnValue(null);
+    setupFetch({
+      detail: okJson(detailTreasurer),
+      meetings: okJson({ meetings: [] }),
+      approvalPatch: failText('{"error":"Approval rejected"}'),
+    });
+
+    sessionState.current = { session: { access_token: "token-1", user: { id: "u2" } } };
+    renderPayments();
+    await screen.findByText("Cycle ledger");
+    fireEvent.click(screen.getByRole("button", { name: /approve payment for ada l/i }));
+    expect(await screen.findByText("Approval rejected")).toBeInTheDocument();
+  });
+
+  it("shows treasurer payout fetch errors in the treasurer payouts panel", async () => {
+    const detailTreasurer = {
+      ...detailBase,
+      membership: { ...detailBase.membership, group_role: "treasurer" },
+    };
+    readViewCacheMock.mockReturnValue(null);
+    setupFetch({
+      detail: okJson(detailTreasurer),
+      meetings: okJson({ meetings: [] }),
+      treasurerPayouts: failText('{"error":"Payout list unavailable"}'),
+    });
+
+    sessionState.current = { session: { access_token: "token-1", user: { id: "u2" } } };
+    renderPayments();
+    expect(await screen.findByText("Payout list unavailable")).toBeInTheDocument();
+    expect(screen.getByText("No payout records available.")).toBeInTheDocument();
+  });
+
+  it("shows payout order save errors for treasurer managers", async () => {
+    const detail = {
+      ...detailBase,
+      stokvel: { ...detailBase.stokvel, type: "Rotating" },
+      membership: { ...detailBase.membership, group_role: "treasurer" },
+      members: [
+        { user_id: "u1", group_role: "treasurer", profiles: { full_name: "Treasurer One" } },
+        { user_id: "u2", group_role: "member", profiles: { full_name: "Member Two" } },
+        { user_id: "u3", group_role: "member", profiles: { full_name: "Member Three" } },
+      ],
+      payouts: [
+        {
+          id: "p1",
+          user_id: "u2",
+          target_month: "2099-12",
+          scheduled_payout_date: "2099-12-05",
+          cycle_index: 0,
+        },
+        {
+          id: "p2",
+          user_id: "u3",
+          target_month: "2100-01",
+          scheduled_payout_date: "2100-01-05",
+          cycle_index: 1,
+        },
+      ],
+    };
+    readViewCacheMock.mockReturnValue(null);
+    setupFetch({
+      detail: okJson(detail),
+      meetings: okJson({ meetings: [] }),
+      payoutOrderPatch: failText('{"error":"Reorder blocked"}'),
+    });
+
+    sessionState.current = { session: { access_token: "token-1", user: { id: "u1" } } };
+    renderPayments();
+    await screen.findByText("Payout schedule");
+    fireEvent.click(screen.getByRole("button", { name: /Save upcoming payout order/i }));
+    expect(await screen.findByText("Reorder blocked")).toBeInTheDocument();
+  });
+
+  it("surfaces missed-payment flag errors from the API", async () => {
+    const detailTreasurer = {
+      ...detailBase,
+      membership: { ...detailBase.membership, group_role: "treasurer" },
+      contributions: [],
+      payouts: [
+        {
+          id: "p-past",
+          user_id: "u2",
+          target_month: "2026-03",
+          scheduled_payout_date: "2026-03-05",
+          cycle_index: 0,
+        },
+      ],
+      currentCycle: { targetMonth: "2026-04", inPaymentWindow: true },
+    };
+    readViewCacheMock.mockReturnValue(null);
+    setupFetch({
+      detail: okJson(detailTreasurer),
+      meetings: okJson({ meetings: [] }),
+      missedPaymentPost: failText('{"error":"Cannot flag member"}'),
+    });
+
+    sessionState.current = { session: { access_token: "token-1", user: { id: "u2" } } };
+    renderPayments();
+    await screen.findByText("Cycle ledger");
+    fireEvent.click(screen.getByRole("button", { name: /^Flag$/i }));
+    expect(await screen.findByText(/Flag missed payment/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^Confirm$/i }));
+    expect(await screen.findByText("Cannot flag member")).toBeInTheDocument();
+  });
+
+  it("shows empty ledger copy when members exist but no payment history is recorded", async () => {
+    const detail = {
+      ...detailBase,
+      contributions: [],
+      payouts: [],
+      missedPayments: [],
+      currentCycle: null,
+    };
+    readViewCacheMock.mockReturnValue(null);
+    setupFetch({ detail: okJson(detail), meetings: okJson({ meetings: [] }) });
+
+    renderPayments();
+    await screen.findByText("No contribution cycles recorded yet.");
+    expect(screen.getByText("No payout schedule yet.")).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
   });
 });

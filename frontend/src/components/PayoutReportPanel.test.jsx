@@ -149,4 +149,17 @@ describe('PayoutReportPanel', () => {
       screen.queryByRole('heading', { name: 'Payout history' }),
     ).not.toBeInTheDocument()
   })
+
+  it('shows plain-text error body when the response is not JSON', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      text: async () => 'Service unavailable',
+    })
+
+    render(
+      <PayoutReportPanel stokvelId="stok-1" accessToken="token-1" enabled />,
+    )
+
+    expect(await screen.findByText('Service unavailable')).toBeInTheDocument()
+  })
 })
