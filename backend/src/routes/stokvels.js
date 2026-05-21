@@ -16,6 +16,7 @@ import {
   getCurrentPaymentCycle,
   getTargetMonthForPaidAt,
   isPaidAtInWindowForTargetMonth,
+  parsePaymentWindowDay,
   paymentWindowFromStokvel,
   zonedYmdParts,
 } from "../utils/dates.js";
@@ -818,12 +819,15 @@ router.patch("/:id", requireAuth, async (req, res) => {
       return res.status(403).json({ error: "Forbidden" });
     }
 
+    const body = req.body ?? {};
     const {
       name,
-      contribution_amount: contributionAmountRaw,
       meeting_frequency: meetingFrequencyRaw,
-      is_public: isPublicRaw,
-    } = req.body ?? {};
+      payment_window_start_day: paymentWindowStartSnake,
+      payment_window_end_day: paymentWindowEndSnake,
+      paymentWindowStartDay: paymentWindowStartCamel,
+      paymentWindowEndDay: paymentWindowEndCamel,
+    } = body;
 
     const patch = {};
 
@@ -834,16 +838,6 @@ router.patch("/:id", requireAuth, async (req, res) => {
           .json({ error: "name must be a non-empty string." });
       }
       patch.name = name.trim();
-    }
-
-    if (contributionAmountRaw !== undefined) {
-      const parsed = Number(contributionAmountRaw);
-      if (!Number.isFinite(parsed) || parsed <= 0) {
-        return res.status(400).json({
-          error: "contribution_amount must be a number greater than 0.",
-        });
-      }
-      patch.contribution_amount = parsed;
     }
 
     if (meetingFrequencyRaw !== undefined) {
@@ -860,11 +854,32 @@ router.patch("/:id", requireAuth, async (req, res) => {
       patch.meeting_frequency = meetingFrequencyRaw;
     }
 
-    if (isPublicRaw !== undefined) {
-      if (typeof isPublicRaw !== "boolean") {
-        return res.status(400).json({ error: "is_public must be a boolean." });
+    const paymentWindowStartRaw =
+      paymentWindowStartSnake !== undefined
+        ? paymentWindowStartSnake
+        : paymentWindowStartCamel;
+    if (paymentWindowStartRaw !== undefined) {
+      const startDay = parsePaymentWindowDay(paymentWindowStartRaw);
+      if (startDay == null) {
+        return res.status(400).json({
+          error: "payment_window_start_day must be an integer between 1 and 31.",
+        });
       }
-      patch.is_public = isPublicRaw;
+      patch.payment_window_start_day = startDay;
+    }
+
+    const paymentWindowEndRaw =
+      paymentWindowEndSnake !== undefined
+        ? paymentWindowEndSnake
+        : paymentWindowEndCamel;
+    if (paymentWindowEndRaw !== undefined) {
+      const endDay = parsePaymentWindowDay(paymentWindowEndRaw);
+      if (endDay == null) {
+        return res.status(400).json({
+          error: "payment_window_end_day must be an integer between 1 and 31.",
+        });
+      }
+      patch.payment_window_end_day = endDay;
     }
 
     if (Object.keys(patch).length === 0) {

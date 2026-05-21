@@ -51,9 +51,9 @@ describe("Settings", () => {
       okJson({
         stokvel: {
           name: "Alpha Group",
-          contribution_amount: 500,
           meeting_frequency: "weekly",
-          is_public: true,
+          payment_window_start_day: 20,
+          payment_window_end_day: 10,
         },
       }),
     );
@@ -61,9 +61,9 @@ describe("Settings", () => {
     render(<Settings />);
 
     expect(await screen.findByDisplayValue("Alpha Group")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("500")).toBeInTheDocument();
     expect(screen.getByLabelText("Meeting Frequency")).toHaveValue("weekly");
-    expect(screen.getByRole("checkbox")).toBeChecked();
+    expect(screen.getByLabelText(/payment window start day/i)).toHaveValue(20);
+    expect(screen.getByLabelText(/payment window end day/i)).toHaveValue(10);
   });
 
   it("normalizes unsupported meeting frequency to monthly", async () => {
@@ -71,9 +71,9 @@ describe("Settings", () => {
       okJson({
         stokvel: {
           name: "Alpha Group",
-          contribution_amount: 250,
           meeting_frequency: "quarterly",
-          is_public: false,
+          payment_window_start_day: 25,
+          payment_window_end_day: 5,
         },
       }),
     );
@@ -109,9 +109,9 @@ describe("Settings", () => {
         okJson({
           stokvel: {
             name: "Initial Group",
-            contribution_amount: 100,
             meeting_frequency: "monthly",
-            is_public: false,
+            payment_window_start_day: 25,
+            payment_window_end_day: 5,
           },
         }),
       )
@@ -119,9 +119,9 @@ describe("Settings", () => {
         okJson({
           stokvel: {
             name: "Updated Group",
-            contribution_amount: 350,
             meeting_frequency: "bi-weekly",
-            is_public: true,
+            payment_window_start_day: 22,
+            payment_window_end_day: 7,
           },
         }),
       );
@@ -130,30 +130,58 @@ describe("Settings", () => {
     await screen.findByDisplayValue("Initial Group");
 
     fireEvent.change(screen.getByLabelText("Group Name"), { target: { value: "  Updated Group  " } });
-    fireEvent.change(screen.getByLabelText("Monthly Contribution (R)"), {
-      target: { value: "350" },
-    });
     fireEvent.change(screen.getByLabelText("Meeting Frequency"), {
       target: { value: "bi-weekly" },
     });
-    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.change(screen.getByLabelText(/payment window start day/i), {
+      target: { value: "22" },
+    });
+    fireEvent.change(screen.getByLabelText(/payment window end day/i), {
+      target: { value: "7" },
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
 
     expect(await screen.findByText("Group settings updated successfully.")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Updated Group")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("350")).toBeInTheDocument();
     expect(screen.getByLabelText("Meeting Frequency")).toHaveValue("bi-weekly");
-    expect(screen.getByRole("checkbox")).toBeChecked();
+    expect(screen.getByLabelText(/payment window start day/i)).toHaveValue(22);
+    expect(screen.getByLabelText(/payment window end day/i)).toHaveValue(7);
 
     const patchCall = global.fetch.mock.calls.find(([, opts]) => opts?.method === "PATCH");
     const body = JSON.parse(patchCall[1].body);
     expect(body).toEqual({
       name: "Updated Group",
-      contribution_amount: 350,
       meeting_frequency: "bi-weekly",
-      is_public: true,
+      payment_window_start_day: 22,
+      payment_window_end_day: 7,
     });
+  });
+
+  it("shows client validation error for invalid payment window days", async () => {
+    global.fetch.mockResolvedValueOnce(
+      okJson({
+        stokvel: {
+          name: "Base",
+          meeting_frequency: "monthly",
+          payment_window_start_day: 25,
+          payment_window_end_day: 5,
+        },
+      }),
+    );
+
+    render(<Settings />);
+    await screen.findByDisplayValue("Base");
+
+    fireEvent.change(screen.getByLabelText(/payment window start day/i), {
+      target: { value: "32" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+
+    expect(
+      await screen.findByText("Payment window days must be whole numbers between 1 and 31."),
+    ).toBeInTheDocument();
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
   it("falls back to existing local values when PATCH response omits updated fields", async () => {
@@ -162,9 +190,9 @@ describe("Settings", () => {
         okJson({
           stokvel: {
             name: "Base Name",
-            contribution_amount: 100,
             meeting_frequency: "monthly",
-            is_public: false,
+            payment_window_start_day: 25,
+            payment_window_end_day: 5,
           },
         }),
       )
@@ -174,16 +202,16 @@ describe("Settings", () => {
     await screen.findByDisplayValue("Base Name");
 
     fireEvent.change(screen.getByLabelText("Group Name"), { target: { value: "Local Name" } });
-    fireEvent.change(screen.getByLabelText("Monthly Contribution (R)"), { target: { value: "410" } });
     fireEvent.change(screen.getByLabelText("Meeting Frequency"), { target: { value: "weekly" } });
-    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.change(screen.getByLabelText(/payment window start day/i), {
+      target: { value: "18" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
 
     expect(await screen.findByText("Group settings updated successfully.")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Local Name")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("410")).toBeInTheDocument();
     expect(screen.getByLabelText("Meeting Frequency")).toHaveValue("monthly");
-    expect(screen.getByRole("checkbox")).not.toBeChecked();
+    expect(screen.getByLabelText(/payment window start day/i)).toHaveValue(25);
   });
 
   it("shows save error from API and clears saving state", async () => {
@@ -192,9 +220,9 @@ describe("Settings", () => {
         okJson({
           stokvel: {
             name: "Base",
-            contribution_amount: 100,
             meeting_frequency: "monthly",
-            is_public: false,
+            payment_window_start_day: 25,
+            payment_window_end_day: 5,
           },
         }),
       )
