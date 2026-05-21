@@ -97,6 +97,86 @@ describe('QuickPayModal', () => {
     })
   })
 
+  it('reports missing Paystack reference after callback', async () => {
+    const setup = vi.fn(({ callback }) => ({
+      openIframe: () => callback({}),
+    }))
+    window.PaystackPop = { setup }
+
+    const props = baseProps()
+    const user = userEvent.setup()
+    render(<QuickPayModal {...props} />)
+    await user.click(screen.getByRole('button', { name: 'Pay Now' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Payment completed but reference is missing.')).toBeInTheDocument()
+      expect(props.onRecordError).toHaveBeenCalledWith('Payment completed but reference is missing.')
+    })
+  })
+
+  it('uses trxref when reference is absent', async () => {
+    const setup = vi.fn(({ callback }) => ({
+      openIframe: () => callback({ trxref: 'trxref-only' }),
+    }))
+    window.PaystackPop = { setup }
+    fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ success: true, contribution: { id: 'c2' } }),
+    })
+
+    const props = baseProps()
+    const user = userEvent.setup()
+    render(<QuickPayModal {...props} />)
+    await user.click(screen.getByRole('button', { name: 'Pay Now' }))
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/payments/verify'),
+        expect.objectContaining({
+          body: expect.stringContaining('trxref-only'),
+        }),
+      )
+      expect(props.onSuccess).toHaveBeenCalled()
+    })
+  })
+
+  it('shows error when verify succeeds but success flag is false', async () => {
+    const setup = vi.fn(({ callback }) => ({
+      openIframe: () => callback({ reference: 'pay-no-success' }),
+    }))
+    window.PaystackPop = { setup }
+    fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ success: false }),
+    })
+
+    const props = baseProps()
+    const user = userEvent.setup()
+    render(<QuickPayModal {...props} />)
+    await user.click(screen.getByRole('button', { name: 'Pay Now' }))
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Payment was verified but could not be recorded.'),
+      ).toBeInTheDocument()
+    })
+  })
+
+  it('shows cancelled message when the popup closes without a callback', async () => {
+    const setup = vi.fn(({ onClose }) => ({
+      openIframe: () => onClose?.(),
+    }))
+    window.PaystackPop = { setup }
+
+    const user = userEvent.setup()
+    render(<QuickPayModal {...baseProps()} />)
+    await user.click(screen.getByRole('button', { name: 'Pay Now' }))
+
+    expect(await screen.findByText('Payment was cancelled')).toBeInTheDocument()
+  })
+
   it('parses plain-text API errors when response is not JSON', async () => {
     const setup = vi.fn(({ callback }) => ({
       openIframe: () => callback({ reference: 'pay-ref-plain' }),

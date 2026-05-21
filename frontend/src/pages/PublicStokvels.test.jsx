@@ -193,6 +193,22 @@ describe("PublicStokvels", () => {
     expect(await screen.findByText("Join blocked")).toBeInTheDocument();
   });
 
+  it("shows invalid selection error when join is triggered without a stokvel id", async () => {
+    sessionState.current = { session: { access_token: "token-abc", user: { id: "u1" } } };
+    global.fetch.mockResolvedValueOnce(
+      responseOk(JSON.stringify([{ id: "", name: "Broken card", contribution_amount: 200, members_count: 2 }])),
+    );
+
+    render(<PublicStokvels />);
+    await screen.findByText("Broken card");
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+    expect(
+      await screen.findByText(/Invalid stokvel selection/i),
+    ).toBeInTheDocument();
+    expect(navState.navigate).not.toHaveBeenCalled();
+  });
+
   it("navigates to dashboard when API says user is already a member", async () => {
     sessionState.current = { session: { access_token: "token-abc", user: { id: "u1" } } };
     global.fetch

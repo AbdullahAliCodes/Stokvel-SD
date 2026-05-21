@@ -150,6 +150,37 @@ describe('PayoutReportPanel', () => {
     ).not.toBeInTheDocument()
   })
 
+  it('renders Member fallback, pending status, and invalid amount formatting', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      text: async () =>
+        JSON.stringify({
+          report: {
+            my_summary: { total_received_ytd: 0 },
+            history: [
+              {
+                id: 'h2',
+                user_id: 'u9',
+                target_month: '2026-02',
+                scheduled_payout_date: 'not-a-date',
+                expected_amount: 'nope',
+                status: 'scheduled',
+                profile: {},
+              },
+            ],
+            upcoming_projections: [],
+          },
+        }),
+    })
+
+    render(<PayoutReportPanel stokvelId="stok-1" accessToken="token-1" enabled />)
+
+    expect(await screen.findByText('Member')).toBeInTheDocument()
+    expect(screen.getByText('Pending')).toBeInTheDocument()
+    expect(screen.getAllByText('R 0').length).toBeGreaterThan(0)
+    expect(screen.getByText('not-a-date')).toBeInTheDocument()
+  })
+
   it('shows plain-text error body when the response is not JSON', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,

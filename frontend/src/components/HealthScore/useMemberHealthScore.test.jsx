@@ -130,6 +130,74 @@ describe('useMemberHealthScore', () => {
     )
   })
 
+  it('uses plain-text error bodies when health-score responses are not JSON', async () => {
+    mockFetch.mockImplementation(async (url) => {
+      const u = String(url)
+      if (u.endsWith('/api/me')) {
+        return {
+          ok: true,
+          text: async () => JSON.stringify({ user: { role: 'member' } }),
+        }
+      }
+      if (u.includes('/health-score')) {
+        return { ok: false, text: async () => 'Health score offline' }
+      }
+      throw new Error(`Unhandled fetch: ${u}`)
+    })
+
+    const { result } = renderHook(
+      () => useMemberHealthScore('u1', 'stok-1'),
+      { wrapper },
+    )
+
+    await waitFor(() => {
+      expect(result.current.error).toBe('Health score offline')
+    })
+  })
+
+  it('surfaces refresh failures without clearing the previous payload', async () => {
+    const { result } = renderHook(
+      () => useMemberHealthScore('u1', 'stok-1'),
+      { wrapper },
+    )
+
+    await waitFor(() => {
+      expect(result.current.payload?.score).toBe(78)
+    })
+
+    mockFetch.mockImplementation(async (url, init) => {
+      const u = String(url)
+      if (u.endsWith('/api/me')) {
+        return {
+          ok: true,
+          text: async () => JSON.stringify({ user: { role: 'member' } }),
+        }
+      }
+      if (u.includes('/health-score/refresh') && init?.method === 'POST') {
+        return {
+          ok: false,
+          text: async () => JSON.stringify({ error: 'Refresh denied' }),
+        }
+      }
+      if (u.includes('/health-score')) {
+        return {
+          ok: true,
+          text: async () => JSON.stringify(healthPayload),
+        }
+      }
+      throw new Error(`Unhandled fetch: ${u}`)
+    })
+
+    await act(async () => {
+      await result.current.refresh()
+    })
+
+    await waitFor(() => {
+      expect(result.current.error).toBe('Refresh denied')
+      expect(result.current.payload?.score).toBe(78)
+    })
+  })
+
   it('does not fetch when userId or groupId is missing', async () => {
     const { result } = renderHook(
       () => useMemberHealthScore('', 'stok-1'),

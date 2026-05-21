@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   adminPageBackTarget,
   groupDashboardPath,
@@ -26,6 +26,14 @@ describe('dashboardPaths', () => {
       localStorage.setItem('last_stokvel_id', '')
       expect(readLastStokvelId()).toBeNull()
     })
+
+    it('returns null when localStorage throws', () => {
+      const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+        throw new Error('storage blocked')
+      })
+      expect(readLastStokvelId()).toBeNull()
+      getItem.mockRestore()
+    })
   })
 
   describe('stokvelIdFromPath', () => {
@@ -35,6 +43,7 @@ describe('dashboardPaths', () => {
 
     it('returns null for non-group routes', () => {
       expect(stokvelIdFromPath('/account')).toBeNull()
+      expect(stokvelIdFromPath('')).toBeNull()
     })
   })
 
@@ -50,12 +59,23 @@ describe('dashboardPaths', () => {
 
     it('falls back to gateway when no id is known', () => {
       expect(groupDashboardPath(null)).toBe('/dashboard')
+      expect(groupDashboardPath('')).toBe('/dashboard')
+    })
+
+    it('treats an empty explicit id as missing and uses last_stokvel_id', () => {
+      localStorage.setItem('last_stokvel_id', 'saved-9')
+      expect(groupDashboardPath('')).toBe('/group/saved-9/dashboard')
     })
   })
 
   describe('adminPageBackTarget', () => {
-    it('returns null on admin groups hub', () => {
+    it('returns null on admin root and groups hub', () => {
+      expect(adminPageBackTarget('/admin')).toBeNull()
       expect(adminPageBackTarget('/admin/groups')).toBeNull()
+    })
+
+    it('returns null for non-admin paths', () => {
+      expect(adminPageBackTarget('/account')).toBeNull()
     })
 
     it('returns groups hub for other admin routes', () => {
