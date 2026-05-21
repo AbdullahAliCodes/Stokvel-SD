@@ -18,6 +18,7 @@ import {
   normalizeInviteEmail,
   sendInvitationEmail,
 } from './utils/invitations.js'
+import { backgroundEmail } from './utils/mailer.js'
 import cron from 'node-cron'
 import { fetchRepoRateFromFred } from './jobs/fetchRates.js'
 import marketRatesRouter from './routes/marketRates.js'
@@ -675,11 +676,13 @@ app.post('/api/stokvels', requireAuth, async (req, res) => {
         })
         if (invErr) throw invErr
         if (invRow?.token) {
-          await sendInvitationEmail({
-            to: em,
-            groupName: newStokvel.name,
-            token: invRow.token,
-          })
+          backgroundEmail(
+            sendInvitationEmail({
+              to: em,
+              groupName: newStokvel.name,
+              token: invRow.token,
+            }),
+          )
         }
         handledEmails.add(em)
       }
