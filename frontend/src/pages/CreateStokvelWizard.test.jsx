@@ -408,6 +408,126 @@ describe('CreateStokvelWizard', { timeout: 15000 }, () => {
     })
   })
 
+  describe('Member variant', () => {
+    const memberSession = {
+      access_token: 'member-token',
+      user: { id: 'member-uuid', email: 'member@test.com' },
+    }
+
+    it('renders the member apply heading', () => {
+      renderWithProviders(<CreateStokvelWizard variant="member" />, {
+        session: memberSession,
+      })
+      expect(screen.getByText('Apply to stokvel')).toBeInTheDocument()
+    })
+
+    it('requires a registered treasurer before leaving the members tab', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({ users: [] }),
+      })
+
+      renderWithProviders(<CreateStokvelWizard variant="member" />, {
+        session: memberSession,
+      })
+
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText(/Group name/i), {
+          target: { value: 'Member Group' },
+        })
+        fireEvent.change(screen.getByLabelText(/Contribution amount/i), {
+          target: { value: '200' },
+        })
+        fireEvent.click(screen.getByRole('button', { name: /Next/i }))
+      })
+
+      const searchInput = screen.getByPlaceholderText(/Search by name/i)
+
+      await act(async () => {
+        fireEvent.change(searchInput, { target: { value: 'invite@example.com' } })
+        vi.advanceTimersByTime(400)
+      })
+
+      const addBtn = await screen.findByRole('button', { name: /Add new member/i })
+      await act(async () => {
+        fireEvent.click(addBtn)
+      })
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Next/i }))
+      })
+
+      expect(
+        await screen.findByText(
+          /You must add at least one registered user to act as the Treasurer/i,
+        ),
+      ).toBeInTheDocument()
+    })
+
+    it('rejects usernames that are too short when adding a pending member', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        text: async () => JSON.stringify({ users: [] }),
+      })
+
+      renderWithProviders(<CreateStokvelWizard variant="admin" />, {
+        session: defaultSessionAdmin,
+      })
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Next/i }))
+      })
+
+      const searchInput = screen.getByPlaceholderText(/Search by name/i)
+
+      await act(async () => {
+        fireEvent.change(searchInput, { target: { value: 'ab' } })
+        fireEvent.focus(searchInput)
+        vi.advanceTimersByTime(400)
+      })
+
+      const addBtn = await screen.findByRole('button', { name: /Add new member/i })
+      await act(async () => {
+        fireEvent.click(addBtn)
+      })
+
+      expect(
+        await screen.findByText(/Username must be 3–30 characters/i),
+      ).toBeInTheDocument()
+    })
+
+    it('surfaces member search errors from the API', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        text: async () => JSON.stringify({ error: 'Search unavailable' }),
+      })
+
+      renderWithProviders(<CreateStokvelWizard variant="member" />, {
+        session: memberSession,
+      })
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Next/i }))
+      })
+
+      const searchInput = screen.getByPlaceholderText(/Search by name/i)
+
+      await act(async () => {
+        fireEvent.change(searchInput, { target: { value: 'jane' } })
+        fireEvent.focus(searchInput)
+        vi.advanceTimersByTime(400)
+      })
+
+      expect(await screen.findByText('Search unavailable')).toBeInTheDocument()
+    })
+  })
+
   describe('Submission', () => {
     it('submits form successfully', async () => {
       mockFetch.mockResolvedValueOnce({

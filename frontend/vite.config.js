@@ -18,6 +18,8 @@ export default defineConfig({
         'src/**/*.test.{js,jsx}',
         'src/test/**',
         'src/main.jsx',
+        'src/data/**',
+        'src/**/index.js',
       ],
       thresholds: {
         lines: 80,

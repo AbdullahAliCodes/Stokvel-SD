@@ -42,7 +42,11 @@ vi.mock('../components/PublicFooter', () => ({
 }))
 
 vi.mock('../components/OpportunityCard', () => ({
-    default: ({ name }) => <div data-testid="opportunity-card">{name}</div>,
+    default: ({ name, onApply, isJoining }) => (
+        <button type="button" onClick={onApply} disabled={isJoining}>
+            Apply to {name}
+        </button>
+    ),
 }))
 
 vi.mock('../assets/landing', () => ({
@@ -349,7 +353,58 @@ describe('Landing page', () => {
         it('renders only the first 3 opportunity cards', async () => {
             renderLanding()
             await waitFor(() => {
-                expect(screen.getAllByTestId('opportunity-card')).toHaveLength(3)
+                expect(screen.getAllByRole('button', { name: /^Apply to /i })).toHaveLength(3)
+            })
+        })
+
+        it('redirects guests to auth when applying from the landing grid', async () => {
+            renderLanding({ session: guestSession })
+
+            await waitFor(() => {
+                expect(screen.getAllByRole('button', { name: /^Apply to /i })).toHaveLength(3)
+            })
+
+            fireEvent.click(screen.getByRole('button', { name: /Apply to Savings Circle A/i }))
+
+            expect(mockNavigate).toHaveBeenCalledWith('/auth')
+        })
+
+        it('joins a public stokvel and navigates to the group dashboard', async () => {
+            mockFetch.mockImplementation(async (url, init) => {
+                const u = String(url)
+                if (u.includes('/api/public/stokvels')) {
+                    return {
+                        ok: true,
+                        text: async () =>
+                            JSON.stringify([
+                                {
+                                    id: 'stok-join-1',
+                                    name: 'Savings Circle A',
+                                    type: 'Rotating',
+                                    contribution_amount: 500,
+                                    members_count: 10,
+                                    cycle_length: 6,
+                                },
+                            ]),
+                    }
+                }
+                if (u.endsWith('/join') && init?.method === 'POST') {
+                    return { ok: true, text: async () => JSON.stringify({ ok: true }) }
+                }
+                return { ok: true, text: async () => JSON.stringify([]) }
+            })
+
+            renderLanding({ session: memberSession })
+
+            const applyBtn = await screen.findByRole('button', {
+                name: /Apply to Savings Circle A/i,
+            })
+            fireEvent.click(applyBtn)
+
+            await waitFor(() => {
+                expect(mockNavigate).toHaveBeenCalledWith('/group/stok-join-1/dashboard', {
+                    replace: true,
+                })
             })
         })
 
