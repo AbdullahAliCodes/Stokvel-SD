@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import DashboardLayout from './DashboardLayout'
 import { SessionContext } from '../context/SessionContext'
 
@@ -34,10 +35,18 @@ const memberships = [
 ]
 
 function renderLayout(initialPath) {
-  global.fetch = vi.fn(async () => ({
-    ok: true,
-    text: async () => JSON.stringify({ memberships }),
-  }))
+  global.fetch = vi.fn(async (url) => {
+    if (String(url).includes('/api/profile/me')) {
+      return {
+        ok: true,
+        text: async () => JSON.stringify({ profile: { firstName: 'Ada' } }),
+      }
+    }
+    return {
+      ok: true,
+      text: async () => JSON.stringify({ memberships }),
+    }
+  })
 
   return render(
     <SessionContext.Provider
@@ -75,5 +84,30 @@ describe('DashboardLayout page content', () => {
     renderLayout('/account')
     expect(await screen.findByText('Account page')).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Back to dashboard' })).not.toBeInTheDocument()
+  })
+
+  it('shows a welcome message with the member first name above Account', async () => {
+    renderLayout('/account')
+    await screen.findByText('Account page')
+    expect(screen.getAllByText('Welcome back, Ada').length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('exposes a mobile menu toggle and closes the drawer via backdrop', async () => {
+    const user = userEvent.setup()
+    renderLayout('/account')
+    await screen.findByText('Account page')
+
+    const openBtn = screen.getByRole('button', { name: 'Open menu' })
+    expect(openBtn).toHaveAttribute('aria-expanded', 'false')
+
+    await user.click(openBtn)
+    expect(screen.getByRole('button', { name: 'Close menu' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    )
+    expect(screen.getByLabelText('Stokvel')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Dismiss menu overlay' }))
+    expect(screen.getByRole('button', { name: 'Open menu' })).toBeInTheDocument()
   })
 })

@@ -23,6 +23,8 @@ import {
   Shield,
   BarChart3,
   HeartPulse,
+  Menu,
+  X,
 } from "lucide-react";
 import { supabase } from "../utils/supabase";
 import { useSession } from "../context/SessionContext";
@@ -66,8 +68,25 @@ export default function DashboardLayout() {
   const stokvel_id = groupPathMatch?.[1] ?? undefined;
   const [memberships, setMemberships] = useState(null);
   const [fetchError, setFetchError] = useState(null);
+  const [firstName, setFirstName] = useState("");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const scopedPrefix = stokvel_id ? `/group/${stokvel_id}` : null;
+
+  const closeMobileNav = () => setMobileNavOpen(false);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev || "";
+    };
+  }, [mobileNavOpen]);
 
   useEffect(() => {
     if (!session?.user?.id || !session?.access_token) return;
@@ -111,6 +130,32 @@ export default function DashboardLayout() {
       cancelled = true;
     };
   }, [session]);
+
+  useEffect(() => {
+    if (!session?.access_token) return;
+
+    let cancelled = false;
+
+    async function loadProfile() {
+      try {
+        const res = await fetch(apiUrl("/api/profile/me"), {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        const text = await res.text();
+        if (!res.ok) return;
+        const data = JSON.parse(text);
+        const name = String(data.profile?.firstName ?? "").trim();
+        if (!cancelled) setFirstName(name);
+      } catch {
+        /* non-blocking sidebar label */
+      }
+    }
+
+    loadProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.access_token]);
 
   const { activeStokvels, pendingOrRejected } = useMemo(() => {
     const list =
@@ -190,6 +235,7 @@ export default function DashboardLayout() {
   const handleStokvelSelect = (e) => {
     const v = e.target.value;
     if (!v) return;
+    closeMobileNav();
     navigate(`/group/${v}/dashboard`, { replace: false });
   };
 
@@ -206,8 +252,50 @@ export default function DashboardLayout() {
     fetchError && memberships !== null && memberships.length === 0;
 
   return (
-    <div className="box-border flex min-h-dvh w-full flex-col gap-3 overflow-y-auto bg-[#F4F5F0] p-3 text-stone-800 dark:bg-slate-950 dark:text-stone-100 md:h-dvh md:min-h-0 md:flex-row md:gap-4 md:overflow-hidden md:p-4">
-      <aside className="flex w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900 md:h-full md:w-[220px] md:min-w-[220px] md:max-w-[220px]">
+    <div className="box-border flex h-dvh max-h-dvh min-h-0 w-full flex-col gap-3 overflow-hidden bg-[#F4F5F0] p-3 text-stone-800 dark:bg-slate-950 dark:text-stone-100 md:flex-row md:gap-4 md:p-4">
+      <header className="flex shrink-0 items-center gap-3 rounded-2xl border border-stone-200 bg-white px-3 py-2.5 shadow-sm dark:border-slate-700 dark:bg-slate-900 md:hidden">
+        <button
+          type="button"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-stone-200 bg-stone-50 text-stone-700 transition hover:bg-stone-100 dark:border-slate-600 dark:bg-slate-800 dark:text-stone-200 dark:hover:bg-slate-700"
+          aria-label={mobileNavOpen ? "Close menu" : "Open menu"}
+          aria-expanded={mobileNavOpen}
+          onClick={() => setMobileNavOpen((open) => !open)}
+        >
+          {mobileNavOpen ? (
+            <X className="h-5 w-5" strokeWidth={1.75} aria-hidden />
+          ) : (
+            <Menu className="h-5 w-5" strokeWidth={1.75} aria-hidden />
+          )}
+        </button>
+        <div className="min-w-0 flex-1">
+          <BrandLogo to="/dashboard" imgClassName="h-9 w-auto" />
+        </div>
+        <div className="flex max-w-[42%] flex-col items-end gap-1 text-right">
+          <span
+            className={`rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${sidebarRoleBadge.className}`}
+          >
+            {sidebarRoleBadge.label}
+          </span>
+          <span className="truncate text-xs font-medium text-stone-600 dark:text-stone-300">
+            Welcome back, {firstName || "user"}
+          </span>
+        </div>
+      </header>
+
+      {mobileNavOpen ? (
+        <button
+          type="button"
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          aria-label="Dismiss menu overlay"
+          onClick={closeMobileNav}
+        />
+      ) : null}
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex h-dvh max-h-dvh w-[min(100vw-1.5rem,280px)] max-w-[85vw] flex-col overflow-hidden rounded-r-2xl border border-stone-200 bg-white shadow-lg transition-transform duration-200 ease-out dark:border-slate-700 dark:bg-slate-900 md:static md:z-auto md:h-full md:w-[220px] md:min-w-[220px] md:max-w-[220px] md:rounded-2xl md:shadow-sm md:transition-none ${
+          mobileNavOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        }`}
+      >
         <div className="shrink-0 border-b border-stone-200 p-3 dark:border-slate-700">
           <label
             htmlFor="stokvel-selector"
@@ -238,7 +326,7 @@ export default function DashboardLayout() {
             })}
           </select>
         </div>
-        <div className="shrink-0 border-b border-stone-200 p-4 dark:border-slate-700">
+        <div className="hidden shrink-0 border-b border-stone-200 p-4 dark:border-slate-700 md:block">
           <div
             className={`rounded-lg py-2 text-center text-xs font-bold uppercase tracking-wide ${sidebarRoleBadge.className}`}
           >
@@ -253,6 +341,7 @@ export default function DashboardLayout() {
             to={scopedPrefix ? `${scopedPrefix}/dashboard` : "/dashboard"}
             className={linkClass}
             end
+            onClick={closeMobileNav}
           >
             <LayoutDashboard
               className="h-4 w-4 shrink-0 text-emerald-700"
@@ -269,6 +358,7 @@ export default function DashboardLayout() {
                   : "/dashboard"
             }
             className={linkClass}
+            onClick={closeMobileNav}
           >
             <Calendar
               className="h-4 w-4 shrink-0 text-emerald-700"
@@ -285,6 +375,7 @@ export default function DashboardLayout() {
                   : "/dashboard"
             }
             className={linkClass}
+            onClick={closeMobileNav}
           >
             <Wallet className="h-4 w-4 shrink-0 text-emerald-700" aria-hidden />
             Payments
@@ -298,6 +389,7 @@ export default function DashboardLayout() {
                   : "/dashboard"
             }
             className={linkClass}
+            onClick={closeMobileNav}
           >
             <BarChart3
               className="h-4 w-4 shrink-0 text-emerald-700"
@@ -314,6 +406,7 @@ export default function DashboardLayout() {
                   : "/dashboard"
             }
             className={linkClass}
+            onClick={closeMobileNav}
           >
             <HeartPulse
               className="h-4 w-4 shrink-0 text-emerald-700"
@@ -322,13 +415,17 @@ export default function DashboardLayout() {
             Financial Health
           </NavLink>
           {String(userRole || "").toLowerCase() === "admin" ? (
-            <NavLink to="/admin/groups" className={linkClass}>
+            <NavLink to="/admin/groups" className={linkClass} onClick={closeMobileNav}>
               <Shield className="h-4 w-4 shrink-0 text-emerald-700" aria-hidden />
               Back to admin
             </NavLink>
           ) : null}
           {effectiveGroupRole === "admin" && scopedPrefix ? (
-            <NavLink to={`${scopedPrefix}/settings`} className={linkClass}>
+            <NavLink
+              to={`${scopedPrefix}/settings`}
+              className={linkClass}
+              onClick={closeMobileNav}
+            >
               <Settings
                 className="h-4 w-4 shrink-0 text-emerald-700"
                 aria-hidden
@@ -338,17 +435,21 @@ export default function DashboardLayout() {
           ) : null}
         </nav>
         <div className="mx-2 mb-2 flex shrink-0 flex-col gap-1">
-          <NavLink to="/account" className={linkClass}>
+          <p className="px-3 pb-1 text-sm font-medium text-stone-600 dark:text-stone-300">
+            Welcome back, {firstName || "user"}
+          </p>
+          <NavLink to="/account" className={linkClass} onClick={closeMobileNav}>
             <User className="h-4 w-4 shrink-0 text-emerald-700" aria-hidden />
             Account
           </NavLink>
-          <NavLink to="/support" className={linkClass}>
+          <NavLink to="/support" className={linkClass} onClick={closeMobileNav}>
             <LifeBuoy className="h-4 w-4 shrink-0 text-stone-500" aria-hidden />
             Support
           </NavLink>
           <Link
             to="/apply"
             className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-stone-600 transition hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-slate-800 dark:hover:text-stone-100"
+            onClick={closeMobileNav}
           >
             <UserPlus
               className="h-4 w-4 shrink-0 text-emerald-700"
@@ -357,7 +458,7 @@ export default function DashboardLayout() {
             Apply to stokvel
           </Link>
           {pendingOrRejected.length > 0 ? (
-            <NavLink to="/apply" className={linkClass}>
+            <NavLink to="/apply" className={linkClass} onClick={closeMobileNav}>
               <ClipboardList
                 className="h-4 w-4 shrink-0 text-emerald-700"
                 aria-hidden
@@ -368,6 +469,7 @@ export default function DashboardLayout() {
           <Link
             to="/"
             className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-stone-600 transition hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-slate-800 dark:hover:text-stone-100"
+            onClick={closeMobileNav}
           >
             <Home className="h-4 w-4" aria-hidden />
             Back to Home
