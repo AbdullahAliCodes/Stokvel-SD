@@ -12,17 +12,20 @@ export function getMailer() {
   cachedTransporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
     port: 465,
-    secure: true,
-    family: 4,
-    connectionTimeout: 10_000,
-    greetingTimeout: 10_000,
-    socketTimeout: 20_000,
+    secure: true, // explicitly use SSL
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_APP_PASSWORD,
     },
   })
   return cachedTransporter
+}
+
+/** Dispatch email without blocking the HTTP handler. */
+export function backgroundEmail(promise) {
+  Promise.resolve(promise).catch((err) => {
+    console.error('Background email failed:', err?.message ?? err)
+  })
 }
 
 export async function sendMailSafe(payload) {

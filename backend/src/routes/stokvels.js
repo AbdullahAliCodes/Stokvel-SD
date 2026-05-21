@@ -4,6 +4,7 @@ import {
   normalizeInviteEmail,
   sendMeetingScheduledEmail,
 } from "../utils/invitations.js";
+import { backgroundEmail } from "../utils/mailer.js";
 import {
   getServiceSupabase,
   createUserJwtSupabase,
@@ -1025,8 +1026,8 @@ router.post("/:id/meetings", requireAuth, async (req, res) => {
         })),
         recipients,
       });
-      await Promise.all(
-        recipients.map((to) =>
+      for (const to of recipients) {
+        backgroundEmail(
           sendMeetingScheduledEmail({
             to,
             groupName: stokvel?.name || "Your stokvel",
@@ -1035,8 +1036,8 @@ router.post("/:id/meetings", requireAuth, async (req, res) => {
             meetingLink: created.meeting_link,
             agenda: created.agenda || created.notes || "",
           }),
-        ),
-      );
+        );
+      }
     }
 
     return res.status(201).json({ success: true, meeting: created });

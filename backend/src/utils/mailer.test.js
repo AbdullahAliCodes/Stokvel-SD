@@ -86,10 +86,6 @@ describe('Mailer Utility', () => {
         host: 'smtp.gmail.com',
         port: 465,
         secure: true,
-        family: 4,
-        connectionTimeout: 10_000,
-        greetingTimeout: 10_000,
-        socketTimeout: 20_000,
         auth: {
           user: 'test@example.com',
           pass: 'secure-password',

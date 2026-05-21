@@ -13,6 +13,7 @@ import {
   sendGroupStatusEmail,
   sendInvitationEmail,
 } from "../utils/invitations.js";
+import { backgroundEmail } from "../utils/mailer.js";
 import { activateStokvel } from "../utils/stokvelActivation.js";
 import {
   computeFixedMaturityFromCycle,
@@ -304,19 +305,17 @@ async function notifyAllCurrentMembersAdded(client, { stokvelId, groupName }) {
   );
   const emailed = new Set();
 
-  await Promise.all(
-    members.map(async (m) => {
-      const userId = m?.user_id;
-      const to = emailByUserId.get(userId);
-      if (!to || emailed.has(to)) return;
-      emailed.add(to);
-      const role =
-        typeof m?.group_role === "string" && m.group_role.trim()
-          ? m.group_role.trim()
-          : "member";
-      await sendGroupAddedEmail({ to, groupName, role });
-    }),
-  );
+  for (const m of members) {
+    const userId = m?.user_id;
+    const to = emailByUserId.get(userId);
+    if (!to || emailed.has(to)) continue;
+    emailed.add(to);
+    const role =
+      typeof m?.group_role === "string" && m.group_role.trim()
+        ? m.group_role.trim()
+        : "member";
+    backgroundEmail(sendGroupAddedEmail({ to, groupName, role }));
+  }
 }
 
 async function notifyMemberAdded(client, { userId, groupName, role }) {
@@ -327,7 +326,7 @@ async function notifyMemberAdded(client, { userId, groupName, role }) {
     .maybeSingle();
   const to = normalizeInviteEmail(profile?.email);
   if (!to) return;
-  await sendGroupAddedEmail({ to, groupName, role });
+  backgroundEmail(sendGroupAddedEmail({ to, groupName, role }));
 }
 
 router.get("/users", requireAuth, requireAdmin, async (req, res) => {
@@ -706,15 +705,15 @@ router.post("/stokvels", requireAuth, requireAdmin, async (req, res) => {
       initialMemberIds,
       req.user.id,
     );
-    await Promise.all(
-      allAddedIds.map((userId) =>
+    for (const userId of allAddedIds) {
+      backgroundEmail(
         notifyMemberAdded(client, {
           userId,
           groupName: stokvel.name,
           role: "member",
         }),
-      ),
-    );
+      );
+    }
 
     const svcAct = getServiceSupabase() ?? client;
     const act = await activateStokvel(stokvel.id, svcAct);
@@ -859,11 +858,13 @@ router.post(
           .json({ error: insertError.message || "Failed to add member" });
       }
 
-      await notifyMemberAdded(client, {
-        userId: targetUserId,
-        groupName: group.name,
-        role: invitedGroupRole,
-      });
+      backgroundEmail(
+        notifyMemberAdded(client, {
+          userId: targetUserId,
+          groupName: group.name,
+          role: invitedGroupRole,
+        }),
+      );
 
       return res.status(201).json({ success: true, userId: targetUserId });
     } catch (err) {
@@ -916,7 +917,7 @@ router.post(
           );
         if (upsertErr)
           return res.status(500).json({ error: upsertErr.message });
-        await sendGroupAddedEmail({ to: email, groupName: group.name, role });
+        backgroundEmail(sendGroupAddedEmail({ to: email, groupName: group.name, role }));
         return res
           .status(201)
           .json({ success: true, mode: "added_existing_user" });
@@ -934,11 +935,13 @@ router.post(
       if (inviteError)
         return res.status(500).json({ error: inviteError.message });
 
-      await sendInvitationEmail({
-        to: email,
-        groupName: group.name,
-        token: invite.token,
-      });
+      backgroundEmail(
+        sendInvitationEmail({
+          to: email,
+          groupName: group.name,
+          token: invite.token,
+        }),
+      );
       return res.status(201).json({ success: true, mode: "invite_sent" });
     } catch (err) {
       console.error("POST /api/admin/stokvels/:stokvelId/invitations:", err);
@@ -1215,11 +1218,13 @@ router.patch(
                   { onConflict: "stokvel_id,user_id" },
                 );
               if (!insErr) {
-                await sendGroupAddedEmail({
-                  to: inviteEmail,
-                  groupName: groupNameForInvites,
-                  role,
-                });
+                backgroundEmail(
+                  sendGroupAddedEmail({
+                    to: inviteEmail,
+                    groupName: groupNameForInvites,
+                    role,
+                  }),
+                );
               }
             } else {
               const { data: created } = await createInvitation(client, {
@@ -1230,11 +1235,13 @@ router.patch(
                 groupRole: inviteRole,
               });
               if (created?.token) {
-                await sendInvitationEmail({
-                  to: inviteEmail,
-                  groupName: groupNameForInvites,
-                  token: created.token,
-                });
+                backgroundEmail(
+                  sendInvitationEmail({
+                    to: inviteEmail,
+                    groupName: groupNameForInvites,
+                    token: created.token,
+                  }),
+                );
               }
             }
 
@@ -1308,18 +1315,22 @@ router.patch(
           recipient &&
           (body.status === "active" || body.status === "rejected")
         ) {
-          await sendGroupStatusEmail({
-            to: recipient,
-            groupName: finalRow.name,
-            status: body.status,
-          });
+          backgroundEmail(
+            sendGroupStatusEmail({
+              to: recipient,
+              groupName: finalRow.name,
+              status: body.status,
+            }),
+          );
         }
       }
       if (body.status === "active") {
-        await notifyAllCurrentMembersAdded(client, {
-          stokvelId,
-          groupName: finalRow.name,
-        });
+        backgroundEmail(
+          notifyAllCurrentMembersAdded(client, {
+            stokvelId,
+            groupName: finalRow.name,
+          }),
+        );
       }
 
       return res.json({ success: true, stokvel: finalRow });
