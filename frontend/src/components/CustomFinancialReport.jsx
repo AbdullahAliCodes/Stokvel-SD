@@ -7,8 +7,8 @@ import {
   labelLight,
   tableHead,
   tableRow,
-  tableWrap,
 } from "../ui";
+import TableScrollArea from "./ui/TableScrollArea";
 import { downloadCsv, downloadPdf } from "../utils/reportExport";
 
 const COLUMN_KEYS = [
@@ -449,7 +449,7 @@ export default function CustomFinancialReport({
           Select at least one column to display the table.
         </p>
       ) : (
-        <div className={tableWrap}>
+        <TableScrollArea>
           <table className="w-full min-w-[480px] text-left text-sm text-stone-800 dark:text-stone-100">
             <thead>
               <tr className={tableHead}>
@@ -487,7 +487,7 @@ export default function CustomFinancialReport({
               )}
             </tbody>
           </table>
-        </div>
+        </TableScrollArea>
       )}
 
       <p className="mt-3 text-xs text-stone-500 dark:text-stone-400">

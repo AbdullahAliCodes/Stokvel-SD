@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import { BarChart3 } from 'lucide-react'
 import { useAlert } from '../context/ModalContext'
 import { EmptyState } from './ui'
+import TableScrollArea from './ui/TableScrollArea'
 import {
   BarChart,
   Bar,
@@ -315,7 +316,7 @@ export default function ComplianceReportWidget({
         ) : null}
 
         {view === 'table' ? (
-          <div className="overflow-x-auto">
+          <TableScrollArea hint="Swipe sideways to see all months">
             <table className="w-full min-w-[480px] text-left text-sm text-stone-800 dark:text-stone-100">
               <thead>
                 <tr className={tableHead}>
@@ -356,7 +357,7 @@ export default function ComplianceReportWidget({
                 ))}
               </tbody>
             </table>
-            </div>
+          </TableScrollArea>
         ) : null}
       </div>
 
