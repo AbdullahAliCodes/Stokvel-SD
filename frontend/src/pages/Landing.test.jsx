@@ -369,6 +369,51 @@ describe('Landing page', () => {
             expect(mockNavigate).toHaveBeenCalledWith('/auth')
         })
 
+        it('renders no opportunity cards when public stokvels request is not ok', async () => {
+            mockFetch.mockResolvedValueOnce({
+                ok: false,
+                text: async () => JSON.stringify({ error: 'Unavailable' }),
+            })
+
+            renderLanding()
+
+            await waitFor(() => {
+                expect(mockFetch).toHaveBeenCalledWith(
+                    'http://localhost/api/public/stokvels',
+                    expect.objectContaining({ signal: expect.any(AbortSignal) }),
+                )
+            })
+
+            expect(screen.queryAllByRole('button', { name: /^Apply to /i })).toHaveLength(0)
+        })
+
+        it('renders no opportunity cards when public stokvels payload is not an array', async () => {
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                text: async () => JSON.stringify({ items: [] }),
+            })
+
+            renderLanding()
+
+            await waitFor(() => {
+                expect(mockFetch).toHaveBeenCalled()
+            })
+
+            expect(screen.queryAllByRole('button', { name: /^Apply to /i })).toHaveLength(0)
+        })
+
+        it('silently handles network errors while loading public stokvels', async () => {
+            mockFetch.mockRejectedValueOnce(new Error('network down'))
+
+            renderLanding()
+
+            await waitFor(() => {
+                expect(mockFetch).toHaveBeenCalled()
+            })
+
+            expect(screen.queryAllByRole('button', { name: /^Apply to /i })).toHaveLength(0)
+        })
+
         it('joins a public stokvel and navigates to the group dashboard', async () => {
             mockFetch.mockImplementation(async (url, init) => {
                 const u = String(url)
@@ -406,6 +451,137 @@ describe('Landing page', () => {
                     replace: true,
                 })
             })
+        })
+
+        it('still navigates when join fails with already a member', async () => {
+            mockFetch.mockImplementation(async (url, init) => {
+                const u = String(url)
+                if (u.includes('/api/public/stokvels')) {
+                    return {
+                        ok: true,
+                        text: async () =>
+                            JSON.stringify([
+                                {
+                                    id: 'stok-join-1',
+                                    name: 'Savings Circle A',
+                                    type: 'Rotating',
+                                    contribution_amount: 500,
+                                    members_count: 10,
+                                    cycle_length: 6,
+                                },
+                            ]),
+                    }
+                }
+                if (u.endsWith('/join') && init?.method === 'POST') {
+                    return {
+                        ok: false,
+                        text: async () =>
+                            JSON.stringify({ error: 'You are already a member of this group' }),
+                    }
+                }
+                return { ok: true, text: async () => JSON.stringify([]) }
+            })
+
+            renderLanding({ session: memberSession })
+
+            const applyBtn = await screen.findByRole('button', {
+                name: /Apply to Savings Circle A/i,
+            })
+            fireEvent.click(applyBtn)
+
+            await waitFor(() => {
+                expect(mockNavigate).toHaveBeenCalledWith('/group/stok-join-1/dashboard', {
+                    replace: true,
+                })
+            })
+        })
+
+        it('does not navigate when join fails with a non-member error', async () => {
+            mockFetch.mockImplementation(async (url, init) => {
+                const u = String(url)
+                if (u.includes('/api/public/stokvels')) {
+                    return {
+                        ok: true,
+                        text: async () =>
+                            JSON.stringify([
+                                {
+                                    id: 'stok-join-1',
+                                    name: 'Savings Circle A',
+                                    type: 'Rotating',
+                                    contribution_amount: 500,
+                                    members_count: 10,
+                                    cycle_length: 6,
+                                },
+                            ]),
+                    }
+                }
+                if (u.endsWith('/join') && init?.method === 'POST') {
+                    return {
+                        ok: false,
+                        text: async () => JSON.stringify({ error: 'Forbidden' }),
+                    }
+                }
+                return { ok: true, text: async () => JSON.stringify([]) }
+            })
+
+            renderLanding({ session: memberSession })
+
+            const applyBtn = await screen.findByRole('button', {
+                name: /Apply to Savings Circle A/i,
+            })
+            fireEvent.click(applyBtn)
+
+            await waitFor(() => {
+                expect(mockFetch).toHaveBeenCalledWith(
+                    'http://localhost/api/stokvels/stok-join-1/join',
+                    expect.objectContaining({ method: 'POST' }),
+                )
+            })
+
+            expect(mockNavigate).not.toHaveBeenCalledWith(
+                '/group/stok-join-1/dashboard',
+                expect.anything(),
+            )
+        })
+
+        it('parses plain-text join errors without navigating', async () => {
+            mockFetch.mockImplementation(async (url, init) => {
+                const u = String(url)
+                if (u.includes('/api/public/stokvels')) {
+                    return {
+                        ok: true,
+                        text: async () =>
+                            JSON.stringify([
+                                {
+                                    id: 'stok-join-1',
+                                    name: 'Savings Circle A',
+                                    type: 'Rotating',
+                                    contribution_amount: 500,
+                                    members_count: 10,
+                                    cycle_length: 6,
+                                },
+                            ]),
+                    }
+                }
+                if (u.endsWith('/join') && init?.method === 'POST') {
+                    return { ok: false, text: async () => 'Join denied' }
+                }
+                return { ok: true, text: async () => JSON.stringify([]) }
+            })
+
+            renderLanding({ session: memberSession })
+
+            fireEvent.click(
+                await screen.findByRole('button', { name: /Apply to Savings Circle A/i }),
+            )
+
+            await waitFor(() => {
+                expect(mockFetch).toHaveBeenCalledWith(
+                    'http://localhost/api/stokvels/stok-join-1/join',
+                    expect.any(Object),
+                )
+            })
+            expect(mockNavigate).not.toHaveBeenCalled()
         })
 
         it('renders View all public stokvels link', () => {
