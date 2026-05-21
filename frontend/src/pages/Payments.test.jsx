@@ -271,6 +271,8 @@ describe("Payments", () => {
 
     renderPayments();
     await screen.findByText("Payments & finances");
+    expect(screen.getByText(/Active cycle: 2026-04/i)).toBeInTheDocument();
+    expect(screen.getByText(/Payment window: 25 Mar 2026 – 0?5 Apr 2026/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Pay monthly contribution/i }));
     expect(screen.getByTestId("quickpay-modal")).toBeInTheDocument();
