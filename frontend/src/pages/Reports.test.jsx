@@ -33,14 +33,6 @@ vi.mock('../utils/viewCache', () => ({
   writeViewCache: (...args) => writeViewCacheMock(...args),
 }))
 
-vi.mock('../components/PayoutReportPanel', () => ({
-  default: ({ stokvelId, enabled }) => (
-    <div data-testid="payout-report-panel" data-stokvel-id={stokvelId} data-enabled={String(enabled)}>
-      PayoutReportPanel
-    </div>
-  ),
-}))
-
 vi.mock('../components/CustomFinancialReport', () => ({
   default: () => <div data-testid="custom-financial-report">CustomFinancialReport</div>,
 }))
@@ -70,6 +62,20 @@ function okDetailJson() {
   }
 }
 
+function okPayoutReportJson() {
+  return {
+    ok: true,
+    text: async () =>
+      JSON.stringify({
+        report: {
+          my_summary: { total_received_ytd: 0 },
+          history: [],
+          upcoming_projections: [],
+        },
+      }),
+  }
+}
+
 describe('Reports', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -80,7 +86,9 @@ describe('Reports', () => {
     }
     readViewCacheMock.mockReturnValue(null)
     global.fetch = vi.fn(async (url) => {
-      if (String(url).endsWith('/api/stokvels/stok-1')) return okDetailJson()
+      const u = String(url)
+      if (u.endsWith('/api/stokvels/stok-1')) return okDetailJson()
+      if (u.endsWith('/api/stokvels/stok-1/payout-report')) return okPayoutReportJson()
       throw new Error(`Unhandled fetch: ${url}`)
     })
   })
@@ -91,13 +99,13 @@ describe('Reports', () => {
     expect(screen.getByRole('heading', { name: 'Reports' })).toBeInTheDocument()
 
     await waitFor(() => {
-      expect(screen.getByTestId('payout-report-panel')).toBeInTheDocument()
+      expect(
+        screen.getByRole('heading', { name: 'Payout History and Projections' }),
+      ).toBeInTheDocument()
     })
 
     expect(screen.getByTestId('custom-financial-report')).toBeInTheDocument()
     expect(screen.getByTestId('compliance-report-widget')).toBeInTheDocument()
-    expect(screen.getByTestId('payout-report-panel')).toHaveAttribute('data-stokvel-id', 'stok-1')
-    expect(screen.getByTestId('payout-report-panel')).toHaveAttribute('data-enabled', 'true')
   })
 
   it('shows sign-in message when session is missing', () => {
@@ -106,7 +114,9 @@ describe('Reports', () => {
     render(<Reports />)
 
     expect(screen.getByText(/Sign in to view reports/i)).toBeInTheDocument()
-    expect(screen.queryByTestId('payout-report-panel')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', { name: 'Payout History and Projections' }),
+    ).not.toBeInTheDocument()
   })
 
   it('shows error when stokvel fetch fails', async () => {
