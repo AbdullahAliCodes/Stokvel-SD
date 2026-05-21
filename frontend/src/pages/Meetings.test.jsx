@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { toLocalDateKey } from "../components/meetings/meetingCalendarUtils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import Meetings from "./Meetings";
 
@@ -44,34 +45,6 @@ const confirmMock = vi.fn().mockResolvedValue(true);
 
 vi.mock("../context/ModalContext", () => ({
   useConfirm: () => confirmMock,
-}));
-
-vi.mock("../components/meetings/MeetingCalendar", () => ({
-  default: ({ meetings, selectedDateKey, onSelectDay }) => (
-    <div data-testid="meeting-calendar">
-      <p>Calendar meetings: {meetings.length}</p>
-      <p>Selected: {selectedDateKey ?? "none"}</p>
-      <button
-        type="button"
-        onClick={() => onSelectDay("2026-04-12", meetings.slice(0, 1))}
-      >
-        Pick date
-      </button>
-    </div>
-  ),
-}));
-
-vi.mock("../components/meetings/MeetingDetailsPanel", () => ({
-  default: ({ open, dateKey, meetings, onClose }) =>
-    open ? (
-      <div data-testid="meeting-day-panel">
-        <p>Panel day: {dateKey}</p>
-        <p>Panel meetings: {meetings.length}</p>
-        <button type="button" onClick={onClose}>
-          Close panel
-        </button>
-      </div>
-    ) : null,
 }));
 
 function makeResponse({ ok = true, json = {} }) {
@@ -267,15 +240,33 @@ describe("Meetings page", () => {
     await screen.findByText("Planning Session");
 
     fireEvent.click(screen.getByRole("button", { name: "Calendar" }));
-    expect(screen.getByTestId("meeting-calendar")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Pick date" }));
-    expect(screen.getByTestId("meeting-day-panel")).toBeInTheDocument();
-    expect(screen.getByText("Panel day: 2026-04-12")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Close panel" }));
-    await waitFor(() =>
-      expect(screen.queryByTestId("meeting-day-panel")).not.toBeInTheDocument(),
-    );
+    const calendarSection = screen.getByLabelText("Meetings calendar");
+    const calendarGrid = await within(calendarSection).findByRole("grid", {
+      name: "Meeting calendar",
+    });
+    expect(within(calendarGrid).getByText("Sun")).toBeInTheDocument();
+
+    const upcomingKey = toLocalDateKey(meetingUpcoming.meeting_date);
+    const dayButton = within(calendarGrid)
+      .getByText("Planning Session")
+      .closest("button");
+    expect(dayButton).toBeTruthy();
+    fireEvent.click(dayButton);
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Planning Session")).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("link", { name: "Open full detail" }),
+    ).toHaveAttribute("href", `/group/stok-1/meetings/${meetingUpcoming.id}`);
+    expect(
+      within(dialog).getByRole("link", { name: "Join link" }),
+    ).toHaveAttribute("href", "https://meet.example.com/up");
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    expect(upcomingKey).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
   it("opens schedule modal and creates meeting with trimmed fields then writes cache", async () => {

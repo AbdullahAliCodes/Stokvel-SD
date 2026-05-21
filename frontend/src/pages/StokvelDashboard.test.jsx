@@ -72,11 +72,20 @@ function failText(text) {
   return { ok: false, text: async () => text };
 }
 
-function setupFetch({ detailRes, meetingsRes }) {
+function okHealthScoreJson() {
+  return {
+    ok: true,
+    text: async () =>
+      JSON.stringify({ score: 68, grade: "Good", confidence: 80 }),
+  };
+}
+
+function setupFetch({ detailRes, meetingsRes, healthScoreRes = okHealthScoreJson() }) {
   global.fetch = vi.fn(async (url) => {
     const u = String(url);
     if (u.endsWith("/api/stokvels/stok-1")) return detailRes;
     if (u.endsWith("/api/stokvels/stok-1/meetings")) return meetingsRes;
+    if (u.includes("/health-score")) return healthScoreRes;
     throw new Error(`Unhandled fetch URL: ${u}`);
   });
 }
@@ -166,6 +175,9 @@ describe("StokvelDashboard", () => {
     expect(screen.getByText("Expected payout (cycle)")).toBeInTheDocument();
     expect(screen.getByText("Monthly contribution")).toBeInTheDocument();
     expect(screen.getByText("Members")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("68")).toBeInTheDocument();
+    });
 
     expect(screen.getByText("Next Meeting")).toBeInTheDocument();
     expect(screen.getByText("Plan payouts")).toBeInTheDocument();

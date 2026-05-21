@@ -42,17 +42,25 @@ describe('AdminReviewStokvel', () => {
     vi.unstubAllGlobals()
   })
 
-  /** Queue fetch responses in call order (avoids mockResolvedValueOnce races in full suite). */
-  function queueFetchResponses(...responses) {
-    const queue = [...responses]
-    mockFetch.mockImplementation(async () => {
-      const next = queue.shift()
-      if (!next) {
-        throw new Error(`Unexpected fetch (remaining queue: ${queue.length})`)
+  /** GET loads stokvel; PATCH handles approve/reject (survives Strict Mode double-mount). */
+  function mockLoadAndPatch(patchResponse) {
+    mockFetch.mockImplementation(async (_url, init) => {
+      if (init?.method === 'PATCH') {
+        if (patchResponse instanceof Error) throw patchResponse
+        return patchResponse
       }
-      if (next instanceof Error) throw next
-      return next
+      return {
+        ok: true,
+        text: async () => JSON.stringify({ stokvel: mockStokvelFull }),
+      }
     })
+  }
+
+  async function clickWhenEnabled(name) {
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name })).toBeEnabled()
+    })
+    fireEvent.click(screen.getByRole('button', { name }))
   }
 
   const mockStokvelFull = {
@@ -159,18 +167,16 @@ describe('AdminReviewStokvel', () => {
   })
 
   it('handles approve action successfully and navigates', async () => {
-    queueFetchResponses(
-      { ok: true, text: async () => JSON.stringify({ stokvel: mockStokvelFull }) },
-      { ok: true, text: async () => JSON.stringify({ success: true }) },
-    )
+    mockLoadAndPatch({
+      ok: true,
+      text: async () => JSON.stringify({ success: true }),
+    })
     renderWithProviders(<AdminReviewStokvel />, { session: { access_token: 'fake-token' } })
 
-    const approveBtn = await screen.findByRole('button', { name: 'Approve' })
-    fireEvent.click(approveBtn)
+    await clickWhenEnabled('Approve')
 
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledTimes(2)
-      expect(mockFetch).toHaveBeenLastCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost/api/admin/stokvels/123',
         expect.objectContaining({
           method: 'PATCH',
@@ -182,14 +188,13 @@ describe('AdminReviewStokvel', () => {
   })
 
   it('handles approve error gracefully', async () => {
-    queueFetchResponses(
-      { ok: true, text: async () => JSON.stringify({ stokvel: mockStokvelFull }) },
-      { ok: false, text: async () => JSON.stringify({ error: 'Approve failure' }) },
-    )
+    mockLoadAndPatch({
+      ok: false,
+      text: async () => JSON.stringify({ error: 'Approve failure' }),
+    })
     renderWithProviders(<AdminReviewStokvel />, { session: { access_token: 'fake-token' } })
 
-    const approveBtn = await screen.findByRole('button', { name: 'Approve' })
-    fireEvent.click(approveBtn)
+    await clickWhenEnabled('Approve')
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent('Approve failure')
@@ -197,18 +202,16 @@ describe('AdminReviewStokvel', () => {
   })
 
   it('handles reject action successfully and navigates', async () => {
-    queueFetchResponses(
-      { ok: true, text: async () => JSON.stringify({ stokvel: mockStokvelFull }) },
-      { ok: true, text: async () => JSON.stringify({ success: true }) },
-    )
+    mockLoadAndPatch({
+      ok: true,
+      text: async () => JSON.stringify({ success: true }),
+    })
     renderWithProviders(<AdminReviewStokvel />, { session: { access_token: 'fake-token' } })
 
-    const rejectBtn = await screen.findByRole('button', { name: 'Reject' })
-    fireEvent.click(rejectBtn)
+    await clickWhenEnabled('Reject')
 
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledTimes(2)
-      expect(mockFetch).toHaveBeenLastCalledWith(
+      expect(mockFetch).toHaveBeenCalledWith(
         'http://localhost/api/admin/stokvels/123',
         expect.objectContaining({
           method: 'PATCH',
@@ -220,14 +223,10 @@ describe('AdminReviewStokvel', () => {
   })
 
   it('handles reject error gracefully', async () => {
-    queueFetchResponses(
-      { ok: true, text: async () => JSON.stringify({ stokvel: mockStokvelFull }) },
-      new Error('Reject network fail'),
-    )
+    mockLoadAndPatch(new Error('Reject network fail'))
     renderWithProviders(<AdminReviewStokvel />, { session: { access_token: 'fake-token' } })
 
-    const rejectBtn = await screen.findByRole('button', { name: 'Reject' })
-    fireEvent.click(rejectBtn)
+    await clickWhenEnabled('Reject')
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent('Reject network fail')

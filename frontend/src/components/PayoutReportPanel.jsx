@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { apiUrl } from '../utils/api'
-import { cardLight, errorBox, tableHead, tableRow, tableWrap } from '../ui'
+import { cardLight, errorBox, tableHead, tableRow } from '../ui'
+import TableScrollArea from './ui/TableScrollArea'
 
 function formatZAR(n) {
   const num = Number(n)
@@ -44,8 +45,10 @@ function PayoutTable({ rows, emptyMessage, showStatus }) {
   }
 
   return (
-    <div className={tableWrap}>
-      <table className="w-full min-w-[300px] text-left text-sm text-stone-800 dark:text-stone-100">
+    <TableScrollArea>
+      <table
+        className={`w-full text-left text-sm text-stone-800 dark:text-stone-100 ${showStatus ? 'min-w-[34rem]' : 'min-w-[26rem]'}`}
+      >
         <thead>
           <tr className={tableHead}>
             <th className="p-3">Date</th>
@@ -77,7 +80,7 @@ function PayoutTable({ rows, emptyMessage, showStatus }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </TableScrollArea>
   )
 }
 

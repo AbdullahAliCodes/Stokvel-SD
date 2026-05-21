@@ -25,7 +25,7 @@ export const cardLight =
   // Note: tests should only join class tokens that do not contain `dark:` for querySelector.
   'rounded-2xl border border-stone-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-stone-100 dark:shadow-black/25'
 
-export const tableWrap = `${cardLight} overflow-hidden`
+export const tableWrap = `${cardLight} overflow-x-auto`
 
 export const tableHead =
   'bg-stone-100 text-left text-xs font-semibold uppercase tracking-wide text-stone-600 dark:bg-slate-800 dark:text-stone-300'

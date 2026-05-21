@@ -11,7 +11,18 @@ export default defineConfig({
     globals: true,
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'lcov'],
+      reporter: ['text', 'lcov', 'json-summary'],
+      reportsDirectory: './coverage',
+      include: ['src/**/*.{js,jsx}'],
+      exclude: [
+        'src/**/*.test.{js,jsx}',
+        'src/test/**',
+        'src/main.jsx',
+      ],
+      thresholds: {
+        lines: 80,
+        statements: 80,
+      },
     },
   },
   server: {
