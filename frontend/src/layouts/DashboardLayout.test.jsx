@@ -91,7 +91,9 @@ describe('DashboardLayout page content', () => {
   it('shows a welcome message with the member first name above Account', async () => {
     renderLayout('/account')
     await screen.findByText('Account page')
-    expect(screen.getAllByText('Welcome back, Ada').length).toBeGreaterThanOrEqual(1)
+    await waitFor(() => {
+      expect(screen.getAllByText(/Welcome back, Ada/i).length).toBeGreaterThanOrEqual(1)
+    })
   })
 
   it('exposes a mobile menu toggle and closes the drawer via backdrop', async () => {

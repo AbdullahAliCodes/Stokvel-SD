@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest'
 import {
   checkIsOnTime,
   DEFAULT_PAYMENT_WINDOW,
+  formatPaymentWindowDaysLabel,
+  formatPaymentWindowRangeLabel,
   getCurrentPaymentCycle,
   isPaidAtInWindowForTargetMonth,
   normalizePaymentWindow,
+  paymentWindowDateRangeForTargetMonth,
   paymentWindowFromStokvel,
   zonedYmdParts,
 } from './paymentWindow.js'
@@ -88,6 +91,20 @@ describe('paymentWindow (SAST, mirrors backend)', () => {
     expect(
       isPaidAtInWindowForTargetMonth(new Date('2026-03-03T12:00:00+02:00'), 'bad-month'),
     ).toBe(false)
+  })
+
+  it('paymentWindowDateRangeForTargetMonth spans prior month for wrap windows', () => {
+    expect(paymentWindowDateRangeForTargetMonth('2026-04')).toEqual({
+      startIso: '2026-03-25',
+      endIso: '2026-04-05',
+    })
+  })
+
+  it('formatPaymentWindowRangeLabel renders a readable date span', () => {
+    expect(formatPaymentWindowRangeLabel('2026-04')).toMatch(
+      /Payment window: 25 Mar 2026 – 0?5 Apr 2026/,
+    )
+    expect(formatPaymentWindowDaysLabel()).toBe('Payment window: day 25 – day 5 (SAST)')
   })
 
   it('isPaidAtInWindowForTargetMonth distinguishes on-time vs late', () => {

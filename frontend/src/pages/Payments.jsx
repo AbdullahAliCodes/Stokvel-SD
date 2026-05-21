@@ -23,6 +23,11 @@ import MarketRatesWidget from "../components/MarketRatesWidget";
 import QuickPayModal from "../components/QuickPayModal";
 import ReportExportActions from "../components/ReportExportActions";
 import GroupPageHeader from "../components/GroupPageHeader";
+import {
+  formatPaymentWindowDaysLabel,
+  formatPaymentWindowRangeLabel,
+  paymentWindowFromStokvel,
+} from "../utils/paymentWindow.js";
 
 const TARGET_MONTH_RE = /^\d{4}-\d{2}$/;
 
@@ -512,6 +517,11 @@ export default function Payments() {
     currentCycle?.inPaymentWindow,
   ]);
 
+  const paymentWindowConfig = useMemo(
+    () => paymentWindowFromStokvel(effectiveStokvel),
+    [effectiveStokvel],
+  );
+
   const cycleBannerText = useMemo(() => {
     if (
       currentCycle?.targetMonth &&
@@ -521,6 +531,17 @@ export default function Payments() {
     }
     return "No active payment window";
   }, [currentCycle?.targetMonth]);
+
+  const quickPayWindowText = useMemo(() => {
+    const tm = currentCycle?.targetMonth;
+    if (tm && TARGET_MONTH_RE.test(tm)) {
+      return (
+        formatPaymentWindowRangeLabel(tm, paymentWindowConfig) ??
+        formatPaymentWindowDaysLabel(paymentWindowConfig)
+      );
+    }
+    return formatPaymentWindowDaysLabel(paymentWindowConfig);
+  }, [currentCycle?.targetMonth, paymentWindowConfig]);
 
   const refMonth = useMemo(
     () => ledgerReferenceMonth(currentCycle),
@@ -1065,6 +1086,11 @@ export default function Payments() {
                 <p className="mt-1 text-sm text-stone-600 dark:text-stone-300">
                   {cycleBannerText}
                 </p>
+                {quickPayWindowText ? (
+                  <p className="mt-0.5 text-xs text-stone-500 dark:text-stone-400">
+                    {quickPayWindowText}
+                  </p>
+                ) : null}
                 <button
                   type="button"
                   disabled={!quickPayEnabled}

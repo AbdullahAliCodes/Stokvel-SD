@@ -112,3 +112,75 @@ export function isPaidAtInWindowForTargetMonth(paidAt, targetMonth, windowConfig
 export function checkIsOnTime(paidAtString, targetMonthStr, windowConfig = null) {
   return isPaidAtInWindowForTargetMonth(paidAtString, targetMonthStr, windowConfig)
 }
+
+/**
+ * Calendar ISO dates for a cycle's payment window (SAST day-of-month rules).
+ *
+ * @param {string} targetMonth `YYYY-MM`
+ * @param {{ startDay?: number, endDay?: number } | null} [windowConfig]
+ * @returns {{ startIso: string, endIso: string } | null}
+ */
+export function paymentWindowDateRangeForTargetMonth(targetMonth, windowConfig = null) {
+  if (!targetMonth || !/^\d{4}-\d{2}$/.test(targetMonth)) return null
+  const { startDay: S, endDay: E } = normalizePaymentWindow(windowConfig)
+  const [y, m] = targetMonth.split('-').map(Number)
+  if (!Number.isFinite(y) || !Number.isFinite(m)) return null
+
+  const pad = (n) => String(n).padStart(2, '0')
+
+  if (S > E) {
+    let sm = m - 1
+    let sy = y
+    if (sm < 1) {
+      sm = 12
+      sy -= 1
+    }
+    return {
+      startIso: `${sy}-${pad(sm)}-${pad(S)}`,
+      endIso: `${y}-${pad(m)}-${pad(E)}`,
+    }
+  }
+
+  return {
+    startIso: `${y}-${pad(m)}-${pad(S)}`,
+    endIso: `${y}-${pad(m)}-${pad(E)}`,
+  }
+}
+
+/**
+ * @param {string} iso `YYYY-MM-DD`
+ */
+function formatIsoDateLabel(iso) {
+  const [ys, ms, ds] = iso.split('-').map(Number)
+  const d = new Date(Date.UTC(ys, ms - 1, ds, 12, 0, 0))
+  return d.toLocaleDateString('en-ZA', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  })
+}
+
+/**
+ * Human-readable payment window for a contribution cycle.
+ *
+ * @param {string} targetMonth `YYYY-MM`
+ * @param {{ startDay?: number, endDay?: number } | null} [windowConfig]
+ * @returns {string | null}
+ */
+export function formatPaymentWindowRangeLabel(targetMonth, windowConfig = null) {
+  const range = paymentWindowDateRangeForTargetMonth(targetMonth, windowConfig)
+  if (!range) return null
+  return `Payment window: ${formatIsoDateLabel(range.startIso)} – ${formatIsoDateLabel(range.endIso)}`
+}
+
+/**
+ * Fallback when no active cycle month is open (shows configured calendar days).
+ *
+ * @param {{ startDay?: number, endDay?: number } | null} [windowConfig]
+ * @returns {string}
+ */
+export function formatPaymentWindowDaysLabel(windowConfig = null) {
+  const { startDay, endDay } = normalizePaymentWindow(windowConfig)
+  return `Payment window: day ${startDay} – day ${endDay} (SAST)`
+}
