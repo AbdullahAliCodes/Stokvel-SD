@@ -438,6 +438,273 @@ describe("Meetings page", () => {
     expect(screen.queryByText("Planning Session")).not.toBeInTheDocument();
   });
 
+  it("cancels inline edit without calling patch", async () => {
+    readViewCacheMock.mockReturnValue(null);
+    setupFetchHandlers({
+      detail: makeResponse({ json: baseDetail }),
+      meetings: makeResponse({ json: { meetings: [meetingUpcoming] } }),
+      patch: makeResponse({ json: { meeting: meetingUpcoming } }),
+    });
+
+    renderMeetings();
+    await screen.findByText("Planning Session");
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit meeting" }));
+    fireEvent.change(screen.getByPlaceholderText("Title"), { target: { value: "Draft title" } });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.getByText("Planning Session")).toBeInTheDocument();
+    expect(screen.queryByText("Draft title")).not.toBeInTheDocument();
+    const patchCalls = global.fetch.mock.calls.filter(
+      ([url, opts]) => String(url).includes("/meetings/") && opts?.method === "PATCH",
+    );
+    expect(patchCalls).toHaveLength(0);
+  });
+
+  it("returns to list view from calendar and clears the day panel", async () => {
+    readViewCacheMock.mockReturnValue(null);
+    setupFetchHandlers({
+      detail: makeResponse({ json: baseDetail }),
+      meetings: makeResponse({ json: { meetings: [meetingUpcoming, meetingPast] } }),
+    });
+
+    renderMeetings();
+    await screen.findByText("Planning Session");
+
+    fireEvent.click(screen.getByRole("button", { name: "Calendar" }));
+    const calendarSection = screen.getByLabelText("Meetings calendar");
+    const dayButton = within(calendarSection)
+      .getByText("Planning Session")
+      .closest("button");
+    fireEvent.click(dayButton);
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "List" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.getByText("Planning Session")).toBeInTheDocument();
+  });
+
+  it("renders cached meetings before the network refresh completes", async () => {
+    let resolveDetail;
+    let resolveMeetings;
+    const detailDeferred = new Promise((resolve) => {
+      resolveDetail = resolve;
+    });
+    const meetingsDeferred = new Promise((resolve) => {
+      resolveMeetings = resolve;
+    });
+
+    readViewCacheMock.mockReturnValue({
+      membership: baseDetail.membership,
+      stokvel: baseDetail.stokvel,
+      members: baseMembers,
+      meetings: [meetingUpcoming],
+    });
+
+    global.fetch = vi.fn(async (url, options = {}) => {
+      const method = options.method ?? "GET";
+      const u = String(url);
+      if (u.endsWith("/api/stokvels/stok-1") && method === "GET") return detailDeferred;
+      if (u.endsWith("/api/stokvels/stok-1/meetings") && method === "GET") return meetingsDeferred;
+      throw new Error(`Unhandled fetch ${method} ${u}`);
+    });
+
+    renderMeetings();
+    expect(await screen.findByText("Planning Session")).toBeInTheDocument();
+
+    resolveDetail(makeResponse({ json: baseDetail }));
+    resolveMeetings(makeResponse({ json: { meetings: [meetingUpcoming] } }));
+    await waitFor(() => expect(writeViewCacheMock).toHaveBeenCalled());
+  });
+
+  it("surfaces HTML parseApiError when detail load fails", async () => {
+    readViewCacheMock.mockReturnValue(null);
+    setupFetchHandlers({
+      detail: makeTextErrorResponse("<html>upstream error</html>"),
+      meetings: makeResponse({ json: { meetings: [] } }),
+    });
+
+    renderMeetings();
+    expect(await screen.findByText("<html>upstream error</html>")).toBeInTheDocument();
+  });
+
+  it("shows action error when delete fails", async () => {
+    readViewCacheMock.mockReturnValue(null);
+    setupFetchHandlers({
+      detail: makeResponse({ json: baseDetail }),
+      meetings: makeResponse({ json: { meetings: [meetingUpcoming] } }),
+      del: makeTextErrorResponse("Delete forbidden"),
+    });
+
+    renderMeetings();
+    await screen.findByText("Planning Session");
+    fireEvent.click(screen.getAllByRole("button", { name: /Delete meeting/i })[0]);
+    expect(await screen.findByText("Delete forbidden")).toBeInTheDocument();
+    expect(screen.getByText("Planning Session")).toBeInTheDocument();
+  });
+
+  it("does not delete when confirmation is rejected", async () => {
+    confirmMock.mockResolvedValueOnce(false);
+    readViewCacheMock.mockReturnValue(null);
+    setupFetchHandlers({
+      detail: makeResponse({ json: baseDetail }),
+      meetings: makeResponse({ json: { meetings: [meetingUpcoming] } }),
+      del: makeResponse({ json: { ok: true } }),
+    });
+
+    renderMeetings();
+    await screen.findByText("Planning Session");
+    fireEvent.click(screen.getAllByRole("button", { name: /Delete meeting/i })[0]);
+
+    const delCalls = global.fetch.mock.calls.filter(
+      ([, opts]) => opts?.method === "DELETE",
+    );
+    expect(delCalls).toHaveLength(0);
+    expect(screen.getByText("Planning Session")).toBeInTheDocument();
+  });
+
+  it("shows Open meeting link label for past sessions", async () => {
+    const pastWithLink = {
+      ...meetingPast,
+      meeting_link: "https://meet.example.com/past",
+    };
+    readViewCacheMock.mockReturnValue(null);
+    setupFetchHandlers({
+      detail: makeResponse({ json: baseDetail }),
+      meetings: makeResponse({ json: { meetings: [pastWithLink] } }),
+    });
+
+    renderMeetings();
+    expect(await screen.findByRole("link", { name: /Open meeting link/i })).toHaveAttribute(
+      "href",
+      "https://meet.example.com/past",
+    );
+    expect(screen.queryByRole("link", { name: /^Join meeting$/i })).not.toBeInTheDocument();
+  });
+
+  it("sends edited date and link fields when saving meeting changes", async () => {
+    const updated = {
+      ...meetingUpcoming,
+      title: "Planning Session",
+      meeting_date: futureIso(),
+      meeting_link: "https://meet.example.com/edited",
+    };
+    readViewCacheMock.mockReturnValue(null);
+    setupFetchHandlers({
+      detail: makeResponse({ json: baseDetail }),
+      meetings: makeResponse({ json: { meetings: [meetingUpcoming] } }),
+      patch: makeResponse({ json: { meeting: updated } }),
+    });
+
+    renderMeetings();
+    await screen.findByText("Planning Session");
+    fireEvent.click(screen.getByRole("button", { name: "Edit meeting" }));
+    fireEvent.change(screen.getByPlaceholderText("Title"), { target: { value: "Planning Session" } });
+    fireEvent.change(screen.getByPlaceholderText("Meeting link"), {
+      target: { value: "https://meet.example.com/edited" },
+    });
+    const dateInput = document.querySelector('input[type="datetime-local"]');
+    fireEvent.change(dateInput, { target: { value: futureDatetimeLocal() } });
+    fireEvent.click(screen.getByRole("button", { name: "Save edits" }));
+
+    expect(await screen.findByText("Meeting updated.")).toBeInTheDocument();
+    const patchCall = global.fetch.mock.calls.find(
+      ([url, opts]) => String(url).includes("/meetings/") && opts?.method === "PATCH",
+    );
+    const body = JSON.parse(patchCall[1].body);
+    expect(body.meetingLink).toBe("https://meet.example.com/edited");
+    expect(body.meetingDate).toBeTruthy();
+  });
+
+  it("surfaces errors when saving meeting edits fails", async () => {
+    readViewCacheMock.mockReturnValue(null);
+    setupFetchHandlers({
+      detail: makeResponse({ json: baseDetail }),
+      meetings: makeResponse({ json: { meetings: [meetingUpcoming] } }),
+      patch: makeTextErrorResponse("Patch rejected"),
+    });
+
+    renderMeetings();
+    await screen.findByText("Planning Session");
+    fireEvent.click(screen.getByRole("button", { name: "Edit meeting" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save edits" }));
+    expect(await screen.findByText("Patch rejected")).toBeInTheDocument();
+  });
+
+  it("surfaces errors when the meetings list request fails", async () => {
+    readViewCacheMock.mockReturnValue(null);
+    global.fetch = vi.fn(async (url) => {
+      const u = String(url);
+      if (u.endsWith("/api/stokvels/stok-1") && !u.includes("/meetings")) {
+        return makeResponse({ json: baseDetail });
+      }
+      if (u.endsWith("/meetings")) {
+        return makeTextErrorResponse('{"error":"Meetings unavailable"}');
+      }
+      throw new Error(`Unhandled ${u}`);
+    });
+
+    renderMeetings();
+    expect(await screen.findByText("Meetings unavailable")).toBeInTheDocument();
+  });
+
+  it("stops loading without fetching when the session is missing", async () => {
+    sessionState.current = { session: null };
+    global.fetch = vi.fn();
+
+    renderMeetings();
+
+    await waitFor(() => {
+      expect(document.querySelector(".animate-pulse")).not.toBeInTheDocument();
+    });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("lists past meetings with the most recent session first", async () => {
+    const olderPast = {
+      ...meetingPast,
+      id: "m-older",
+      title: "Older Past Session",
+      meeting_date: new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString(),
+    };
+    const newerPast = {
+      ...meetingPast,
+      id: "m-newer",
+      title: "Newer Past Session",
+      meeting_date: pastIso(),
+    };
+
+    readViewCacheMock.mockReturnValue(null);
+    setupFetchHandlers({
+      detail: makeResponse({ json: baseDetail }),
+      meetings: makeResponse({ json: { meetings: [olderPast, newerPast, meetingUpcoming] } }),
+    });
+
+    renderMeetings();
+    await screen.findByText("Past meetings");
+    const body = document.body.textContent ?? "";
+    expect(body.indexOf("Newer Past Session")).toBeLessThan(body.indexOf("Older Past Session"));
+  });
+
+  it("keeps the meeting list unchanged when save returns no meeting payload", async () => {
+    readViewCacheMock.mockReturnValue(null);
+    setupFetchHandlers({
+      detail: makeResponse({ json: baseDetail }),
+      meetings: makeResponse({ json: { meetings: [meetingUpcoming] } }),
+      patch: makeResponse({ json: { success: true } }),
+    });
+
+    renderMeetings();
+    await screen.findByText("Planning Session");
+    fireEvent.click(screen.getByRole("button", { name: "Edit meeting" }));
+    fireEvent.change(screen.getByPlaceholderText("Title"), { target: { value: "Still old" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save edits" }));
+
+    expect(await screen.findByText("Meeting updated.")).toBeInTheDocument();
+    expect(screen.getByText("Planning Session")).toBeInTheDocument();
+    expect(screen.queryByText("Still old")).not.toBeInTheDocument();
+  });
+
   it("shows action error when saving minutes fails", async () => {
     readViewCacheMock.mockReturnValue(null);
     setupFetchHandlers({

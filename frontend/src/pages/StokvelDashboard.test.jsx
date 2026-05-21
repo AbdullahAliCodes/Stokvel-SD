@@ -268,6 +268,32 @@ describe("StokvelDashboard", () => {
     expect(writeViewCacheMock).toHaveBeenCalled();
   });
 
+  it("stops loading without fetching when the session is missing", async () => {
+    sessionState.current = { session: null };
+    global.fetch = vi.fn();
+
+    render(<StokvelDashboard />);
+
+    await waitFor(() => {
+      expect(document.querySelector(".animate-pulse")).not.toBeInTheDocument();
+    });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it("displays full_name when first and last names are absent", async () => {
+    readViewCacheMock.mockReturnValue(null);
+    setupFetch({
+      detailRes: okJson({
+        ...baseDetail,
+        members: [{ user_id: "u9", group_role: "member", profiles: { full_name: "Full Only" } }],
+      }),
+      meetingsRes: okJson({ meetings: [] }),
+    });
+
+    render(<StokvelDashboard />);
+    expect(await screen.findByText("Full Only")).toBeInTheDocument();
+  });
+
   it("uses cached data immediately while still refreshing from API", async () => {
     readViewCacheMock.mockReturnValue({
       membership: { group_role: "member", stokvels: { name: "Cached Name" } },

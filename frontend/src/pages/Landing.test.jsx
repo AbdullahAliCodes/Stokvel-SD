@@ -25,6 +25,14 @@ vi.mock('../utils/api', () => ({
     apiUrl: (path) => `http://localhost${path}`,
 }))
 
+const writeViewCacheMock = vi.fn()
+const readViewCacheMock = vi.fn(() => null)
+
+vi.mock('../utils/viewCache', () => ({
+    readViewCache: (...args) => readViewCacheMock(...args),
+    writeViewCache: (...args) => writeViewCacheMock(...args),
+}))
+
 vi.mock('../components/BrandLogo', () => ({
     default: ({ to, onClick }) => (
         <a href={to} onClick={onClick} data-testid="brand-logo">
@@ -41,13 +49,10 @@ vi.mock('../components/PublicFooter', () => ({
     default: () => <footer data-testid="public-footer">Footer</footer>,
 }))
 
-vi.mock('../components/OpportunityCard', () => ({
-    default: ({ name, onApply, isJoining }) => (
-        <button type="button" onClick={onApply} disabled={isJoining}>
-            Apply to {name}
-        </button>
-    ),
-}))
+vi.mock('../components/OpportunityCard', async () => {
+    const actual = await vi.importActual('../components/OpportunityCard')
+    return actual
+})
 
 vi.mock('../assets/landing', () => ({
     heroDashboardIllustration: 'hero.png',
@@ -64,42 +69,10 @@ vi.mock('../data/landingTestimonial', () => ({
     },
 }))
 
-vi.mock('../styles/tokens', () => ({
-    bodyMuted: '',
-    bodyMutedLg: '',
-    btnPrimary: '',
-    btnSecondaryOnHero: '',
-    captionMuted: '',
-    cardCaptionBar: '',
-    cardCaptionTitle: '',
-    cardMediaPlaceholder: '',
-    headingHero: '',
-    headingHeroAccent: '',
-    headingSection: '',
-    heroGrid: '',
-    heroMediaCard: '',
-    heroRoseCard: '',
-    heroStatCluster: '',
-    iconButton: '',
-    landingPageShell: '',
-    lead: '',
-    marketingNavInnerRow: '',
-    navLink: '',
-    roseBody: '',
-    roseIconBubble: '',
-    roseTitle: '',
-    sectionContainer: '',
-    sectionNarrow: '',
-    statLabel: '',
-    statValue: '',
-    surfaceHero: '',
-    testimonialGrid: '',
-    testimonialKicker: '',
-    testimonialPhotoFrame: '',
-    testimonialQuote: '',
-    testimonialSection: '',
-    topNavBar: '',
-}))
+vi.mock('../styles/tokens', async () => {
+    const actual = await vi.importActual('../styles/tokens')
+    return actual
+})
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -113,9 +86,11 @@ const renderLanding = ({ session = null, userRole = null } = {}) =>
     )
 
 const guestSession = null
+const MEMBER_USER_ID = '11111111-1111-4111-8111-111111111111'
+
 const memberSession = {
     access_token: 'member-token',
-    user: { id: 'member-uuid', email: 'member@test.com' },
+    user: { id: MEMBER_USER_ID, email: 'member@test.com' },
 }
 const adminSession = {
     access_token: 'admin-token',
@@ -130,6 +105,9 @@ describe('Landing page', () => {
 
     beforeEach(() => {
         vi.clearAllMocks()
+        writeViewCacheMock.mockReset()
+        readViewCacheMock.mockReset()
+        readViewCacheMock.mockReturnValue(null)
         mockFetch.mockResolvedValue({
             ok: true,
             text: async () =>
@@ -324,6 +302,25 @@ describe('Landing page', () => {
             const logoutBtns = screen.getAllByRole('button', { name: /Log out/i })
             expect(logoutBtns.length).toBeGreaterThan(0)
         })
+
+        it('signs out from the mobile menu logout control', async () => {
+            const { supabase } = await import('../utils/supabase')
+            renderLanding({ session: memberSession, userRole: 'member' })
+
+            await act(async () => {
+                fireEvent.click(screen.getByRole('button', { name: /Open menu/i }))
+            })
+
+            const logoutBtns = screen.getAllByRole('button', { name: /Log out/i })
+            await act(async () => {
+                fireEvent.click(logoutBtns[logoutBtns.length - 1])
+            })
+
+            expect(supabase.auth.signOut).toHaveBeenCalledTimes(1)
+            await waitFor(() => {
+                expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true })
+            })
+        })
     })
 
     // ── Hero CTAs ──────────────────────────────────────────────────────────────
@@ -353,18 +350,51 @@ describe('Landing page', () => {
         it('renders only the first 3 opportunity cards', async () => {
             renderLanding()
             await waitFor(() => {
-                expect(screen.getAllByRole('button', { name: /^Apply to /i })).toHaveLength(3)
+                expect(screen.getAllByRole('button', { name: /Apply to join/i })).toHaveLength(3)
             })
+        })
+
+        it('renders real opportunity cards for rotating and fixed stokvel types', async () => {
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                text: async () =>
+                    JSON.stringify([
+                        {
+                            id: 'fixed-1',
+                            name: 'Fixed Pool',
+                            type: 'Fixed',
+                            contribution_amount: 1000,
+                            members_count: 5,
+                            cycle_length: 12,
+                        },
+                        {
+                            id: 'rot-1',
+                            name: 'Rotating Circle',
+                            type: 'Rotating',
+                            contribution_amount: 500,
+                            members_count: 8,
+                            cycle_length: 6,
+                        },
+                    ]),
+            })
+
+            renderLanding()
+            await waitFor(() => {
+                expect(screen.getByText('Fixed Pool')).toBeInTheDocument()
+                expect(screen.getByText('Rotating Circle')).toBeInTheDocument()
+            })
+            expect(screen.getByText(/Fixed · 12 month cycle/i)).toBeInTheDocument()
+            expect(screen.getByText(/Rotating · 6 month cycle/i)).toBeInTheDocument()
         })
 
         it('redirects guests to auth when applying from the landing grid', async () => {
             renderLanding({ session: guestSession })
 
             await waitFor(() => {
-                expect(screen.getAllByRole('button', { name: /^Apply to /i })).toHaveLength(3)
+                expect(screen.getAllByRole('button', { name: /Apply to join/i })).toHaveLength(3)
             })
 
-            fireEvent.click(screen.getByRole('button', { name: /Apply to Savings Circle A/i }))
+            fireEvent.click(screen.getAllByRole('button', { name: /Apply to join/i })[0])
 
             expect(mockNavigate).toHaveBeenCalledWith('/auth')
         })
@@ -441,10 +471,7 @@ describe('Landing page', () => {
 
             renderLanding({ session: memberSession })
 
-            const applyBtn = await screen.findByRole('button', {
-                name: /Apply to Savings Circle A/i,
-            })
-            fireEvent.click(applyBtn)
+            fireEvent.click(await screen.findByRole('button', { name: /Apply to join/i }))
 
             await waitFor(() => {
                 expect(mockNavigate).toHaveBeenCalledWith('/group/stok-join-1/dashboard', {
@@ -484,16 +511,14 @@ describe('Landing page', () => {
 
             renderLanding({ session: memberSession })
 
-            const applyBtn = await screen.findByRole('button', {
-                name: /Apply to Savings Circle A/i,
-            })
-            fireEvent.click(applyBtn)
+            fireEvent.click(await screen.findByRole('button', { name: /Apply to join/i }))
 
             await waitFor(() => {
                 expect(mockNavigate).toHaveBeenCalledWith('/group/stok-join-1/dashboard', {
                     replace: true,
                 })
             })
+            expect(writeViewCacheMock).toHaveBeenCalled()
         })
 
         it('does not navigate when join fails with a non-member error', async () => {
@@ -526,10 +551,7 @@ describe('Landing page', () => {
 
             renderLanding({ session: memberSession })
 
-            const applyBtn = await screen.findByRole('button', {
-                name: /Apply to Savings Circle A/i,
-            })
-            fireEvent.click(applyBtn)
+            fireEvent.click(await screen.findByRole('button', { name: /Apply to join/i }))
 
             await waitFor(() => {
                 expect(mockFetch).toHaveBeenCalledWith(
@@ -571,9 +593,7 @@ describe('Landing page', () => {
 
             renderLanding({ session: memberSession })
 
-            fireEvent.click(
-                await screen.findByRole('button', { name: /Apply to Savings Circle A/i }),
-            )
+            fireEvent.click(await screen.findByRole('button', { name: /Apply to join/i }))
 
             await waitFor(() => {
                 expect(mockFetch).toHaveBeenCalledWith(
@@ -584,10 +604,118 @@ describe('Landing page', () => {
             expect(mockNavigate).not.toHaveBeenCalled()
         })
 
+        it('renders R 0 for invalid contribution amounts on opportunity cards', async () => {
+            mockFetch.mockResolvedValueOnce({
+                ok: true,
+                text: async () =>
+                    JSON.stringify([
+                        {
+                            id: 'bad-amt',
+                            name: 'Broken Amount Circle',
+                            type: 'Fixed',
+                            contribution_amount: 'not-a-number',
+                            members_count: 3,
+                            cycle_length: 6,
+                        },
+                    ]),
+            })
+
+            renderLanding()
+            expect(await screen.findByText('R 0')).toBeInTheDocument()
+        })
+
         it('renders View all public stokvels link', () => {
             renderLanding()
             const link = screen.getByRole('link', { name: /View all public stokvels/i })
             expect(link).toHaveAttribute('href', '/stokvels')
+        })
+
+        it('writes optimistic membership cache after a successful join', async () => {
+            mockFetch.mockImplementation(async (url, init) => {
+                const u = String(url)
+                if (u.includes('/api/public/stokvels')) {
+                    return {
+                        ok: true,
+                        text: async () =>
+                            JSON.stringify([
+                                {
+                                    id: 'stok-cache-1',
+                                    name: 'Cache Circle',
+                                    type: 'Fixed',
+                                    contribution_amount: 400,
+                                    members_count: 4,
+                                    cycle_length: 6,
+                                },
+                            ]),
+                    }
+                }
+                if (u.endsWith('/join') && init?.method === 'POST') {
+                    return { ok: true, text: async () => JSON.stringify({ ok: true }) }
+                }
+                return { ok: true, text: async () => JSON.stringify([]) }
+            })
+
+            renderLanding({ session: memberSession, userRole: 'member' })
+            fireEvent.click(await screen.findByRole('button', { name: /Apply to join/i }))
+
+            await waitFor(() => {
+                expect(writeViewCacheMock).toHaveBeenCalledWith(
+                    `my_stokvels:${MEMBER_USER_ID}`,
+                    expect.objectContaining({
+                        memberships: [
+                            expect.objectContaining({
+                                stokvels: expect.objectContaining({
+                                    id: 'stok-cache-1',
+                                    name: 'Cache Circle',
+                                }),
+                            }),
+                        ],
+                    }),
+                )
+            })
+        })
+
+        it('skips cache write when the member is already in the cached list', async () => {
+            readViewCacheMock.mockReturnValue({
+                memberships: [
+                    {
+                        group_role: 'member',
+                        stokvels: { id: 'stok-cache-1', name: 'Existing' },
+                    },
+                ],
+            })
+
+            mockFetch.mockImplementation(async (url, init) => {
+                const u = String(url)
+                if (u.includes('/api/public/stokvels')) {
+                    return {
+                        ok: true,
+                        text: async () =>
+                            JSON.stringify([
+                                {
+                                    id: 'stok-cache-1',
+                                    name: 'Cache Circle',
+                                    type: 'Rotating',
+                                    contribution_amount: 400,
+                                    members_count: 4,
+                                    cycle_length: 6,
+                                },
+                            ]),
+                    }
+                }
+                if (u.endsWith('/join') && init?.method === 'POST') {
+                    return { ok: true, text: async () => JSON.stringify({ ok: true }) }
+                }
+                return { ok: true, text: async () => JSON.stringify([]) }
+            })
+
+            renderLanding({ session: memberSession, userRole: 'member' })
+            fireEvent.click(await screen.findByRole('button', { name: /Apply to join/i }))
+
+            await waitFor(() => {
+                expect(mockNavigate).toHaveBeenCalled()
+            })
+            expect(writeViewCacheMock).not.toHaveBeenCalled()
         })
     })
 

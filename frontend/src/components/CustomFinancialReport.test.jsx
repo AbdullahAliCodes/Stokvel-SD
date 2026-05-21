@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import CustomFinancialReport from './CustomFinancialReport'
+import CustomFinancialReport, { getExpectedPayoutAmount } from './CustomFinancialReport'
 
 const downloadCsvMock = vi.fn()
 const downloadPdfMock = vi.fn().mockResolvedValue(undefined)
@@ -55,6 +55,34 @@ function buildMockProps() {
 function getReportTable() {
   return screen.getByRole('table')
 }
+
+describe('getExpectedPayoutAmount', () => {
+  it('multiplies contribution by member count for rotating stokvels', () => {
+    expect(
+      getExpectedPayoutAmount(
+        { type: 'Rotating', contribution_amount: 250 },
+        [{ user_id: 'a' }, { user_id: 'b' }],
+        null,
+      ),
+    ).toBe(500)
+  })
+
+  it('falls back to contribution-only estimate when fixed pool data is missing', () => {
+    expect(
+      getExpectedPayoutAmount({ type: 'Fixed', contribution_amount: 300 }, [{ user_id: 'a' }], null),
+    ).toBe(300)
+  })
+
+  it('uses the fixed pool per-member payout when available', () => {
+    expect(
+      getExpectedPayoutAmount(
+        { type: 'Fixed', contribution_amount: 300 },
+        [{ user_id: 'a' }],
+        { expected_payout_per_member: 7777 },
+      ),
+    ).toBe(7777)
+  })
+})
 
 describe('CustomFinancialReport (interactive)', () => {
   beforeEach(() => {
@@ -124,6 +152,51 @@ describe('CustomFinancialReport (interactive)', () => {
         filenameBase: 'custom_financial_Test Group',
       }),
     )
+  })
+
+  it('excludes pending contributions from actual paid totals', async () => {
+    render(
+      <CustomFinancialReport
+        {...buildMockProps()}
+        contributions={[
+          {
+            user_id: USER_A,
+            target_month: '2026-01',
+            amount: 100,
+            treasurer_approval_status: 'pending',
+          },
+        ]}
+      />,
+    )
+
+    const janRow = within(getReportTable()).getByRole('row', { name: /2026-01/i })
+    expect(within(janRow).getAllByRole('cell')[2]).toHaveTextContent('R 0')
+  })
+
+  it('toggles visible columns off before exporting', async () => {
+    const user = userEvent.setup()
+    render(<CustomFinancialReport {...buildMockProps()} />)
+
+    await user.click(screen.getByRole('checkbox', { name: /Expected In \(Target\)/i }))
+    await user.click(screen.getByRole('button', { name: /Export CSV/i }))
+
+    const [, headers] = downloadCsvMock.mock.calls[0]
+    expect(headers).not.toContain('Expected contributions')
+  })
+
+  it('uses fixed-pool expected payout amounts for Fixed stokvel rows', () => {
+    render(
+      <CustomFinancialReport
+        {...buildMockProps()}
+        effectiveStokvel={{ name: 'Fixed Group', type: 'Fixed', contribution_amount: 500 }}
+        fixedPool={{ expected_payout_per_member: 9000 }}
+        payouts={[{ user_id: USER_A, target_month: '2026-01' }]}
+        ledgerMonths={['2026-01']}
+      />,
+    )
+
+    const janRow = within(getReportTable()).getByRole('row', { name: /2026-01/i })
+    expect(within(janRow).getAllByRole('cell')[4]).toHaveTextContent(/R\s?9[\s\u00a0]?000/)
   })
 
   it('shows empty-state copy when ledger months are missing', () => {
